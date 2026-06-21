@@ -6,3 +6,5 @@ networkx
 typer
 rich
 httpx
+cryptography
+cryptography
