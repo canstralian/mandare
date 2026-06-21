@@ -57,3 +57,8 @@ Reflexive Loop
 Governance Graph
   ↓
 Persistent Memory
+
+
+## License
+
+MIT. See `LICENSE`.
