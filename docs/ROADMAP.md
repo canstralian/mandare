@@ -39,7 +39,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 **Goal:** attach relevant history and policy context without making retrieval authoritative.
 
-- Introduce an Evidence Record schema.
+- Introduce an EvidenceRecord schema.
 - Add pluggable embedding and reranking adapters.
 - Build cited retrieval with source metadata.
 - Keep retrieval read-only in the initial runtime.
@@ -67,7 +67,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 **Goal:** publish a reproducible demonstration of RIF's governance thesis.
 
 - Deploy a Hugging Face Space with a Gradio interface.
-- Demonstrate intent evaluation, explainability, diagnosis, repair proposal, and evidence trails.
+- Demonstrate intent evaluation, explainability, Diagnosis, RepairProposal, and EvidenceRecord visualization.
 - Run without production credentials or privileged write tools.
 - Treat the Space as a demo boundary, not a production control plane.
 

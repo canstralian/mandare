@@ -72,7 +72,7 @@ Persistent Memory
 
 ### Target architecture
 
-The diagram below is the architecture the [roadmap](docs/ROADMAP.md) milestones build toward. Stages beyond Policy Engine — Capability Router, Adapter Layer, Execution, and Evidence Record — do not exist in the runtime yet; see the roadmap for sequencing.
+The diagram below is the architecture the [roadmap](docs/ROADMAP.md) milestones build toward. Stages beyond Policy Engine — Capability Router, Adapter Layer, Execution, and EvidenceRecord — do not exist in the runtime yet; see the roadmap for sequencing.
 
 ```text
 Agent / User
@@ -87,7 +87,7 @@ Adapter Layer
       ↓
 Execution
       ↓
-Evidence Record
+EvidenceRecord
       ↓
 Reflexive Review
       ↓

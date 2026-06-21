@@ -8,7 +8,7 @@ RIF Runtime is designed to govern intelligent action, not merely execute it. The
 
 RIF separates adaptation into three loops:
 
-1. **Self-healing** restores an expected operating state through bounded, reversible repair actions.
+1. **Reflexive healing** restores an expected operating state through bounded, reversible repair actions.
 2. **Learning** captures diagnosis, evidence, repair outcomes, and confidence for future retrieval.
 3. **Evolution** changes policies, adapters, workflows, or architecture only through explicit review and promotion controls.
 
