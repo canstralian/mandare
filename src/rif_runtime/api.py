@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
+from rif_runtime.agents.auditor import AuditorAgent
 
 runtime=RIFRuntime()
 app=FastAPI(title='RIF Runtime', version='0.1.0')
@@ -48,7 +49,6 @@ def telemetry_summary():
     return runtime.telemetry_summary()
 
 
-from rif_runtime.agents.auditor import AuditorAgent
 
 @app.get("/v1/audit")
 def audit():
