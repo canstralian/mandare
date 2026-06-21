@@ -1,0 +1,30 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: codeql-python
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: python
+          queries: security-extended,security-and-quality
+
+      - uses: github/codeql-action/analyze@v4
