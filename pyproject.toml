@@ -5,7 +5,7 @@ build-backend='setuptools.build_meta'
 [project]
 name='rif-runtime'
 version='0.1.0'
-dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx']
+dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
 
 [project.scripts]
 rif='rif_runtime.cli:app'
