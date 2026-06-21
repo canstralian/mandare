@@ -1,5 +1,13 @@
 # RIF Runtime MVP
 
+[![CI](https://github.com/canstralian/rif-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/canstralian/rif-runtime?label=release)](https://github.com/canstralian/rif-runtime/releases)
+[![Tag](https://img.shields.io/github/v/tag/canstralian/rif-runtime?label=tag)](https://github.com/canstralian/rif-runtime/tags)
+[![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](https://github.com/canstralian/rif-runtime/actions/workflows/ci.yml)
+[![Issues](https://img.shields.io/github/issues/canstralian/rif-runtime)](https://github.com/canstralian/rif-runtime/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/canstralian/rif-runtime)](https://github.com/canstralian/rif-runtime/commits/main)
+
+
 Run:
 
 ```bash
