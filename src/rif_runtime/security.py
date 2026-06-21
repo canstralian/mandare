@@ -29,38 +29,19 @@ def decode_bytes(value: str) -> bytes:
     return base64.urlsafe_b64decode(value.encode())
 
 
-def derive_fernet_key(
-    passphrase: str,
-    salt: bytes,
-    iterations: int = DEFAULT_PBKDF2_ITERATIONS,
-) -> bytes:
+def derive_fernet_key(passphrase: str, salt: bytes, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> bytes:
     raw = hashlib.pbkdf2_hmac("sha256", passphrase.encode(), salt, iterations, dklen=32)
     return base64.urlsafe_b64encode(raw)
 
 
-def encrypt_text(
-    plaintext: str,
-    passphrase: str,
-    salt: bytes | None = None,
-    iterations: int = DEFAULT_PBKDF2_ITERATIONS,
-) -> dict[str, str | int]:
+def encrypt_text(plaintext: str, passphrase: str, salt: bytes | None = None, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> dict[str, str | int]:
     actual_salt = salt or random_salt()
     key = derive_fernet_key(passphrase, actual_salt, iterations)
     ciphertext = Fernet(key).encrypt(plaintext.encode()).decode()
-    return {
-        "ciphertext": ciphertext,
-        "salt": encode_bytes(actual_salt),
-        "kdf": "pbkdf2_hmac_sha256",
-        "iterations": iterations,
-    }
+    return {"ciphertext": ciphertext, "salt": encode_bytes(actual_salt), "kdf": "pbkdf2_hmac_sha256", "iterations": iterations}
 
 
-def decrypt_text(
-    ciphertext: str,
-    passphrase: str,
-    salt_b64: str,
-    iterations: int = DEFAULT_PBKDF2_ITERATIONS,
-) -> str:
+def decrypt_text(ciphertext: str, passphrase: str, salt_b64: str, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> str:
     key = derive_fernet_key(passphrase, decode_bytes(salt_b64), iterations)
     try:
         return Fernet(key).decrypt(ciphertext.encode()).decode()
@@ -69,40 +50,26 @@ def decrypt_text(
 
 
 def decrypt_text_from_record(record: dict[str, str | int], passphrase: str) -> str:
-    return decrypt_text(
-        ciphertext=str(record["ciphertext"]),
-        passphrase=passphrase,
-        salt_b64=str(record["salt"]),
-        iterations=int(record["iterations"]),
-    )
+    return decrypt_text(str(record["ciphertext"]), passphrase, str(record["salt"]), int(record["iterations"]))
 
 
-def hash_secret(
-    secret: str,
-    salt: bytes | None = None,
-    iterations: int = DEFAULT_PBKDF2_ITERATIONS,
-) -> dict[str, str | int]:
+def hash_secret(secret: str, salt: bytes | None = None, iterations: int = DEFAULT_PBKDF2_ITERATIONS) -> dict[str, str | int]:
     actual_salt = salt or random_salt()
     digest = hashlib.pbkdf2_hmac("sha256", secret.encode(), actual_salt, iterations)
-    return {
-        "algorithm": "pbkdf2_hmac_sha256",
-        "iterations": iterations,
-        "salt": encode_bytes(actual_salt),
-        "digest": encode_bytes(digest),
-    }
+    return {"algorithm": "pbkdf2_hmac_sha256", "iterations": iterations, "salt": encode_bytes(actual_salt), "digest": encode_bytes(digest)}
 
 
 def verify_secret(secret: str, record: dict[str, str | int]) -> bool:
     salt = decode_bytes(str(record["salt"]))
     expected = str(record["digest"])
-    candidate = str(hash_secret(secret, salt=salt, iterations=int(record["iterations"]))["digest"])
-    return hmac.compare_digest(candidate, expected)
+    candidate = hash_secret(secret, salt=salt, iterations=int(record["iterations"]))["digest"]
+    return hmac.compare_digest(str(candidate), expected)
 
 
 def normalize_for_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): normalize_for_json(inner) for key, inner in value.items()}
-    if isinstance(value, list | tuple):
+    if isinstance(value, (list, tuple)):
         return [normalize_for_json(item) for item in value]
     if isinstance(value, datetime):
         return value.astimezone(timezone.utc).isoformat()
@@ -110,7 +77,7 @@ def normalize_for_json(value: Any) -> Any:
         return str(value)
     if isinstance(value, bytes):
         return encode_bytes(value)
-    if value is None or isinstance(value, str | int | float | bool):
+    if value is None or isinstance(value, (str, int, float, bool)):
         return value
     raise TypeError(f"unsupported canonical JSON type: {type(value).__name__}")
 
@@ -144,6 +111,6 @@ def redact_secrets(value: Any) -> Any:
             key: "[REDACTED]" if should_redact_key(str(key)) else redact_secrets(inner)
             for key, inner in value.items()
         }
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         return [redact_secrets(item) for item in value]
     return value
