@@ -156,6 +156,7 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 ## API surface (from `src/rif_runtime/api.py`)
 
 ```
+GET  /
 GET  /health
 GET  /v1/environments
 POST /v1/environment/{name}
