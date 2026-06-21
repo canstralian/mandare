@@ -30,9 +30,9 @@ def test_decision_explanation_captures_causal_path():
         },
     )
 
-    assert explanation.actor == "agent:test"
-    assert explanation.decision == Decision.deny
-    assert explanation.matched_rule == "network.host.denied"
+    assert explanation.request.actor == "agent:test"
+    assert explanation.decision.decision == Decision.deny
+    assert explanation.decision.matched_rule == "network.host.denied"
     assert explanation.precedence == ("posture", "mcp", "package", "network", "default")
     assert explanation.posture_before == Posture.normal
     assert explanation.posture_after == Posture.elevated
