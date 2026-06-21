@@ -9,3 +9,6 @@ build/
 *.egg-info/
 .env
 data/*.jsonl
+
+data/*.jsonl
+data/*.tmp

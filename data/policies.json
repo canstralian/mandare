@@ -1,0 +1,18 @@
+{
+  "rules": [
+    {
+      "action": "http.request",
+      "effect": "allow",
+      "id": "allow_known_model_hosts",
+      "reason": "known model API host",
+      "target": "api.anthropic.com"
+    },
+    {
+      "action": "*",
+      "effect": "deny",
+      "id": "deny_unknown_by_default",
+      "reason": "deny by default",
+      "target": "*"
+    }
+  ]
+}
