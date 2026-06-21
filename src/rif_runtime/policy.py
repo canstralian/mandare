@@ -15,8 +15,10 @@ def rule_matches(rule, req:PolicyRequest):
         return False
     if rule.target=='*':
         return True
-    target_value = host(req.target) if req.action in NETWORK_ACTIONS else req.target
-    return allowed(target_value, [rule.target])
+    is_network = req.action in NETWORK_ACTIONS
+    target_value = host(req.target) if is_network else req.target
+    rule_target = host(rule.target) if is_network else rule.target
+    return allowed(target_value, [rule_target])
 
 class PolicyEngine:
     def evaluate(self, req:PolicyRequest, env_name, profile, posture, policy_rules=()):
@@ -26,8 +28,7 @@ class PolicyEngine:
             if rule.action=='*' or rule.target=='*':
                 continue
             if rule_matches(rule, req):
-                decision = Decision(rule.effect)
-                return PolicyDecision(decision=decision, actor=req.actor, action=req.action, target=req.target, environment=env_name, posture=posture, reason=rule.reason, matched_rule=f'policy.{rule.id}')
+                return PolicyDecision(decision=rule.effect, actor=req.actor, action=req.action, target=req.target, environment=env_name, posture=posture, reason=rule.reason, matched_rule=f'policy.{rule.id}')
         if req.action=='package.install' and not profile.allow_package_manager_network_access:
             return self.deny(req, env_name, Posture.elevated, 'package manager egress disabled', 'package.egress.disabled')
         if req.action.startswith('mcp.') and not profile.allow_mcp_server_network_access:
