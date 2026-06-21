@@ -3,6 +3,7 @@ import uvicorn
 from rich import print
 
 from .runtime import RIFRuntime
+from .replay import ReplayEngine
 from .schemas import PolicyRequest
 
 app = typer.Typer()
@@ -25,3 +26,9 @@ def check(actor: str, action: str, target: str):
 
 if __name__ == "__main__":
     app()
+
+
+@app.command()
+def replay(decisions_path: str = "data/decisions.jsonl"):
+    state = ReplayEngine(decisions_path).recover()
+    print(state.__dict__)

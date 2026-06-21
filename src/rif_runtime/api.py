@@ -76,3 +76,8 @@ def reset_posture():
     from rif_runtime.schemas import Posture
     runtime.posture = Posture.normal
     return {"posture": runtime.posture.value}
+
+
+@app.get("/v1/recovered-state")
+def recovered_state():
+    return runtime.recovered_summary()
