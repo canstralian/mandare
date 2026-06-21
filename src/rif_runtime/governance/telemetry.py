@@ -2,6 +2,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 
+
 @dataclass
 class TelemetryStore:
     max_events: int = 1000

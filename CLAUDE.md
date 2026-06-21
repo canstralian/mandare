@@ -98,7 +98,9 @@ pytest -q
 ```
 
 Run all three before considering a change done — CI enforces all three on every
-push/PR and there is no separate formatting step (no black/isort configured).
+push/PR. `ruff format .` is also enforced (by `quality.yml`'s
+`ruff-mypy-pytest` job, separate from `ci.yml`); run it before committing so
+the repo stays uniformly formatted.
 
 Manual smoke test against a running server:
 
@@ -111,10 +113,10 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 
 - Python 3.12, Pydantic v2 models (`model_dump`, `model_validate`, `model_copy`)
   for everything that crosses an API boundary or gets persisted.
-- Existing source files use a dense style (no spaces around `=` in keyword
-  args in some modules, e.g. `policy.py`). Match the style of the file you're
-  editing rather than reformatting wholesale; ruff is the enforced linter, not
-  black.
+- The codebase is formatted with `ruff format .`; run it before committing.
+  Double quotes, spaced operators/keyword args, and trailing commas on
+  multi-line calls are the enforced style — don't hand-roll a denser style
+  even in modules that used to be terser (e.g. `policy.py`).
 - New persisted state goes through `JsonlStore` (append-only logs, e.g.
   decisions) or `JsonStore` (whole-file JSON with atomic temp-file replace,
   e.g. policies). Don't hand-roll file I/O elsewhere.

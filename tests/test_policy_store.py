@@ -25,10 +25,16 @@ def test_policy_store_upsert_and_delete(tmp_path):
 
 def test_custom_policy_rule_overrides_engine_default():
     profile = EnvironmentProfile(networking_type="open", allowed_hosts=[])
-    req = PolicyRequest(actor="agent:test", action="http.request", target="https://example.com")
+    req = PolicyRequest(
+        actor="agent:test", action="http.request", target="https://example.com"
+    )
 
-    rule = PolicyRule(id="block_example", effect="deny", action="http.request", target="example.com")
-    decision = PolicyEngine().evaluate(req, "RIF_Runtime", profile, Posture.normal, [rule])
+    rule = PolicyRule(
+        id="block_example", effect="deny", action="http.request", target="example.com"
+    )
+    decision = PolicyEngine().evaluate(
+        req, "RIF_Runtime", profile, Posture.normal, [rule]
+    )
 
     assert decision.decision == "deny"
     assert decision.matched_rule == "policy.block_example"
@@ -36,9 +42,16 @@ def test_custom_policy_rule_overrides_engine_default():
 
 def test_custom_allow_rule_overrides_network_denial():
     profile = EnvironmentProfile(networking_type="limited", allowed_hosts=[])
-    req = PolicyRequest(actor="agent:test", action="http.request", target="https://api.anthropic.com")
+    req = PolicyRequest(
+        actor="agent:test", action="http.request", target="https://api.anthropic.com"
+    )
 
-    rule = PolicyRule(id="allow_known_model_hosts", effect="allow", action="http.request", target="api.anthropic.com")
+    rule = PolicyRule(
+        id="allow_known_model_hosts",
+        effect="allow",
+        action="http.request",
+        target="api.anthropic.com",
+    )
     decision = PolicyEngine().evaluate(req, "RIF_CI", profile, Posture.normal, [rule])
 
     assert decision.decision == "allow"
@@ -47,10 +60,19 @@ def test_custom_allow_rule_overrides_network_denial():
 
 def test_custom_rule_matches_full_url_target():
     profile = EnvironmentProfile(networking_type="open", allowed_hosts=[])
-    req = PolicyRequest(actor="agent:test", action="http.request", target="https://example.com/path")
+    req = PolicyRequest(
+        actor="agent:test", action="http.request", target="https://example.com/path"
+    )
 
-    rule = PolicyRule(id="block_example", effect="deny", action="http.request", target="https://example.com")
-    decision = PolicyEngine().evaluate(req, "RIF_Runtime", profile, Posture.normal, [rule])
+    rule = PolicyRule(
+        id="block_example",
+        effect="deny",
+        action="http.request",
+        target="https://example.com",
+    )
+    decision = PolicyEngine().evaluate(
+        req, "RIF_Runtime", profile, Posture.normal, [rule]
+    )
 
     assert decision.decision == "deny"
     assert decision.matched_rule == "policy.block_example"
@@ -58,4 +80,6 @@ def test_custom_rule_matches_full_url_target():
 
 def test_policy_rule_rejects_invalid_effect():
     with pytest.raises(ValidationError):
-        PolicyRule(id="bad_rule", effect="alloww", action="http.request", target="example.com")
+        PolicyRule(
+            id="bad_rule", effect="alloww", action="http.request", target="example.com"
+        )
