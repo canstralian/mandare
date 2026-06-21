@@ -28,7 +28,7 @@ class DecisionExplanation(BaseModel):
         posture_before: Posture,
         posture_after: Posture,
         environment_snapshot: dict[str, Any],
-        precedence: tuple[str, ...] = ("posture", "mcp", "package", "network", "default"),
+        precedence: tuple[str, ...] = ("posture", "policy", "mcp", "package", "network", "default"),
     ) -> "DecisionExplanation":
         return cls(
             request=request,

@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
-from rif_runtime.configuration.policies import PolicyRule, PolicyStore
+from rif_runtime.configuration.policies import PolicyRule
 
 runtime=RIFRuntime()
 app=FastAPI(title='RIF Runtime', version='0.1.0')
@@ -84,21 +84,18 @@ def recovered_state():
     return runtime.recovered_summary()
 
 
-policy_store = PolicyStore()
-
-
 @app.get("/v1/policies")
 def list_policies():
-    return {"rules": [rule.model_dump() for rule in policy_store.list()]}
+    return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 
 @app.put("/v1/policies/{rule_id}")
 def upsert_policy(rule_id: str, rule: PolicyRule):
     if rule.id != rule_id:
         rule = rule.model_copy(update={"id": rule_id})
-    return policy_store.upsert(rule)
+    return runtime.policy_store.upsert(rule)
 
 
 @app.delete("/v1/policies/{rule_id}")
 def delete_policy(rule_id: str):
-    return {"deleted": policy_store.delete(rule_id)}
+    return {"deleted": runtime.policy_store.delete(rule_id)}

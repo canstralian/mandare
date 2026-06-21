@@ -128,13 +128,15 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 
 ## Gotchas / known inconsistencies
 
-- **PolicyStore is not wired into PolicyEngine.** `configuration/policies.py`
-  exposes a full CRUD API for declarative `PolicyRule`s (`/v1/policies`), and
-  `data/policies.json` seeds default rules, but `PolicyEngine.evaluate()` in
-  `policy.py` never reads from `PolicyStore` — it only consults the
-  `EnvironmentProfile` (allowed hosts, MCP/package-manager flags) and
-  `Posture`. If you're asked to make custom policy rules actually take effect,
-  this is the gap to close.
+- **PolicyStore rule matching is exact-match only.** `RIFRuntime` owns a
+  shared `PolicyStore` (`self.policy_store`) and passes its rules into
+  `PolicyEngine.evaluate()`. Only fully-specific rules (non-`"*"` `action`
+  and `target`) are consulted as overrides, checked right after the
+  `posture.locked` check and before the built-in package/MCP/network
+  constraints — see `policy.py:rule_matches`. Wildcard rules (like the
+  seeded `deny_unknown_by_default`) are intentionally skipped so they don't
+  blanket-deny everything; they're inert placeholders until rule precedence
+  for partial wildcards is designed.
 - **Docs lag the code.** `docs/API.md` lists `POST /v1/runtime/reset-posture`,
   but the actual route in `api.py` is `POST /v1/posture/reset`. `README.md`
   and `docs/RIF_RUNTIME_MVP.md` both describe the project with overlapping
