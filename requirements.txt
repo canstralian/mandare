@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+pyyaml
+networkx
+typer
+rich
+httpx

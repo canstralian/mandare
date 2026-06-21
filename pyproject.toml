@@ -1,0 +1,14 @@
+[build-system]
+requires=['setuptools']
+build-backend='setuptools.build_meta'
+
+[project]
+name='rif-runtime'
+version='0.1.0'
+dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx']
+
+[project.scripts]
+rif='rif_runtime.cli:app'
+
+[tool.setuptools.packages.find]
+where=['src']

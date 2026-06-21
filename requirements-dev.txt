@@ -1,0 +1,5 @@
+pytest
+httpx
+ruff
+mypy
+types-PyYAML
