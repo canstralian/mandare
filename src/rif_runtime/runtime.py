@@ -1,9 +1,15 @@
+from hashlib import sha256
+from uuid import uuid4
+
 from .config import load_config
 from .policy import PolicyEngine
-from .schemas import PolicyRequest, Posture
+from .schemas import GovernanceArtifact, PolicyRequest, Posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
 from .storage.jsonl import JsonlStore
+from .model_layer import LocalModelError
+from .model_router import ModelRouter
+
 
 class RIFRuntime:
     def __init__(self):
@@ -40,6 +46,44 @@ class RIFRuntime:
             })
         return decision
 
+    def evaluate_with_models(self, req: PolicyRequest, request_text: str, router: ModelRouter | None = None) -> GovernanceArtifact:
+        """Attach untrusted model advice without delegating authorization to a model."""
+        router = router or ModelRouter()
+        intent = None
+        try:
+            intent = router.classify(request_text)
+        except LocalModelError:
+            pass
+
+        decision = self.evaluate(req)
+        route = router.route(intent)
+        reasoning = None
+        if decision.decision.value == "allow" and route.uses_deep_reasoner:
+            try:
+                reasoning = router.reason(request_text, [decision.reason])
+            except LocalModelError:
+                pass
+
+        summary = router.summarise(
+            f"policy={decision.model_dump(mode='json')} intent={intent.model_dump() if intent else None} "
+            f"reasoning={reasoning.model_dump() if reasoning else None}"
+        )
+        return GovernanceArtifact(
+            request_id=str(uuid4()),
+            input_hash=sha256(request_text.encode()).hexdigest(),
+            intent=intent,
+            policy_decision=decision,
+            model_route=route,
+            deep_reasoning=reasoning,
+            final_summary=summary,
+            replay_metadata={
+                "runtime_version": "rif-runtime-v0.3",
+                "environment": self.environment_name,
+                "posture_after_decision": self.posture.value,
+                "models": route.stages,
+            },
+        )
+
     def graph_summary(self):
         return self.governance_graph.summary()
 
@@ -48,7 +92,6 @@ class RIFRuntime:
             "recent_denials_60m": self.reflexive.telemetry.denial_count(minutes=60),
             "event_count": len(self.reflexive.telemetry.events),
         }
-
 
     def persisted_summary(self):
         return {
