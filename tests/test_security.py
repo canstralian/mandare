@@ -13,7 +13,9 @@ from rif_runtime.security import (
 
 def test_encrypt_decrypt_roundtrip():
     record = encrypt_text("classified", "correct horse battery staple")
-    assert decrypt_text_from_record(record, "correct horse battery staple") == "classified"
+    assert (
+        decrypt_text_from_record(record, "correct horse battery staple") == "classified"
+    )
 
 
 def test_wrong_passphrase_fails_decryption():

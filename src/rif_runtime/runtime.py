@@ -4,6 +4,8 @@ from .schemas import PolicyRequest, Posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
 from .storage.jsonl import JsonlStore
+from .configuration.policies import PolicyStore
+
 
 class RIFRuntime:
     def __init__(self):
@@ -11,6 +13,7 @@ class RIFRuntime:
         self.environment_name = self.config.default_environment
         self.posture = Posture.normal
         self.policy = PolicyEngine()
+        self.policy_store = PolicyStore()
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
         self.decisions_store = JsonlStore("data/decisions.jsonl")
@@ -26,7 +29,13 @@ class RIFRuntime:
         self.environment_name = name
 
     def evaluate(self, req: PolicyRequest):
-        decision = self.policy.evaluate(req, self.environment_name, self.profile, self.posture)
+        decision = self.policy.evaluate(
+            req,
+            self.environment_name,
+            self.profile,
+            self.posture,
+            self.policy_store.list(),
+        )
         self.governance_graph.record_decision(decision)
         old_posture = self.posture
         self.posture = self.reflexive.observe(decision, self.posture)
@@ -34,10 +43,9 @@ class RIFRuntime:
         self.decisions_store.append(decision.model_dump())
 
         if old_posture != self.posture:
-            self.posture_store.append({
-                "old_posture": str(old_posture),
-                "new_posture": str(self.posture)
-            })
+            self.posture_store.append(
+                {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+            )
         return decision
 
     def graph_summary(self):
@@ -48,7 +56,6 @@ class RIFRuntime:
             "recent_denials_60m": self.reflexive.telemetry.denial_count(minutes=60),
             "event_count": len(self.reflexive.telemetry.events),
         }
-
 
     def persisted_summary(self):
         return {
@@ -61,7 +68,9 @@ class RIFRuntime:
     def audit_summary(self):
         return {
             "environment": self.environment_name,
-            "posture": self.posture.value if hasattr(self.posture, "value") else self.posture,
+            "posture": self.posture.value
+            if hasattr(self.posture, "value")
+            else self.posture,
             "live": {
                 "graph": self.graph_summary(),
                 "telemetry": self.telemetry_summary(),

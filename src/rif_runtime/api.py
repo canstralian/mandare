@@ -2,42 +2,55 @@ from fastapi import FastAPI, HTTPException
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
-from rif_runtime.configuration.policies import PolicyRule, PolicyStore
+from rif_runtime.configuration.policies import PolicyRule
 
-runtime=RIFRuntime()
-app=FastAPI(title='RIF Runtime', version='0.1.0')
+runtime = RIFRuntime()
+app = FastAPI(title="RIF Runtime", version="0.1.0")
 
-@app.get('/health')
+
+@app.get("/health")
 def health():
-    return {'status':'ok','environment':runtime.environment_name,'posture':runtime.posture}
+    return {
+        "status": "ok",
+        "environment": runtime.environment_name,
+        "posture": runtime.posture,
+    }
 
-@app.get('/v1/environments')
+
+@app.get("/v1/environments")
 def environments():
-    return {'current':runtime.environment_name,'environments':runtime.config.environments}
+    return {
+        "current": runtime.environment_name,
+        "environments": runtime.config.environments,
+    }
 
-@app.post('/v1/environment/{name}')
-def set_environment(name:str):
+
+@app.post("/v1/environment/{name}")
+def set_environment(name: str):
     try:
         runtime.set_environment(name)
-        return {'current':runtime.environment_name}
+        return {"current": runtime.environment_name}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@app.post('/v1/policy/evaluate')
-def evaluate(req:PolicyRequest):
+
+@app.post("/v1/policy/evaluate")
+def evaluate(req: PolicyRequest):
     return runtime.evaluate(req)
 
-@app.post('/v1/posture/{posture}')
-def posture(posture:Posture):
-    runtime.posture=posture
-    return {'posture':runtime.posture}
+
+@app.post("/v1/posture/{posture}")
+def posture(posture: Posture):
+    runtime.posture = posture
+    return {"posture": runtime.posture}
+
 
 @app.get("/")
 def root():
     return {
         "name": "RIF Runtime",
         "status": "online",
-        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate"]
+        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate"],
     }
 
 
@@ -45,24 +58,26 @@ def root():
 def graph_summary():
     return runtime.graph_summary()
 
+
 @app.get("/v1/telemetry/summary")
 def telemetry_summary():
     return runtime.telemetry_summary()
-
 
 
 @app.get("/v1/audit")
 def audit():
     return AuditorAgent().audit(runtime)
 
+
 @app.post("/v1/mcp/invoke")
 def mcp_invoke(payload: dict):
     from rif_runtime.schemas import PolicyRequest
+
     req = PolicyRequest(
-        actor=payload.get("actor","agent:mcp"),
+        actor=payload.get("actor", "agent:mcp"),
         action="mcp.invoke",
-        target=payload.get("target","unknown"),
-        reason=payload.get("reason")
+        target=payload.get("target", "unknown"),
+        reason=payload.get("reason"),
     )
     return runtime.evaluate(req)
 
@@ -75,6 +90,7 @@ def persistence_summary():
 @app.post("/v1/posture/reset")
 def reset_posture():
     from rif_runtime.schemas import Posture
+
     runtime.posture = Posture.normal
     return {"posture": runtime.posture.value}
 
@@ -84,21 +100,18 @@ def recovered_state():
     return runtime.recovered_summary()
 
 
-policy_store = PolicyStore()
-
-
 @app.get("/v1/policies")
 def list_policies():
-    return {"rules": [rule.model_dump() for rule in policy_store.list()]}
+    return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 
 @app.put("/v1/policies/{rule_id}")
 def upsert_policy(rule_id: str, rule: PolicyRule):
     if rule.id != rule_id:
         rule = rule.model_copy(update={"id": rule_id})
-    return policy_store.upsert(rule)
+    return runtime.policy_store.upsert(rule)
 
 
 @app.delete("/v1/policies/{rule_id}")
 def delete_policy(rule_id: str):
-    return {"deleted": policy_store.delete(rule_id)}
+    return {"deleted": runtime.policy_store.delete(rule_id)}
