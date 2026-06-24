@@ -9,7 +9,7 @@ from .prompts import JSON_SCHEMA, SYSTEM_PROMPT
 
 _SECRET_PATTERNS = (
     re.compile(r"(?:s" + "k)-[A-Za-z0-9_-]{12,}"),
-    re.compile(r"(?:api[_-]?key|token|secret)\\s*[:=]\\s*[^\\s,;]+", re.IGNORECASE),
+    re.compile(r"(?:api[_-]?key|token|secret)\s*[:=]\s*[^\s,;]+", re.IGNORECASE),
 )
 
 
