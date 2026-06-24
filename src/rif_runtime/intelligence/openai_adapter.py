@@ -32,14 +32,22 @@ def generate_structured(payload: dict[str, Any]) -> tuple[dict[str, Any] | None,
     try:
         from openai import OpenAI
         client = OpenAI(api_key=api_key, timeout=10.0, max_retries=0)
-        response = client.responses.create(
-            model=os.getenv("RIF_OPENAI_MODEL", "gpt-5-mini"),
-            input=[
+        response = client.chat.completions.create(
+            model=os.getenv("RIF_OPENAI_MODEL", "gpt-4o-mini"),
+            messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(redact_secrets(payload), sort_keys=True)},
             ],
-            text={"format": {"type": "json_schema", "name": JSON_SCHEMA["name"], "strict": True, "schema": JSON_SCHEMA["schema"]}},
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": JSON_SCHEMA["name"],
+                    "strict": True,
+                    "schema": JSON_SCHEMA["schema"]
+                }
+            },
         )
-        return json.loads(response.output_text), getattr(response, "model", None)
+        content = response.choices[0].message.content
+        return json.loads(content) if content else None, response.model
     except Exception:
         return None, None
