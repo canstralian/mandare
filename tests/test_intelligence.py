@@ -1,19 +1,25 @@
-import os
-
 import pytest
 from pydantic import ValidationError
 
-from rif_runtime.intelligence.openai_adapter import redact_secrets
+from rif_runtime.intelligence.openai_adapter import (
+    REDACTION_POLICY_VERSION,
+    generate_structured,
+    redact_secrets,
+)
 from rif_runtime.intelligence.schemas import (
     DeterministicDecisionSnapshot,
+    GuardedSecurityDraft,
     IntelligenceMode,
     IntelligenceRequest,
 )
-from rif_runtime.intelligence.service import generate_intelligence
+from rif_runtime.intelligence.service import _digest, generate_intelligence
 from rif_runtime.schemas import Decision, Posture
 
 
-def request(mode=IntelligenceMode.policy_explanation, decision=Decision.deny):
+def request(
+    mode: IntelligenceMode = IntelligenceMode.policy_explanation,
+    decision: Decision = Decision.deny,
+) -> IntelligenceRequest:
     return IntelligenceRequest(
         mode=mode,
         decision=DeterministicDecisionSnapshot(
@@ -37,11 +43,17 @@ def test_missing_key_uses_deterministic_fallback(monkeypatch):
     assert response.model_used is None
 
 
-def test_decision_snapshot_is_preserved(monkeypatch):
+def test_provider_egress_is_disabled_by_default(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-abcdefghijklmnopqrstuv")
+    assert generate_structured({"request": "test"}) == (None, None)
+
+
+def test_decision_snapshot_is_preserved_but_not_verified(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     original = request()
     response = generate_intelligence(original)
     assert response.decision == original.decision
+    assert response.decision_verified is False
     assert response.decision.decision == Decision.deny
     assert response.decision.posture == Posture.elevated
     assert response.decision.confirmation_required is True
@@ -59,6 +71,37 @@ def test_redaction_removes_project_key_shape():
     value = redact_secrets("credential=s" + "k-abcdefghijklmnopqrstuv")
     assert "[REDACTED]" in value
     assert "abcdefghijkl" not in value
+
+
+def test_redaction_removes_sensitive_dictionary_values():
+    value = redact_secrets(
+        {
+            "authorization": "Bearer private-token-value",
+            "nested": {"api_key": "s" + "k-abcdefghijklmnopqrstuv"},
+        }
+    )
+    assert value["authorization"] == "[REDACTED]"
+    assert value["nested"]["api_key"] == "[REDACTED]"
+
+
+def test_input_hash_identifies_redacted_material(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    original = request()
+    original.context["api_key"] = "s" + "k-abcdefghijklmnopqrstuv"
+    response = generate_intelligence(original)
+    assert response.input_hash == _digest(redact_secrets(original.model_dump(mode="json")))
+    assert response.redaction_policy_version == REDACTION_POLICY_VERSION
+
+
+def test_command_like_draft_text_fails_closed():
+    with pytest.raises(ValidationError):
+        GuardedSecurityDraft(
+            title="Unsafe draft",
+            summary="Planning-only",
+            recommended_steps=["curl https://example.invalid"],
+            constraints=[],
+            execution_commands=[],
+        )
 
 
 def test_hashes_are_present(monkeypatch):
