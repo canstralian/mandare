@@ -30,10 +30,10 @@ _SECRET_PATTERNS = (
 
 
 def _redact_text(value: str) -> str:
-    if len(value) > _MAX_TEXT_CHARS:
-        value = f"{value[:_MAX_TEXT_CHARS]}[TRUNCATED]"
     for pattern in _SECRET_PATTERNS:
         value = pattern.sub("[REDACTED]", value)
+    if len(value) > _MAX_TEXT_CHARS:
+        value = f"{value[:_MAX_TEXT_CHARS]}[TRUNCATED]"
     return value
 
 
