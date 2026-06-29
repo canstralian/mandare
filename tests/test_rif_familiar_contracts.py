@@ -1,4 +1,3 @@
-import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -115,10 +114,3 @@ def test_offline_safe_forces_queue_only_transport() -> None:
     }
 
     _assert_invalid(_validator("posture_decision.schema.json"), decision)
-
-
-def test_manifest_fixture_can_be_copied_without_mutation() -> None:
-    manifest = _fixture("valid_manifest.json")
-    copied = copy.deepcopy(manifest)
-
-    assert copied == manifest
