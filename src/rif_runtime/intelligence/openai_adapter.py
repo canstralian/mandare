@@ -32,7 +32,7 @@ def generate_structured(payload: dict[str, Any]) -> tuple[dict[str, Any] | None,
     try:
         from openai import OpenAI
         client = OpenAI(api_key=api_key, timeout=10.0, max_retries=0)
-        response = client.chat.completions.create(
+        response = client.chat.completions.create(  # type: ignore[call-overload]
             model=os.getenv("RIF_OPENAI_MODEL", "gpt-4o-mini"),
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
