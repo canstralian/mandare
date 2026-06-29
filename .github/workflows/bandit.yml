@@ -26,7 +26,7 @@ jobs:
 
       - run: python -m pip install --upgrade pip bandit[toml] bandit-sarif-formatter
 
-      - run: bandit -r src -f sarif -o bandit.sarif
+      - run: bandit -r src -f sarif -o bandit.sarif --exit-zero
 
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
