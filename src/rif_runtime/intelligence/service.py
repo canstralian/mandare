@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import Any, Literal
 
 from .openai_adapter import generate_structured
 from .schemas import GuardedSecurityDraft, IntelligenceRequest, IntelligenceResponse
@@ -38,6 +38,7 @@ def generate_intelligence(request: IntelligenceRequest) -> IntelligenceResponse:
     input_payload = request.model_dump(mode="json")
     input_hash = _digest(input_payload)
     raw, model_used = generate_structured(input_payload)
+    source: Literal["llm_assisted", "deterministic_fallback"]
     if raw is None:
         interpretation, warnings, draft = _fallback(request)
         source = "deterministic_fallback"
