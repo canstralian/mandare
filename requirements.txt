@@ -7,4 +7,4 @@ typer
 rich
 httpx
 cryptography
-cryptography
+openai

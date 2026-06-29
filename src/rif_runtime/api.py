@@ -3,9 +3,11 @@ from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
+from rif_runtime.intelligence.routes import router as intelligence_router
 
 runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")
+app.include_router(intelligence_router)
 
 
 @app.get("/health")
@@ -50,7 +52,7 @@ def root():
     return {
         "name": "RIF Runtime",
         "status": "online",
-        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate"],
+        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate", "/v1/intelligence/generate"],
     }
 
 
