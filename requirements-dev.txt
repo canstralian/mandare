@@ -3,3 +3,4 @@ httpx
 ruff
 mypy
 types-PyYAML
+jsonschema
