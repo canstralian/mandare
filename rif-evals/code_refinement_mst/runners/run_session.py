@@ -111,7 +111,7 @@ def run_session(
 
         if gate_decision.decision == Decision.deny:
             state_hash_after = state_hash_before
-            tests_passed = False
+            tests_passed = None
             verification_status = "blocked"
             policy_decision = gate_decision.decision
         else:
@@ -139,8 +139,8 @@ def run_session(
                 )
                 policy_decision = verification_decision.decision
 
-        regression_detected = still_correct and not tests_passed
-        still_correct = still_correct and tests_passed
+        regression_detected = still_correct and (tests_passed is False)
+        still_correct = still_correct and (tests_passed is not False)
 
         events.append(
             {
@@ -157,7 +157,7 @@ def run_session(
             }
         )
 
-    turn_results = [bool(event["tests_passed"]) for event in events]
+    turn_results = [event["tests_passed"] for event in events]
     score = score_session(task_id, turn_results)
 
     result = {

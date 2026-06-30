@@ -59,9 +59,7 @@ def run_in_sandbox(
             return SandboxResult(
                 passed=False,
                 exit_code=-1,
-                stdout=(error.stdout or b"").decode()
-                if isinstance(error.stdout, bytes)
-                else (error.stdout or ""),
+                stdout=error.stdout or "",
                 stderr=f"sandbox execution timed out after {timeout}s",
                 timed_out=True,
             )

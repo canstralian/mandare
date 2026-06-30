@@ -15,12 +15,13 @@ class SessionScore:
     mst_score: int
 
 
-def score_session(task_id: str, turn_results: list[bool]) -> SessionScore:
+def score_session(task_id: str, turn_results: list[bool | None]) -> SessionScore:
     """Score one session from its per-turn pass/fail outcomes.
 
     turn_results:
       True  = tests passed after this turn
       False = regression detected after this turn
+      None  = turn was blocked by policy; tests were not run
 
     Every turn in `turn_results` was actually attempted, regardless of
     earlier failures — MST is computed post-hoc from the full trace.
@@ -28,7 +29,7 @@ def score_session(task_id: str, turn_results: list[bool]) -> SessionScore:
     first_failure = None
 
     for index, passed in enumerate(turn_results, start=1):
-        if not passed:
+        if passed is False:
             first_failure = index
             break
 
