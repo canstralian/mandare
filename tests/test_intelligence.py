@@ -89,7 +89,9 @@ def test_input_hash_identifies_redacted_material(monkeypatch):
     original = request()
     original.context["api_key"] = "s" + "k-abcdefghijklmnopqrstuv"
     response = generate_intelligence(original)
-    assert response.input_hash == _digest(redact_secrets(original.model_dump(mode="json")))
+    assert response.input_hash == _digest(
+        redact_secrets(original.model_dump(mode="json"))
+    )
     assert response.redaction_policy_version == REDACTION_POLICY_VERSION
 
 

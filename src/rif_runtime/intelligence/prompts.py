@@ -24,7 +24,10 @@ JSON_SCHEMA = {
                     "summary": {"type": "string"},
                     "recommended_steps": {"type": "array", "items": {"type": "string"}},
                     "constraints": {"type": "array", "items": {"type": "string"}},
-                    "execution_commands": {"type": "array", "items": {"type": "string"}},
+                    "execution_commands": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
                 },
                 "required": [
                     "title",

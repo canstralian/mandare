@@ -6,12 +6,18 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from .openai_adapter import REDACTION_POLICY_VERSION, generate_structured, redact_secrets
+from .openai_adapter import (
+    REDACTION_POLICY_VERSION,
+    generate_structured,
+    redact_secrets,
+)
 from .schemas import GuardedSecurityDraft, IntelligenceRequest, IntelligenceResponse
 
 
 def _digest(value: Any) -> str:
-    encoded = json.dumps(value, sort_keys=True, default=str, separators=(",", ":")).encode()
+    encoded = json.dumps(
+        value, sort_keys=True, default=str, separators=(",", ":")
+    ).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
