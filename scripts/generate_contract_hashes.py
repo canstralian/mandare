@@ -24,10 +24,7 @@ def sha256_file(path: Path) -> str:
 def main() -> None:
     receipt = {
         "receipt_version": "rif-familiar.contract-hashes/v0.1",
-        "artifacts": {
-            name: sha256_file(CONTRACTS / name)
-            for name in SCHEMA_NAMES
-        },
+        "artifacts": {name: sha256_file(CONTRACTS / name) for name in SCHEMA_NAMES},
     }
     print(json.dumps(receipt, indent=2, sort_keys=True))
 
