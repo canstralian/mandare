@@ -38,7 +38,7 @@ cleanly:
 python -m uvicorn rif_runtime.api:app --host 127.0.0.1 --port 8000 > /tmp/rif.log 2>&1 &
 PID=$!
 
-for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && break; sleep 0.5; done
+for i in {1..30}; do curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && break; sleep 0.5; done
 curl -sf http://127.0.0.1:8000/health; echo
 ```
 
