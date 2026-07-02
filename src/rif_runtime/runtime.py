@@ -1,3 +1,5 @@
+import threading
+
 from .config import load_config
 from .policy import PolicyEngine
 from .schemas import PolicyRequest, Posture
@@ -28,6 +30,7 @@ class RIFRuntime:
         self.posture_store = JsonlStore("data/posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore("data/metasploit_evidence.jsonl")
+        self._lock = threading.Lock()
 
     @property
     def profile(self):
@@ -64,28 +67,31 @@ class RIFRuntime:
         mode: GovernanceMode = GovernanceMode.read_only_firewall,
         token: CapabilityToken | None = None,
     ) -> GovernanceOutcome:
-        outcome = self.metasploit.evaluate(
-            intent,
-            mode=mode,
-            env_name=self.environment_name,
-            posture=self.posture,
-            token=token,
-        )
-        decision = outcome.decision
-        self.governance_graph.record_decision(decision)
-        old_posture = self.posture
-        self.posture = self.reflexive.observe(decision, self.posture)
-        if outcome.severe:
-            self.posture = escalate_posture(self.posture)
-
-        self.decisions_store.append(decision.model_dump())
-        self.evidence_store.append(outcome.evidence.model_dump())
-
-        if old_posture != self.posture:
-            self.posture_store.append(
-                {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+        # Serialise the read-modify-write of posture and the JSONL appends:
+        # the API shares one RIFRuntime across FastAPI's sync threadpool.
+        with self._lock:
+            outcome = self.metasploit.evaluate(
+                intent,
+                mode=mode,
+                env_name=self.environment_name,
+                posture=self.posture,
+                token=token,
             )
-        return outcome
+            decision = outcome.decision
+            self.governance_graph.record_decision(decision)
+            old_posture = self.posture
+            self.posture = self.reflexive.observe(decision, self.posture)
+            if outcome.severe:
+                self.posture = escalate_posture(self.posture)
+
+            self.decisions_store.append(decision.model_dump())
+            self.evidence_store.append(outcome.evidence.model_dump())
+
+            if old_posture != self.posture:
+                self.posture_store.append(
+                    {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                )
+            return outcome
 
     def graph_summary(self):
         return self.governance_graph.summary()

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import ValidationError
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
@@ -95,13 +96,18 @@ def metasploit_capabilities():
 
 @app.post("/v1/mcp/metasploit/evaluate")
 def metasploit_evaluate(payload: dict):
-    intent = MetasploitIntent.model_validate(payload.get("intent", payload))
-    mode = GovernanceMode(payload.get("mode", GovernanceMode.read_only_firewall.value))
-    token = (
-        CapabilityToken.model_validate(payload["token"])
-        if payload.get("token")
-        else None
-    )
+    try:
+        intent = MetasploitIntent.model_validate(payload.get("intent", payload))
+        mode = GovernanceMode(
+            payload.get("mode", GovernanceMode.read_only_firewall.value)
+        )
+        token = (
+            CapabilityToken.model_validate(payload["token"])
+            if payload.get("token")
+            else None
+        )
+    except (ValidationError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
     outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token)
     return {
         "decision": outcome.decision,
@@ -114,13 +120,18 @@ def metasploit_evaluate(payload: dict):
 
 @app.post("/v1/mcp/metasploit/token")
 def metasploit_token(payload: dict):
-    intent = MetasploitIntent.model_validate(payload["intent"])
-    token = runtime.metasploit.mint_token(
+    if "intent" not in payload:
+        raise HTTPException(status_code=422, detail="missing 'intent' in payload")
+    try:
+        intent = MetasploitIntent.model_validate(payload["intent"])
+        ttl_seconds = int(payload.get("ttl_seconds", 600))
+    except (ValidationError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return runtime.metasploit.mint_token(
         intent,
         approver=payload.get("approver", "human:operator"),
-        ttl_seconds=int(payload.get("ttl_seconds", 600)),
+        ttl_seconds=ttl_seconds,
     )
-    return token
 
 
 @app.get("/v1/persistence/summary")

@@ -28,7 +28,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..schemas import Decision, PolicyDecision, Posture
 from ..security import hmac_signature, sha256_digest
@@ -128,6 +128,16 @@ class CapabilityToken(BaseModel):
     expires_at: datetime
     signature: str = ""
 
+    @field_validator("issued_at", "expires_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, value: datetime) -> datetime:
+        # A token deserialised from a naive ISO string would otherwise raise a
+        # TypeError when compared against the timezone-aware ``now`` in the
+        # broker, and would sign inconsistently across environments.
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
     def signing_payload(self) -> dict[str, Any]:
         return {
             "token_id": self.token_id,
@@ -136,8 +146,8 @@ class CapabilityToken(BaseModel):
             "scope_id": self.scope_id,
             "intent_hash": self.intent_hash,
             "approver": self.approver,
-            "issued_at": self.issued_at,
-            "expires_at": self.expires_at,
+            "issued_at": self.issued_at.isoformat(),
+            "expires_at": self.expires_at.isoformat(),
         }
 
 
@@ -164,14 +174,22 @@ class GovernanceOutcome:
     simulated: bool
 
 
-def _string_params(params: dict[str, Any]) -> list[str]:
-    values: list[str] = []
-    for value in params.values():
-        if isinstance(value, str):
-            values.append(value)
-        elif isinstance(value, (list, tuple)):
-            values.extend(str(item) for item in value if isinstance(item, str))
-    return values
+def _string_params(value: Any) -> list[str]:
+    # Recurse through nested containers so a string buried in a sub-dict or
+    # list cannot smuggle an injected instruction past the scanner.
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        collected: list[str] = []
+        for inner in value.values():
+            collected.extend(_string_params(inner))
+        return collected
+    if isinstance(value, (list, tuple, set)):
+        collected = []
+        for item in value:
+            collected.extend(_string_params(item))
+        return collected
+    return []
 
 
 def scan_for_injection(*texts: str | None) -> list[str]:

@@ -60,6 +60,19 @@ def test_token_mint_then_broker_allow_route():
     assert body["decision"]["matched_rule"] == "msf.broker.authorized"
 
 
+def test_evaluate_route_rejects_invalid_payload_with_422():
+    r = client.post(
+        "/v1/mcp/metasploit/evaluate",
+        json={"intent": {"capability": "module.search"}},  # missing target
+    )
+    assert r.status_code == 422
+
+
+def test_token_route_rejects_missing_intent_with_422():
+    r = client.post("/v1/mcp/metasploit/token", json={"approver": "human:alice"})
+    assert r.status_code == 422
+
+
 def test_runtime_severe_denial_escalates_posture():
     runtime = RIFRuntime()
     runtime.posture = Posture.normal
