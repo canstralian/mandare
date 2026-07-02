@@ -161,5 +161,5 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 
 ```
 GET  /
-GET  /\nGET  /health\nGET  /v1/environments\nPOST /v1/environment/{name}\nPOST /v1/policy/evaluate\nPOST /v1/posture/{posture}\nPOST /v1/posture/reset\nGET  /v1/graph/summary\nGET  /v1/telemetry/summary\nGET  /v1/persistence/summary\nGET  /v1/recovered-state\nGET  /v1/audit\nPOST /v1/mcp/invoke\nGET  /v1/policies\nPUT  /v1/policies/{rule_id}\nDELETE /v1/policies/{rule_id}
+GET  /\nGET  /health\nGET  /v1/environments\nPOST /v1/environment/{name}\nPOST /v1/policy/evaluate\nPOST /v1/posture/{posture}\nPOST /v1/posture/reset\nGET  /v1/graph/summary\nGET  /v1/telemetry/summary\nGET  /v1/persistence/summary\nGET  /v1/recovered-state\nGET  /v1/audit\nPOST /v1/mcp/invoke\nGET  /v1/mcp/metasploit/capabilities\nPOST /v1/mcp/metasploit/evaluate\nPOST /v1/mcp/metasploit/token\nGET  /v1/policies\nPUT  /v1/policies/{rule_id}\nDELETE /v1/policies/{rule_id}
 ```
