@@ -5,6 +5,7 @@ from rich import print
 from .runtime import RIFRuntime
 from .replay import ReplayEngine
 from .schemas import PolicyRequest
+from .mcp.metasploit import GovernanceMode, MetasploitIntent
 
 app = typer.Typer()
 
@@ -32,3 +33,20 @@ if __name__ == "__main__":
 def replay(decisions_path: str = "data/decisions.jsonl"):
     state = ReplayEngine(decisions_path).recover()
     print(state.__dict__)
+
+
+@app.command("msf-check")
+def msf_check(
+    capability: str,
+    target: str,
+    mode: str = "read_only_firewall",
+    actor: str = "agent:metasploit",
+    scope_id: str = "unscoped",
+):
+    r = RIFRuntime()
+    intent = MetasploitIntent(
+        actor=actor, capability=capability, target=target, scope_id=scope_id
+    )
+    outcome = r.evaluate_metasploit(intent, mode=GovernanceMode(mode))
+    print(outcome.decision.model_dump_json(indent=2))
+    print(outcome.evidence.model_dump_json(indent=2))
