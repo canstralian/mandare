@@ -52,7 +52,13 @@ def root():
     return {
         "name": "RIF Runtime",
         "status": "online",
-        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate", "/v1/intelligence/generate"],
+        "routes": [
+            "/health",
+            "/docs",
+            "/v1/environments",
+            "/v1/policy/evaluate",
+            "/v1/intelligence/generate",
+        ],
     }
 
 
