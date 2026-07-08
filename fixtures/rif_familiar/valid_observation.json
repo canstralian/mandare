@@ -1,0 +1,36 @@
+{
+  "schema_version": "rif-familiar.observation-event/v0.1",
+  "event_id": "obs_01JABCDEF0123456789",
+  "emitted_at": "2026-06-30T08:12:00Z",
+  "device_id": "rif-familiar-001",
+  "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sequence": 42,
+  "collection_mode": "passive_aggregate",
+  "wireless_summary": {
+    "wifi_network_count": 14,
+    "wifi_channels": [1, 6, 11, 36],
+    "ble_device_count": 6
+  },
+  "device_health": {
+    "battery_percent": 83,
+    "temperature_c": 38.2,
+    "uptime_seconds": 911,
+    "storage_queue_depth": 0
+  },
+  "privacy": {
+    "classification": "aggregate_redacted",
+    "raw_identifier_retention": false,
+    "prohibited_fields": [
+      "ssid",
+      "bssid",
+      "mac_address",
+      "device_name",
+      "manufacturer_data",
+      "packet_payload"
+    ]
+  },
+  "integrity": {
+    "previous_event_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "payload_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}

@@ -1,5 +1,6 @@
 from rif_runtime.schemas import PolicyRequest
 
+
 class OrchestratorAgent:
     name = "agent:orchestrator"
 

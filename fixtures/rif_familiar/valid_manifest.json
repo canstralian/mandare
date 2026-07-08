@@ -1,0 +1,36 @@
+{
+  "schema_version": "rif-familiar.capability-manifest/v0.1",
+  "manifest_id": "rfm_rif-familiar-v01",
+  "device": {
+    "device_id": "rif-familiar-001",
+    "hardware_platform": "esp32-c5",
+    "firmware_version": "0.1.0",
+    "identity_key_id": "kid_device001a"
+  },
+  "capabilities": {
+    "wifi_observation": "allow",
+    "ble_observation": "allow",
+    "local_relay_transport": "allow",
+    "active_rf_transmission": "deny",
+    "ir_transmit": "deny",
+    "usb_hid": "deny",
+    "packet_injection": "deny",
+    "command_execution": "deny",
+    "cloud_egress": "deny"
+  },
+  "relay_policy": {
+    "hostname": "rif-edge.local",
+    "port": 8443,
+    "tls_required": true,
+    "relay_key_id": "kid_relay001a"
+  },
+  "budgets": {
+    "max_observations_per_minute": 30,
+    "offline_event_buffer": 500,
+    "max_payload_bytes": 4096
+  },
+  "integrity": {
+    "canonicalization": "RFC8785-JCS",
+    "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

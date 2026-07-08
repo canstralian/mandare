@@ -3,5 +3,4 @@ httpx
 ruff
 mypy
 types-PyYAML
-cryptography
-cryptography
+jsonschema[format]

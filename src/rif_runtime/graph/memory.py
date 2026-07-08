@@ -1,5 +1,6 @@
 import networkx as nx
 
+
 class GovernanceGraph:
     def __init__(self):
         self.graph = nx.MultiDiGraph()
@@ -10,10 +11,14 @@ class GovernanceGraph:
         self.graph.add_edge(
             decision.actor,
             decision.target,
-            decision=decision.decision.value if hasattr(decision.decision, "value") else decision.decision,
+            decision=decision.decision.value
+            if hasattr(decision.decision, "value")
+            else decision.decision,
             rule=decision.matched_rule,
             environment=decision.environment,
-            posture=decision.posture.value if hasattr(decision.posture, "value") else decision.posture,
+            posture=decision.posture.value
+            if hasattr(decision.posture, "value")
+            else decision.posture,
             timestamp=decision.timestamp.isoformat(),
         )
 
