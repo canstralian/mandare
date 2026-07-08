@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/rif-familiar/posture-decision/v0.1",
+  "title": "RIF Familiar Posture Decision v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "evaluated_at",
+    "relay_id",
+    "device_id",
+    "manifest_sha256",
+    "decision",
+    "posture",
+    "connectivity_state",
+    "reason",
+    "operating_constraints",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rif-familiar.posture-decision/v0.1"
+    },
+    "decision_id": {
+      "type": "string",
+      "pattern": "^pdec_[A-Za-z0-9_-]{12,96}$"
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "relay_id": {
+      "type": "string",
+      "pattern": "^rif-edge-[a-z0-9-]{1,48}$"
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^rif-familiar-[a-z0-9-]{1,48}$"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "decision": {
+      "enum": ["allow", "deny", "review"]
+    },
+    "posture": {
+      "enum": ["normal", "elevated", "restricted", "locked"]
+    },
+    "connectivity_state": {
+      "enum": ["online", "offline_safe"]
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "summary", "matched_rule"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "matched_rule": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evidence_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^obs_[A-Za-z0-9_-]{12,96}$"
+          },
+          "maxItems": 20
+        }
+      }
+    },
+    "operating_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scan_interval_seconds",
+        "transport_enabled",
+        "queue_only"
+      ],
+      "properties": {
+        "scan_interval_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600
+        },
+        "transport_enabled": {
+          "type": "boolean"
+        },
+        "queue_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_sha256", "relay_key_id"],
+      "properties": {
+        "decision_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "relay_key_id": {
+          "type": "string",
+          "pattern": "^kid_[A-Za-z0-9_-]{8,96}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "posture": {
+            "const": "locked"
+          }
+        },
+        "required": ["posture"]
+      },
+      "then": {
+        "properties": {
+          "operating_constraints": {
+            "properties": {
+              "transport_enabled": {
+                "const": false
+              },
+              "queue_only": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "connectivity_state": {
+            "const": "offline_safe"
+          }
+        },
+        "required": ["connectivity_state"]
+      },
+      "then": {
+        "properties": {
+          "operating_constraints": {
+            "properties": {
+              "transport_enabled": {
+                "const": false
+              },
+              "queue_only": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
