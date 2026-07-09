@@ -98,7 +98,7 @@ To clear many merged local branches at once after a large release:
 ```bash
 git branch --merged main |
   grep -Ev '^\*|^\s*(main|release/|hotfix/)' |
-  xargs -r -n 1 git branch -d
+  while read -r branch; do git branch -d "$branch"; done
 ```
 
 Only use `git branch -D` after independently verifying the branch was merged

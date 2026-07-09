@@ -16,7 +16,7 @@ set -euo pipefail
 
 REMOTE="${REMOTE:-origin}"
 BASE="${BASE:-main}"
-PROTECTED='^(main|master|HEAD|release/.+|hotfix/.+)$'
+PROTECTED='^(main|master|HEAD|release(/.*)?|hotfix(/.*)?)$'
 
 DELETE=false
 case "${1:-}" in
@@ -29,6 +29,11 @@ case "${1:-}" in
 esac
 
 git fetch "$REMOTE" --prune
+
+git rev-parse --verify --quiet "$REMOTE/$BASE" >/dev/null || {
+  echo "Error: remote branch '$REMOTE/$BASE' does not exist." >&2
+  exit 1
+}
 
 merged=$(git branch -r --merged "$REMOTE/$BASE" --format='%(refname:short)' |
   sed -n "s|^$REMOTE/||p" |
@@ -43,10 +48,9 @@ count=$(printf '%s\n' "$merged" | wc -l | tr -d ' ')
 
 if [ "$DELETE" = true ]; then
   echo "Deleting $count merged branch(es) on $REMOTE:"
-  printf '%s\n' "$merged" | while IFS= read -r branch; do
-    echo "  deleting $branch"
-    git push "$REMOTE" --delete "$branch"
-  done
+  printf '%s\n' "$merged" | sed 's/^/  deleting /'
+  # Batch into a single push so each branch is not a separate network round trip
+  printf '%s\n' "$merged" | xargs git push "$REMOTE" --delete
   git fetch "$REMOTE" --prune
   echo "Done."
 else
