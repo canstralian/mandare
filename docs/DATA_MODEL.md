@@ -91,7 +91,8 @@ One governed working session of an agent (optionally on behalf of a user).
 | agent_id | uuid FK -> agents | |
 | user_id | uuid FK -> users, nullable | supervising human |
 | posture | enum: normal, elevated, restricted, locked | current posture |
-| started_at / ended_at | timestamptz | |
+| started_at | timestamptz | |
+| ended_at | timestamptz, nullable | |
 | status | enum: running, completed, aborted | |
 | metadata | jsonb | |
 
@@ -151,6 +152,7 @@ Append-only record of every governed action — the Postgres form of
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
+| project_id | uuid FK -> projects | denormalized for direct RLS filtering |
 | session_id | uuid FK -> sessions | |
 | agent_id | uuid FK -> agents | denormalized for query speed |
 | tool_id | uuid FK -> tools, nullable | |
@@ -160,10 +162,12 @@ Append-only record of every governed action — the Postgres form of
 | action | text | e.g. network.request, mcp.invoke |
 | target | text | host, tool name, package |
 | decision | enum: allow, deny | |
-| posture_at_decision | enum posture | |
+| posture_at_decision | enum: normal, elevated, restricted, locked | |
 | reason | text | engine's explanation |
-| input / output | jsonb | hashed or redacted per logging rules |
-| requested_at / completed_at | timestamptz | |
+| input | jsonb | hashed or redacted per logging rules |
+| output | jsonb, nullable | hashed or redacted per logging rules |
+| requested_at | timestamptz | |
+| completed_at | timestamptz, nullable | |
 | status | enum: pending, succeeded, failed, denied | |
 
 ### execution_logs
@@ -174,6 +178,7 @@ from audit data by design).
 | Column | Type | Notes |
 |---|---|---|
 | id | bigint identity PK | high volume; no uuid needed |
+| project_id | uuid FK -> projects | denormalized for direct RLS filtering |
 | execution_id | uuid FK -> executions | |
 | ts | timestamptz | |
 | level | enum: debug, info, warning, error | |
@@ -205,7 +210,8 @@ Durable agent memory with scoping and expiry.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| agent_id | uuid FK -> agents | |
+| project_id | uuid FK -> projects | enables project-scoped memories + direct RLS |
+| agent_id | uuid FK -> agents, nullable | null for project-scoped memories |
 | session_id | uuid FK -> sessions, nullable | |
 | scope | enum: session, agent, project | |
 | key | text | |
@@ -222,6 +228,7 @@ evaluator models.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
+| project_id | uuid FK -> projects | denormalized for direct RLS filtering |
 | subject_type | enum: execution, session, agent, prompt | |
 | subject_id | uuid | polymorphic; validated in app layer |
 | evaluator_kind | enum: human, model | |
@@ -263,8 +270,10 @@ erDiagram
 
 Key relationship rules:
 
-- **projects** is the tenancy boundary: every RLS policy filters on
-  `project_id` (directly or via the session/execution chain).
+- **projects** is the tenancy boundary: `project_id` is denormalized onto
+  all tenant-specific tables (including high-volume ones like `executions`,
+  `execution_logs`, `memories`, and `evaluations`) so every RLS policy
+  filters directly on `project_id` without joins or subqueries.
 - **executions** is the hub: it links session, agent, tool, prompt, model,
   and matched policy for every governed action; `execution_logs` and
   `artifacts` hang off it.
