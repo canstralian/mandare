@@ -27,15 +27,18 @@ class TemplateAgent:
         """Check the agent is well-formed before it issues requests.
 
         Returns:
-            True when ``name`` follows the ``agent:<role>`` convention.
+            True when ``name`` follows the ``agent:<role>`` convention
+            with a non-empty role.
         """
-        return bool(self.name) and self.name.startswith("agent:")
+        prefix, _, role = self.name.partition(":")
+        return prefix == "agent" and bool(role)
 
     def request(
         self,
         action: str,
         target: str,
         reason: str | None = None,
+        context: dict | None = None,
     ) -> PolicyRequest:
         """Build a request for the runtime to evaluate.
 
@@ -43,12 +46,14 @@ class TemplateAgent:
             action: Governed action name, e.g. ``http.request``.
             target: The host, URL, package, or tool being acted on.
             reason: Optional intent string recorded for the audit trail.
+            context: Optional extra metadata for policy evaluation.
         """
         return PolicyRequest(
             actor=self.name,
             action=action,
             target=target,
             reason=reason,
+            context=context or {},
         )
 
     def handle_decision(self, decision: PolicyDecision) -> dict[str, str]:

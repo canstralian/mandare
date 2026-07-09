@@ -10,6 +10,7 @@ def make_agent():
 def test_validate_requires_agent_prefix():
     assert make_agent().validate()
     assert not TemplateAgent("").validate()
+    assert not TemplateAgent("agent:").validate()
     assert not TemplateAgent("orchestrator").validate()
 
 
@@ -18,11 +19,14 @@ def test_request_builds_policy_request():
         "http.request",
         "https://api.example.com/v1",
         reason="fetch upstream state",
+        context={"env": "production"},
     )
     assert req.actor == "agent:template"
     assert req.action == "http.request"
     assert req.target == "https://api.example.com/v1"
     assert req.reason == "fetch upstream state"
+    assert req.context == {"env": "production"}
+    assert make_agent().request("http.request", "https://api.example.com").context == {}
 
 
 def test_round_trip_through_policy_engine():
