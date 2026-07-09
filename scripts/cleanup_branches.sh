@@ -30,14 +30,9 @@ esac
 
 git fetch "$REMOTE" --prune
 
-git rev-parse --verify --quiet "$REMOTE/$BASE" >/dev/null || {
-  echo "Error: remote branch '$REMOTE/$BASE' does not exist." >&2
-  exit 1
-git fetch "$REMOTE" --prune
-
 # Verify that the base branch exists on the remote
 git rev-parse --verify --quiet "$REMOTE/$BASE" >/dev/null || {
-  echo "Error: Remote branch '$REMOTE/$BASE' does not exist." >&2
+  echo "Error: remote branch '$REMOTE/$BASE' does not exist." >&2
   exit 1
 }
 
