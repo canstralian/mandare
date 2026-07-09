@@ -51,11 +51,9 @@ if [ -z "$merged" ]; then
 fi
 
 count=$(printf '%s\n' "$merged" | wc -l | tr -d ' ')
-
 if [ "$DELETE" = true ]; then
   echo "Deleting $count merged branch(es) on $REMOTE:"
   printf '%s\n' "$merged" | sed 's/^/  deleting /'
-  # Batch into a single push so each branch is not a separate network round trip
   printf '%s\n' "$merged" | xargs git push "$REMOTE" --delete
   git fetch "$REMOTE" --prune
   echo "Done."
