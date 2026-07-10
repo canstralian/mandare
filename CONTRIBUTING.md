@@ -19,6 +19,14 @@ mypy src/rif_runtime --ignore-missing-imports
 pytest -q
 ```
 
+## Branches
+
+- `main` is the only long-lived branch; develop every change on a short-lived
+  branch (`feature/*`, `fix/*`, `docs/*`, …) and merge via pull request.
+- Delete your branch after merge. See
+  [docs/BRANCH_CLEANUP.md](docs/BRANCH_CLEANUP.md) for the post-release
+  cleanup procedure and `scripts/cleanup_branches.sh` for the scripted path.
+
 ## Pull Requests
 
 - Keep changes focused; unrelated cleanup belongs in a separate PR.
