@@ -1,8 +1,15 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import ValidationError
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
+from rif_runtime.mcp.capabilities import capability_catalog
+from rif_runtime.mcp.metasploit import (
+    CapabilityToken,
+    GovernanceMode,
+    MetasploitIntent,
+)
 
 runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")
@@ -80,6 +87,51 @@ def mcp_invoke(payload: dict):
         reason=payload.get("reason"),
     )
     return runtime.evaluate(req)
+
+
+@app.get("/v1/mcp/metasploit/capabilities")
+def metasploit_capabilities():
+    return capability_catalog()
+
+
+@app.post("/v1/mcp/metasploit/evaluate")
+def metasploit_evaluate(payload: dict):
+    try:
+        intent = MetasploitIntent.model_validate(payload.get("intent", payload))
+        mode = GovernanceMode(
+            payload.get("mode", GovernanceMode.read_only_firewall.value)
+        )
+        token = (
+            CapabilityToken.model_validate(payload["token"])
+            if payload.get("token")
+            else None
+        )
+    except (ValidationError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token)
+    return {
+        "decision": outcome.decision,
+        "evidence": outcome.evidence,
+        "simulated": outcome.simulated,
+        "severe": outcome.severe,
+        "posture": runtime.posture,
+    }
+
+
+@app.post("/v1/mcp/metasploit/token")
+def metasploit_token(payload: dict):
+    if "intent" not in payload:
+        raise HTTPException(status_code=422, detail="missing 'intent' in payload")
+    try:
+        intent = MetasploitIntent.model_validate(payload["intent"])
+        ttl_seconds = int(payload.get("ttl_seconds", 600))
+    except (ValidationError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return runtime.metasploit.mint_token(
+        intent,
+        approver=payload.get("approver", "human:operator"),
+        ttl_seconds=ttl_seconds,
+    )
 
 
 @app.get("/v1/persistence/summary")

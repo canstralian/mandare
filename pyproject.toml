@@ -7,6 +7,9 @@ name='rif-runtime'
 version='0.1.0'
 dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
 
+[project.optional-dependencies]
+dev=['pytest','httpx','ruff','mypy','types-PyYAML','jsonschema[format]']
+
 [project.scripts]
 rif='rif_runtime.cli:app'
 
