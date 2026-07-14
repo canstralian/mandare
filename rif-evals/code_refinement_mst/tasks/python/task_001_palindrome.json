@@ -1,0 +1,34 @@
+{
+  "task_id": "py_001_palindrome",
+  "language": "python",
+  "prompt": "Write a function is_palindrome(text: str) -> bool that returns true if text is a palindrome, ignoring case and non-alphanumeric characters.",
+  "entrypoint": "is_palindrome",
+  "tests": [
+    "assert is_palindrome('Racecar') is True",
+    "assert is_palindrome('A man, a plan, a canal: Panama') is True",
+    "assert is_palindrome('hello') is False",
+    "assert is_palindrome('') is True"
+  ],
+  "refinement_turns": [
+    {
+      "turn": 1,
+      "instruction": "Refactor the solution for readability without changing behavior.",
+      "change_type": "refactor"
+    },
+    {
+      "turn": 2,
+      "instruction": "Optimize the solution to avoid unnecessary intermediate strings if possible.",
+      "change_type": "performance"
+    },
+    {
+      "turn": 3,
+      "instruction": "Add type hints and a docstring without changing behavior.",
+      "change_type": "style"
+    },
+    {
+      "turn": 4,
+      "instruction": "Handle Unicode alphanumeric characters correctly.",
+      "change_type": "edge_case"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import threading
 
 from .config import load_config
 from .policy import PolicyEngine
-from .schemas import PolicyRequest, Posture
+from .schemas import PolicyDecision, PolicyRequest, Posture
 from .governance.reflexive import ReflexiveLoop
 from .governance.posture import escalate_posture
 from .graph.memory import GovernanceGraph
@@ -49,6 +49,17 @@ class RIFRuntime:
             self.posture,
             self.policy_store.list(),
         )
+        return self.record_decision(decision)
+
+    def record_decision(self, decision: PolicyDecision) -> PolicyDecision:
+        """Feed an already-computed decision through the governance circuit.
+
+        Used by `evaluate()` for policy-gated requests, and directly by
+        callers (e.g. eval harnesses) that need to record a governance-relevant
+        outcome — such as a verification failure — that wasn't produced by
+        `PolicyEngine.evaluate()` itself but should still drive posture
+        escalation and land in the audit trail.
+        """
         self.governance_graph.record_decision(decision)
         old_posture = self.posture
         self.posture = self.reflexive.observe(decision, self.posture)

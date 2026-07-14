@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RIFCodeRefinementTask",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "language",
+    "prompt",
+    "entrypoint",
+    "tests",
+    "refinement_turns"
+  ],
+  "properties": {
+    "task_id": { "type": "string" },
+    "language": { "enum": ["python"] },
+    "prompt": { "type": "string" },
+    "entrypoint": { "type": "string" },
+    "tests": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "refinement_turns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["turn", "instruction", "change_type"],
+        "properties": {
+          "turn": { "type": "integer", "minimum": 1 },
+          "instruction": { "type": "string" },
+          "change_type": {
+            "enum": [
+              "style",
+              "refactor",
+              "performance",
+              "logic_preserving",
+              "additive",
+              "edge_case",
+              "semantic"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
