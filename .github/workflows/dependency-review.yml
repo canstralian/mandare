@@ -15,24 +15,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Dependency review needs the Dependency Graph, which on private repos
-      # requires GitHub Advanced Security (Settings -> Advanced Security ->
-      # Dependency graph). Without it the action fails on every PR with
-      # "Dependency review is not supported on this repository", so probe for
-      # the feature and skip the review cleanly until it is enabled.
-      - name: Check dependency graph availability
-        id: dep-graph
+      # Dependency review uses the dependency-graph *compare* API, which on
+      # private repos requires GitHub Advanced Security (the SBOM endpoint
+      # alone is not enough). Without it the action fails on every PR with
+      # "Dependency review is not supported on this repository", so probe the
+      # same compare endpoint the action calls and skip the review cleanly
+      # until the feature is enabled.
+      - name: Check dependency review availability
+        id: dep-review
         env:
           GH_TOKEN: ${{ github.token }}
+          BASEHEAD: ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
         run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" --silent 2>/dev/null; then
+          if gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/compare/${BASEHEAD}?per_page=1" --silent 2>/dev/null; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Dependency graph is not enabled on this repository; skipping dependency review. Enable it (with GitHub Advanced Security) under Settings -> Advanced Security to activate this check."
+            echo "::notice::Dependency review is not available on this repository (requires Dependency graph + GitHub Advanced Security); skipping. Enable it under Settings -> Advanced Security to activate this check."
           fi
 
       - uses: actions/dependency-review-action@v4
-        if: steps.dep-graph.outputs.enabled == 'true'
+        if: steps.dep-review.outputs.enabled == 'true'
         with:
           fail-on-severity: moderate
