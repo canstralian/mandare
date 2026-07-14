@@ -12,6 +12,12 @@ jobs:
     name: dependency-review
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Dependency review needs the Dependency Graph, which on private repos
+    # requires GitHub Advanced Security (Settings -> Advanced Security ->
+    # Dependency graph). Until that is enabled, the action fails on every PR
+    # with "Dependency review is not supported on this repository", so keep
+    # the job non-blocking. Remove continue-on-error once the feature is on.
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v6
