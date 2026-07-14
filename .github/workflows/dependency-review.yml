@@ -12,16 +12,27 @@ jobs:
     name: dependency-review
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Dependency review needs the Dependency Graph, which on private repos
-    # requires GitHub Advanced Security (Settings -> Advanced Security ->
-    # Dependency graph). Until that is enabled, the action fails on every PR
-    # with "Dependency review is not supported on this repository", so keep
-    # the job non-blocking. Remove continue-on-error once the feature is on.
-    continue-on-error: true
-
     steps:
       - uses: actions/checkout@v6
 
+      # Dependency review needs the Dependency Graph, which on private repos
+      # requires GitHub Advanced Security (Settings -> Advanced Security ->
+      # Dependency graph). Without it the action fails on every PR with
+      # "Dependency review is not supported on this repository", so probe for
+      # the feature and skip the review cleanly until it is enabled.
+      - name: Check dependency graph availability
+        id: dep-graph
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" --silent 2>/dev/null; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Dependency graph is not enabled on this repository; skipping dependency review. Enable it (with GitHub Advanced Security) under Settings -> Advanced Security to activate this check."
+          fi
+
       - uses: actions/dependency-review-action@v4
+        if: steps.dep-graph.outputs.enabled == 'true'
         with:
           fail-on-severity: moderate
