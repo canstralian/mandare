@@ -32,13 +32,16 @@ jobs:
 
       - run: bandit -r src -f sarif -o bandit.sarif
 
-      # jq is pre-installed on GitHub-hosted ubuntu runners; runs even when bandit exits 1 (findings found)
+      # jq is pre-installed on GitHub-hosted ubuntu runners
+      # runs on bandit success (0) or findings (1), but not on cancellation or pip/setup failures
       - name: Validate SARIF is well-formed and non-empty
-        if: always()
+        if: success() || failure()
         run: |
-          test -s bandit.sarif || { echo "::error::bandit.sarif is empty or missing"; exit 1; }
+          test -f bandit.sarif || { echo "::error::bandit.sarif not found — did bandit run?"; exit 1; }
+          test -s bandit.sarif || { echo "::error::bandit.sarif is empty"; exit 1; }
           jq . bandit.sarif > /dev/null || { echo "::error::bandit.sarif is not valid JSON"; exit 1; }
 
+      # upload will fail until Code scanning is enabled in repo settings (see #36)
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
