@@ -9,8 +9,16 @@ GUARDED_REQUESTS = [
     ("post", "/v1/environment/default"),
     ("post", "/v1/posture/normal"),
     ("post", "/v1/posture/reset"),
-    ("post", "/v1/mcp/metasploit/token", {"intent": {"capability": "module.search", "target": "10.10.10.5"}}),
-    ("post", "/v1/policy/evaluate", {"actor": "agent:test", "action": "read", "target": "resource"}),
+    (
+        "post",
+        "/v1/mcp/metasploit/token",
+        {"intent": {"capability": "module.search", "target": "10.10.10.5"}},
+    ),
+    (
+        "post",
+        "/v1/policy/evaluate",
+        {"actor": "agent:test", "action": "read", "target": "resource"},
+    ),
 ]
 
 
@@ -33,9 +41,7 @@ def test_guarded_endpoints_reject_missing_or_wrong_key(monkeypatch):
         no_key = _call(method, path, json=body)
         assert no_key.status_code == 401
 
-        wrong_key = _call(
-            method, path, json=body, headers={"X-API-Key": "wrong-key"}
-        )
+        wrong_key = _call(method, path, json=body, headers={"X-API-Key": "wrong-key"})
         assert wrong_key.status_code == 401
 
 
