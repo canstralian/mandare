@@ -2,6 +2,8 @@ import tomllib
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+import pytest
+
 import rif_runtime
 
 
@@ -11,16 +13,14 @@ def test_version_matches_pyproject() -> None:
         data = tomllib.load(f)
     expected = data["project"]["version"]
 
-    # Explicitly verify installed package metadata matches pyproject.toml.
-    # If this raises, the package wasn't pip-installed after the version bump
-    # (run `pip install -e .`). Relying solely on __version__ would silently
-    # pass via the fallback constant when the package isn't installed.
+    # Verify installed package metadata matches pyproject.toml.
+    # CI always runs `pip install -e .` before pytest (see ci.yml), so this
+    # path is always taken there. Local dev runs without an editable install
+    # are skipped rather than hard-failed to avoid confusing new contributors.
     try:
         installed = version("rif-runtime")
-    except PackageNotFoundError as exc:
-        raise AssertionError(
-            "rif-runtime not installed — run `pip install -e .` before testing"
-        ) from exc
+    except PackageNotFoundError:
+        pytest.skip("rif-runtime not installed — run `pip install -e .` first")
 
     assert installed == expected, (
         f"installed metadata {installed!r} != pyproject {expected!r}"
