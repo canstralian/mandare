@@ -27,5 +27,6 @@ if n != 1:
 p.write_text(new_text)
 PYEOF
 
-echo "Bumped to $VERSION in pyproject.toml"
-echo "Now run: pip install -e . && pytest -q"
+pip install -e "$ROOT" -q
+echo "Bumped to $VERSION, metadata refreshed."
+echo "Now run: pytest -q"

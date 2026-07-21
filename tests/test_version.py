@@ -34,6 +34,21 @@ def test_version_matches_pyproject() -> None:
     assert rif_runtime.__version__ == expected
 
 
+def test_read_version_from_pyproject_path_resolution() -> None:
+    """_read_version_from_pyproject() resolves pyproject.toml via the real 3-parent path."""
+    from rif_runtime import _read_version_from_pyproject
+
+    pyproject = Path(__file__).parent.parent / "pyproject.toml"
+    with pyproject.open("rb") as f:
+        expected = tomllib.load(f)["project"]["version"]
+
+    result = _read_version_from_pyproject()
+    assert result == expected, (
+        f"_read_version_from_pyproject() returned {result!r}, expected {expected!r}; "
+        "check that Path(__file__).parent.parent.parent resolves to the repo root"
+    )
+
+
 def test_version_falls_back_to_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
     """_read_version() reads pyproject.toml when importlib.metadata raises PackageNotFoundError."""
     from importlib.metadata import PackageNotFoundError as _PNFE

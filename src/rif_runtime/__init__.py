@@ -39,4 +39,6 @@ def _read_version() -> str:
     return "unknown"
 
 
+# Called once at module import time; Python's module cache means this runs at most
+# once per process regardless of how many times `import rif_runtime` is called.
 __version__ = _read_version()
