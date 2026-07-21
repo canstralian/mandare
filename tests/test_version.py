@@ -36,7 +36,7 @@ def test_version_matches_pyproject() -> None:
 
 def test_read_version_from_pyproject_path_resolution() -> None:
     """_read_version_from_pyproject() resolves pyproject.toml via the real 3-parent path."""
-    from rif_runtime import _read_version_from_pyproject
+    from rif_runtime._version import _read_version_from_pyproject
 
     pyproject = Path(__file__).parent.parent / "pyproject.toml"
     with pyproject.open("rb") as f:
@@ -57,9 +57,11 @@ def test_version_falls_back_to_pyproject(monkeypatch: pytest.MonkeyPatch) -> Non
         raise _PNFE(_name)
 
     monkeypatch.setattr("importlib.metadata.version", _raise)
-    monkeypatch.setattr("rif_runtime._read_version_from_pyproject", lambda: "9.8.7")
+    monkeypatch.setattr(
+        "rif_runtime._version._read_version_from_pyproject", lambda: "9.8.7"
+    )
 
-    from rif_runtime import _read_version
+    from rif_runtime._version import _read_version
 
     assert _read_version() == "9.8.7"
 
@@ -74,9 +76,11 @@ def test_version_unknown_when_all_fallbacks_fail(
         raise _PNFE(_name)
 
     monkeypatch.setattr("importlib.metadata.version", _raise)
-    monkeypatch.setattr("rif_runtime._read_version_from_pyproject", lambda: None)
+    monkeypatch.setattr(
+        "rif_runtime._version._read_version_from_pyproject", lambda: None
+    )
 
-    from rif_runtime import _read_version
+    from rif_runtime._version import _read_version
 
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
