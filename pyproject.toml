@@ -4,7 +4,7 @@ build-backend='setuptools.build_meta'
 
 [project]
 name='rif-runtime'
-version='0.1.0'
+version='0.2.2'
 dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
 
 [project.optional-dependencies]
