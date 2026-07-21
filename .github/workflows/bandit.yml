@@ -27,6 +27,7 @@ jobs:
 
       # [toml] extra enables pyproject.toml-based bandit config if added later
       # bandit-sarif-formatter pinned for SARIF schema compatibility; bandit floats to pick up security fixes
+      # bump bandit-sarif-formatter pin when upgrading bandit to verify SARIF schema compatibility
       - run: python -m pip install --upgrade pip "bandit[toml]" "bandit-sarif-formatter==1.1.1"
 
       - run: bandit -r src -f sarif -o bandit.sarif
@@ -34,7 +35,9 @@ jobs:
       # jq is pre-installed on GitHub-hosted ubuntu runners; runs even when bandit exits 1 (findings found)
       - name: Validate SARIF is well-formed and non-empty
         if: always()
-        run: test -s bandit.sarif && jq . bandit.sarif > /dev/null
+        run: |
+          test -s bandit.sarif || { echo "::error::bandit.sarif is empty or missing"; exit 1; }
+          jq . bandit.sarif > /dev/null || { echo "::error::bandit.sarif is not valid JSON"; exit 1; }
 
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
