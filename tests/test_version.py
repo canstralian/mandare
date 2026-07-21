@@ -1,4 +1,6 @@
+import os
 import tomllib
+import warnings
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -20,9 +22,52 @@ def test_version_matches_pyproject() -> None:
     try:
         installed = version("rif-runtime")
     except PackageNotFoundError:
+        if os.environ.get("CI"):
+            pytest.fail(
+                "rif-runtime not installed in CI — ci.yml must run `pip install -e .` before pytest"
+            )
         pytest.skip("rif-runtime not installed — run `pip install -e .` first")
 
     assert installed == expected, (
         f"installed metadata {installed!r} != pyproject {expected!r}"
     )
     assert rif_runtime.__version__ == expected
+
+
+def test_version_falls_back_to_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_read_version() reads pyproject.toml when importlib.metadata raises PackageNotFoundError."""
+    from importlib.metadata import PackageNotFoundError as _PNFE
+
+    def _raise(_name: str) -> str:
+        raise _PNFE(_name)
+
+    monkeypatch.setattr("importlib.metadata.version", _raise)
+    monkeypatch.setattr("rif_runtime._read_version_from_pyproject", lambda: "9.8.7")
+
+    from rif_runtime import _read_version
+
+    assert _read_version() == "9.8.7"
+
+
+def test_version_unknown_when_all_fallbacks_fail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_read_version() returns 'unknown' and emits a RuntimeWarning when all sources fail."""
+    from importlib.metadata import PackageNotFoundError as _PNFE
+
+    def _raise(_name: str) -> str:
+        raise _PNFE(_name)
+
+    monkeypatch.setattr("importlib.metadata.version", _raise)
+    monkeypatch.setattr("rif_runtime._read_version_from_pyproject", lambda: None)
+
+    from rif_runtime import _read_version
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        result = _read_version()
+
+    assert result == "unknown"
+    assert len(w) == 1
+    assert issubclass(w[0].category, RuntimeWarning)
+    assert "rif-runtime" in str(w[0].message)

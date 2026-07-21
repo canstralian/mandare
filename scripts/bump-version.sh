@@ -20,7 +20,11 @@ from pathlib import Path
 root, version = Path(sys.argv[1]), sys.argv[2]
 
 p = root / "pyproject.toml"
-p.write_text(re.sub(r"version='[^']*'", f"version='{version}'", p.read_text()))
+text = p.read_text()
+new_text, n = re.subn(r"^version='[^']*'", f"version='{version}'", text, flags=re.MULTILINE)
+if n != 1:
+    raise SystemExit(f"Expected exactly 1 version= line in {p}, found {n}")
+p.write_text(new_text)
 PYEOF
 
 echo "Bumped to $VERSION in pyproject.toml"
