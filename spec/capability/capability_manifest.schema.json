@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/rif-familiar/capability-manifest/v0.1",
+  "title": "RIF Familiar Capability Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "device",
+    "capabilities",
+    "relay_policy",
+    "budgets",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rif-familiar.capability-manifest/v0.1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "pattern": "^rfm_[a-z0-9][a-z0-9._-]{7,63}$"
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "hardware_platform",
+        "firmware_version",
+        "identity_key_id"
+      ],
+      "properties": {
+        "device_id": {
+          "type": "string",
+          "pattern": "^rif-familiar-[a-z0-9-]{1,48}$"
+        },
+        "hardware_platform": {
+          "const": "esp32-c5"
+        },
+        "firmware_version": {
+          "type": "string",
+          "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+        },
+        "identity_key_id": {
+          "type": "string",
+          "pattern": "^kid_[A-Za-z0-9_-]{8,96}$"
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wifi_observation",
+        "ble_observation",
+        "local_relay_transport",
+        "active_rf_transmission",
+        "ir_transmit",
+        "usb_hid",
+        "packet_injection",
+        "command_execution",
+        "cloud_egress"
+      ],
+      "properties": {
+        "wifi_observation": {
+          "const": "allow"
+        },
+        "ble_observation": {
+          "const": "allow"
+        },
+        "local_relay_transport": {
+          "const": "allow"
+        },
+        "active_rf_transmission": {
+          "const": "deny"
+        },
+        "ir_transmit": {
+          "const": "deny"
+        },
+        "usb_hid": {
+          "const": "deny"
+        },
+        "packet_injection": {
+          "const": "deny"
+        },
+        "command_execution": {
+          "const": "deny"
+        },
+        "cloud_egress": {
+          "const": "deny"
+        }
+      }
+    },
+    "relay_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostname", "port", "tls_required", "relay_key_id"],
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "pattern": "^(?:[a-z0-9][a-z0-9-]{0,62}\\.)*local$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "tls_required": {
+          "const": true
+        },
+        "relay_key_id": {
+          "type": "string",
+          "pattern": "^kid_[A-Za-z0-9_-]{8,96}$"
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_observations_per_minute",
+        "offline_event_buffer",
+        "max_payload_bytes"
+      ],
+      "properties": {
+        "max_observations_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "offline_event_buffer": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 1000
+        },
+        "max_payload_bytes": {
+          "type": "integer",
+          "minimum": 512,
+          "maximum": 8192
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalization", "manifest_sha256"],
+      "properties": {
+        "canonicalization": {
+          "const": "RFC8785-JCS"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}
