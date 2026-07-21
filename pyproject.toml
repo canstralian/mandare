@@ -4,6 +4,7 @@ build-backend='setuptools.build_meta'
 
 [project]
 name='rif-runtime'
+# Bump with: scripts/bump-version.sh X.Y.Z
 version='0.2.2'
 dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
 
