@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
+from .auth import ControlPlaneAuth
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
@@ -32,7 +33,7 @@ def environments():
     }
 
 
-@app.post("/v1/environment/{name}")
+@app.post("/v1/environment/{name}", dependencies=[ControlPlaneAuth])
 def set_environment(name: str):
     try:
         runtime.set_environment(name)
@@ -46,7 +47,7 @@ def evaluate(req: PolicyRequest):
     return runtime.evaluate(req)
 
 
-@app.post("/v1/posture/{posture}")
+@app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture):
     runtime.posture = posture
     return {"posture": runtime.posture}
@@ -118,7 +119,7 @@ def metasploit_evaluate(payload: dict):
     }
 
 
-@app.post("/v1/mcp/metasploit/token")
+@app.post("/v1/mcp/metasploit/token", dependencies=[ControlPlaneAuth])
 def metasploit_token(payload: dict):
     if "intent" not in payload:
         raise HTTPException(status_code=422, detail="missing 'intent' in payload")
@@ -139,7 +140,7 @@ def persistence_summary():
     return runtime.persisted_summary()
 
 
-@app.post("/v1/posture/reset")
+@app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
 def reset_posture():
     from rif_runtime.schemas import Posture
 
@@ -157,13 +158,13 @@ def list_policies():
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 
-@app.put("/v1/policies/{rule_id}")
+@app.put("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
 def upsert_policy(rule_id: str, rule: PolicyRule):
     if rule.id != rule_id:
         rule = rule.model_copy(update={"id": rule_id})
     return runtime.policy_store.upsert(rule)
 
 
-@app.delete("/v1/policies/{rule_id}")
+@app.delete("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
 def delete_policy(rule_id: str):
     return {"deleted": runtime.policy_store.delete(rule_id)}
