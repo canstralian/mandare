@@ -22,5 +22,7 @@ def test_version_matches_pyproject() -> None:
             "rif-runtime not installed — run `pip install -e .` before testing"
         ) from exc
 
-    assert installed == expected, f"installed metadata {installed!r} != pyproject {expected!r}"
+    assert installed == expected, (
+        f"installed metadata {installed!r} != pyproject {expected!r}"
+    )
     assert rif_runtime.__version__ == expected
