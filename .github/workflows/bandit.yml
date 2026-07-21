@@ -39,10 +39,12 @@ jobs:
         run: |
           test -f bandit.sarif || { echo "::error::bandit.sarif not found — did bandit run?"; exit 1; }
           test -s bandit.sarif || { echo "::error::bandit.sarif is empty"; exit 1; }
-          jq . bandit.sarif > /dev/null || { echo "::error::bandit.sarif is not valid JSON"; exit 1; }
+          # jq empty validates JSON syntax; does not check SARIF schema beyond basic structure
+          jq empty bandit.sarif || { echo "::error::bandit.sarif is not valid JSON"; exit 1; }
+          jq -e '.runs | length > 0' bandit.sarif > /dev/null || { echo "::error::bandit.sarif missing required .runs[]"; exit 1; }
 
       # upload will fail until Code scanning is enabled in repo settings (see #36)
       - uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: success() || failure()
         with:
           sarif_file: bandit.sarif
