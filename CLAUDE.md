@@ -147,12 +147,13 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   routes.
 - **Version bump checklist.** `__version__` is derived from installed package
   metadata via `importlib.metadata.version("rif-runtime")` (single source of
-  truth: `pyproject.toml`). When cutting a release, only `pyproject.toml`
-  needs the version bump — but also update the fallback constant in
-  `src/rif_runtime/__init__.py` to match, then run `pip install -e .` to
-  refresh installed metadata before committing. The version consistency test
+  truth: `pyproject.toml`). When cutting a release, **only `pyproject.toml`
+  needs the version bump** — `src/rif_runtime/__init__.py` has no hardcoded
+  version string to sync. Use `scripts/bump-version.sh X.Y.Z` to update
+  `pyproject.toml`, then run `pip install -e .` to refresh the installed
+  metadata before committing. The version consistency test
   (`tests/test_version.py`) will catch any drift when the package is
-  installed (as CI always is).
+  installed (as CI always does via `pip install -e .` before `pytest`).
 - Tests that instantiate `RIFRuntime()` write real records into
   `data/decisions.jsonl` and `data/posture_history.jsonl` (gitignored) as a
   side effect — there's no fixture isolating this. `tests/test_policy_store.py`

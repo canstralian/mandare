@@ -9,6 +9,7 @@ def _read_version() -> str:
 
     # Package not installed — read directly from pyproject.toml in the source tree.
     # Covers `python -m rif_runtime` style runs without a prior `pip install -e .`.
+    # Note: this path only works in source/editable checkouts, not built wheels.
     try:
         import tomllib
         from pathlib import Path
