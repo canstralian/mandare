@@ -9,6 +9,17 @@ import pytest
 import rif_runtime
 
 
+@pytest.fixture()
+def patch_metadata_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch importlib.metadata.version to always raise PackageNotFoundError."""
+    from importlib.metadata import PackageNotFoundError as _PNFE
+
+    def _raise(_name: str) -> str:
+        raise _PNFE(_name)
+
+    monkeypatch.setattr("importlib.metadata.version", _raise)
+
+
 def test_version_matches_pyproject() -> None:
     pyproject = Path(__file__).parent.parent / "pyproject.toml"
     with pyproject.open("rb") as f:
@@ -49,14 +60,10 @@ def test_read_version_from_pyproject_path_resolution() -> None:
     )
 
 
-def test_version_falls_back_to_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_version_falls_back_to_pyproject(
+    patch_metadata_unavailable: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """_read_version() reads pyproject.toml when importlib.metadata raises PackageNotFoundError."""
-    from importlib.metadata import PackageNotFoundError as _PNFE
-
-    def _raise(_name: str) -> str:
-        raise _PNFE(_name)
-
-    monkeypatch.setattr("importlib.metadata.version", _raise)
     monkeypatch.setattr(
         "rif_runtime._version._read_version_from_pyproject", lambda: "9.8.7"
     )
@@ -67,15 +74,10 @@ def test_version_falls_back_to_pyproject(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_version_unknown_when_all_fallbacks_fail(
+    patch_metadata_unavailable: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """_read_version() returns 'unknown' and emits a RuntimeWarning when all sources fail."""
-    from importlib.metadata import PackageNotFoundError as _PNFE
-
-    def _raise(_name: str) -> str:
-        raise _PNFE(_name)
-
-    monkeypatch.setattr("importlib.metadata.version", _raise)
     monkeypatch.setattr(
         "rif_runtime._version._read_version_from_pyproject", lambda: None
     )
