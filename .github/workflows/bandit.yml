@@ -25,12 +25,13 @@ jobs:
           python-version: "3.13"
           cache: pip
 
+      # bandit-sarif-formatter 1.1.1 is verified compatible with bandit 1.9.4
       - run: python -m pip install --upgrade pip "bandit[toml]==1.9.4" "bandit-sarif-formatter==1.1.1"
 
       - run: bandit -r src -f sarif -o bandit.sarif
 
-      - name: Validate SARIF is well-formed JSON
-        run: jq . bandit.sarif > /dev/null
+      - name: Validate SARIF is well-formed and non-empty
+        run: test -s bandit.sarif && jq . bandit.sarif > /dev/null
 
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
