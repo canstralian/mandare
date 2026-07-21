@@ -42,7 +42,7 @@ def set_environment(name: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.post("/v1/policy/evaluate")
+@app.post("/v1/policy/evaluate", dependencies=[ControlPlaneAuth])
 def evaluate(req: PolicyRequest):
     return runtime.evaluate(req)
 

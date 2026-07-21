@@ -12,6 +12,7 @@ GUARDED_REQUESTS = [
     ("post", "/v1/posture/normal"),
     ("post", "/v1/posture/reset"),
     ("post", "/v1/mcp/metasploit/token", {"intent": {"capability": "module.search", "target": "10.10.10.5"}}),
+    ("post", "/v1/policy/evaluate", {"actor": "agent:test", "action": "read", "target": "resource"}),
 ]
 
 
@@ -61,6 +62,14 @@ def test_guarded_endpoints_accept_valid_key(monkeypatch):
     )
     assert response.status_code != 401
 
+    response = _call(
+        "post",
+        "/v1/policy/evaluate",
+        json={"actor": "agent:test", "action": "read", "target": "resource"},
+        headers=headers,
+    )
+    assert response.status_code != 401
+
 
 def test_policy_crud_requires_key(monkeypatch):
     monkeypatch.setenv(ENV_VAR, "correct-key")
@@ -85,3 +94,13 @@ def test_read_only_endpoints_stay_open(monkeypatch):
     assert client.get("/health").status_code == 200
     assert client.get("/v1/environments").status_code == 200
     assert client.get("/v1/policies").status_code == 200
+
+
+def test_api_key_length_mismatch_returns_401_not_500(monkeypatch):
+    """Cursor Bugbot finding: a key shorter/longer than any configured key
+    must not raise ValueError inside hmac.compare_digest -- it should fall
+    through to a clean 401."""
+    monkeypatch.setenv(ENV_VAR, "a-much-longer-configured-key-value")
+    headers = {"X-API-Key": "short"}
+    response = _call("post", "/v1/posture/normal", headers=headers)
+    assert response.status_code == 401
