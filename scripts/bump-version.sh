@@ -27,6 +27,8 @@ if n != 1:
 p.write_text(new_text)
 PYEOF
 
-pip install -e "$ROOT" -q
-echo "Bumped to $VERSION, metadata refreshed."
-echo "Now run: pytest -q"
+echo "Bumped to $VERSION in pyproject.toml"
+echo ""
+echo "Next steps (required — this script only edits the file):"
+echo "  pip install -e .   # refresh installed metadata so importlib.metadata sees the new version"
+echo "  pytest -q"

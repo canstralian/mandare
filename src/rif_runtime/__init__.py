@@ -1,5 +1,8 @@
 def _read_version_from_pyproject() -> str | None:
     # Only reachable in source/editable checkouts, not built wheels.
+    # Returns None (not raises) so _read_version() can escalate to RuntimeWarning
+    # — None is correct here both for built wheels (no pyproject.toml on path)
+    # and for source checkouts where the layout changed.
     try:
         import tomllib
         from pathlib import Path
