@@ -1,5 +1,3 @@
-import os
-
 from fastapi.testclient import TestClient
 
 from rif_runtime.api import app
