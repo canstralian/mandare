@@ -1,11 +1,12 @@
 import threading
 
 from .config import load_config
-from .policy import PolicyEngine
-from .schemas import PolicyDecision, PolicyRequest, Posture
+from .governance.drift import DriftVector
 from .governance.reflexive import ReflexiveLoop
 from .governance.posture import escalate_posture
 from .graph.memory import GovernanceGraph
+from .policy import PolicyEngine
+from .schemas import PolicyDecision, PolicyRequest, Posture
 from .storage.jsonl import JsonlStore
 from .configuration.policies import PolicyStore
 from .mcp.metasploit import (
@@ -120,6 +121,10 @@ class RIFRuntime:
             "decisions_by_result": self.decisions_store.count_by("decision"),
             "decisions_by_rule": self.decisions_store.count_by("matched_rule"),
         }
+
+    def drift_vector(self) -> DriftVector:
+        events = self.reflexive.telemetry.recent(minutes=60)
+        return DriftVector.from_events(events)
 
     def audit_summary(self):
         return {

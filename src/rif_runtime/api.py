@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
+from .governance.drift import recommend_correction
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
@@ -150,6 +151,22 @@ def persistence_summary():
 @app.get("/v1/recovered-state")
 def recovered_state():
     return runtime.recovered_summary()
+
+
+@app.get("/v1/drift/recommend")
+def drift_recommend():
+    vector = runtime.drift_vector()
+    correction = recommend_correction(vector)
+    return {
+        "drift_vector": {
+            "denial_rate": vector.denial_rate,
+            "adversarial_score": vector.adversarial_score,
+            "action_entropy": vector.action_entropy,
+            "target_entropy": vector.target_entropy,
+        },
+        "recommended_correction": correction.value,
+    }
+
 
 
 @app.get("/v1/policies")
