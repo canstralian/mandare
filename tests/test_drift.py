@@ -23,6 +23,7 @@ from rif_runtime.schemas import Decision, PolicyDecision, Posture
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
+
 def _decision(
     target: str = "https://api.example.com",
     action: str = "http.request",
@@ -44,6 +45,7 @@ def _decision(
 
 # ── _entropy ─────────────────────────────────────────────────────────────────
 
+
 def test_entropy_empty_returns_zero():
     assert _entropy([]) == 0.0
 
@@ -64,27 +66,38 @@ def test_entropy_grows_with_diversity():
 
 # ── _ADVERSARIAL_PATTERNS word-boundary anchoring ────────────────────────────
 
-@pytest.mark.parametrize("safe", [
-    "elasticsearch",       # 'select' embedded in a longer word — no boundary after 'select'
-    "executor.run()",      # 'exec' is a prefix; 'u' immediately follows
-    "selectAll(items)",    # camelCase prefix — no boundary after 'select'
-])
+
+@pytest.mark.parametrize(
+    "safe",
+    [
+        "elasticsearch",  # 'select' embedded in a longer word — no boundary after 'select'
+        "executor.run()",  # 'exec' is a prefix; 'u' immediately follows
+        "selectAll(items)",  # camelCase prefix — no boundary after 'select'
+    ],
+)
 def test_adversarial_patterns_no_false_positive(safe: str):
-    assert not any(p.search(safe) for p in _ADVERSARIAL_PATTERNS), f"false positive on: {safe!r}"
+    assert not any(p.search(safe) for p in _ADVERSARIAL_PATTERNS), (
+        f"false positive on: {safe!r}"
+    )
 
 
-@pytest.mark.parametrize("payload", [
-    "SELECT * FROM users",
-    "1; DROP TABLE students",
-    "cmd.exe /c whoami",
-    "../../etc/passwd",
-    "<script>alert(1)</script>",
-    "1 | cat /etc/shadow",
-    "EXEC xp_cmdshell('whoami')",
-    "1 UNION SELECT null,null",
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "SELECT * FROM users",
+        "1; DROP TABLE students",
+        "cmd.exe /c whoami",
+        "../../etc/passwd",
+        "<script>alert(1)</script>",
+        "1 | cat /etc/shadow",
+        "EXEC xp_cmdshell('whoami')",
+        "1 UNION SELECT null,null",
+    ],
+)
 def test_adversarial_patterns_detects_payloads(payload: str):
-    assert any(p.search(payload) for p in _ADVERSARIAL_PATTERNS), f"missed payload: {payload!r}"
+    assert any(p.search(payload) for p in _ADVERSARIAL_PATTERNS), (
+        f"missed payload: {payload!r}"
+    )
 
 
 # shell chaining operators: ; and | are explicitly restored
@@ -102,6 +115,7 @@ def test_backtick_pattern_fires():
 
 # ── _adversarial_score ───────────────────────────────────────────────────────
 
+
 def test_adversarial_score_empty():
     assert _adversarial_score([]) == 0.0
 
@@ -116,8 +130,8 @@ def test_adversarial_score_sql_in_target():
     assert _adversarial_score(events) == 1.0
 
 
-def test_adversarial_score_shell_pipe_in_reason():
-    events = [_decision(reason="fetch | cat /etc/passwd")]
+def test_adversarial_score_shell_pipe_in_target_query():
+    events = [_decision(target="https://host/run?cmd=fetch | cat /etc/passwd")]
     assert _adversarial_score(events) == 1.0
 
 
@@ -133,6 +147,7 @@ def test_adversarial_score_partial_mix():
 
 
 # ── DriftVector.from_events ──────────────────────────────────────────────────
+
 
 def test_drift_vector_empty():
     assert DriftVector.from_events([]) == DriftVector(0.0, 0.0, 0.0, 0.0)
@@ -172,65 +187,90 @@ def test_drift_vector_action_entropy_grows():
         _decision(action="package.install"),
         _decision(action="api.call"),
     ]
-    assert DriftVector.from_events(same).action_entropy < DriftVector.from_events(mixed).action_entropy
+    assert (
+        DriftVector.from_events(same).action_entropy
+        < DriftVector.from_events(mixed).action_entropy
+    )
 
 
 # ── recommend_correction ─────────────────────────────────────────────────────
 
+
 def test_recommend_normal_on_clean():
-    v = DriftVector(denial_rate=0.0, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.0, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0
+    )
     assert recommend_correction(v) == Posture.normal
 
 
 def test_recommend_elevated_at_moderate_denial():
-    v = DriftVector(denial_rate=0.25, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.25, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0
+    )
     assert recommend_correction(v) == Posture.elevated
 
 
 def test_recommend_restricted_at_high_denial():
-    v = DriftVector(denial_rate=0.6, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.6, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0
+    )
     assert recommend_correction(v) == Posture.restricted
 
 
 def test_recommend_locked_at_very_high_denial():
-    v = DriftVector(denial_rate=0.9, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.9, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0
+    )
     assert recommend_correction(v) == Posture.locked
 
 
 def test_recommend_locked_on_heavy_adversarial():
-    v = DriftVector(denial_rate=0.1, adversarial_score=0.5, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.1, adversarial_score=0.5, action_entropy=1.0, target_entropy=1.0
+    )
     assert recommend_correction(v) == Posture.locked
 
 
 def test_recommend_restricted_on_light_adversarial():
-    v = DriftVector(denial_rate=0.1, adversarial_score=0.15, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.1, adversarial_score=0.15, action_entropy=1.0, target_entropy=1.0
+    )
     assert recommend_correction(v) == Posture.restricted
 
 
 def test_recommend_restricted_on_focused_probe():
     # Low target entropy + elevated denials without adversarial content = hammering
     # a single blocked target (entropy-based detector)
-    v = DriftVector(denial_rate=0.4, adversarial_score=0.0, action_entropy=1.0, target_entropy=0.2)
+    v = DriftVector(
+        denial_rate=0.4, adversarial_score=0.0, action_entropy=1.0, target_entropy=0.2
+    )
     assert recommend_correction(v) == Posture.restricted
 
 
 def test_recommend_elevated_not_triggered_without_denial():
-    v = DriftVector(denial_rate=0.05, adversarial_score=0.0, action_entropy=0.0, target_entropy=0.0)
+    v = DriftVector(
+        denial_rate=0.05, adversarial_score=0.0, action_entropy=0.0, target_entropy=0.0
+    )
     assert recommend_correction(v) == Posture.normal
 
 
 # ── OrchestratorAgent integration ────────────────────────────────────────────
 
+
 def test_orchestrator_choose_correction_locked():
     agent = OrchestratorAgent()
-    v = DriftVector(denial_rate=0.9, adversarial_score=0.0, action_entropy=0.0, target_entropy=0.0)
+    v = DriftVector(
+        denial_rate=0.9, adversarial_score=0.0, action_entropy=0.0, target_entropy=0.0
+    )
     assert agent.choose_correction(v) == Posture.locked
     assert agent._choose_correction(v) == Posture.locked
 
 
 def test_orchestrator_choose_correction_normal():
     agent = OrchestratorAgent()
-    v = DriftVector(denial_rate=0.0, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0)
+    v = DriftVector(
+        denial_rate=0.0, adversarial_score=0.0, action_entropy=1.0, target_entropy=1.0
+    )
     assert agent.choose_correction(v) == Posture.normal
 
 

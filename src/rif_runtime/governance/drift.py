@@ -26,6 +26,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import Sequence
+from urllib.parse import urlparse
 
 from rif_runtime.schemas import PolicyDecision, Posture
 
@@ -51,14 +52,41 @@ _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
+def _extract_payload(target: str) -> str:
+    """For URL targets, return path+params+query (not scheme or hostname).
+
+    urlparse splits ';'-delimited path parameters into a separate `params`
+    field (RFC 1808), so we re-join them to preserve shell-chaining operators
+    like `; ls` that land there.
+    """
+    try:
+        parsed = urlparse(target)
+        if parsed.scheme in ("http", "https") and parsed.netloc:
+            payload = parsed.path or ""
+            if parsed.params:
+                payload += ";" + parsed.params
+            if parsed.query:
+                payload += "?" + parsed.query
+            return payload
+    except Exception:
+        pass
+    return target
+
+
 def _adversarial_score(events: Sequence[PolicyDecision]) -> float:
-    """Return the fraction of events whose target or reason matches an adversarial pattern."""
+    """Return fraction of events whose target contains an adversarial pattern.
+
+    For URL targets, only path+query is checked — the hostname is excluded to
+    avoid false-positives from subdomain labels that happen to match SQL keywords
+    (e.g. api.update.service.io).  The reason field is not checked because it is
+    system-generated and not a user-controlled injection vector.
+    """
     if not events:
         return 0.0
     hits = sum(
         1
         for e in events
-        if any(p.search(e.target) or p.search(e.reason) for p in _ADVERSARIAL_PATTERNS)
+        if any(p.search(_extract_payload(e.target)) for p in _ADVERSARIAL_PATTERNS)
     )
     return hits / len(events)
 
@@ -76,10 +104,10 @@ def _entropy(values: Sequence[str]) -> float:
 class DriftVector:
     """Multidimensional summary of behavioural drift in a recent event window."""
 
-    denial_rate: float        # [0, 1]
+    denial_rate: float  # [0, 1]
     adversarial_score: float  # [0, 1]
-    action_entropy: float     # >= 0
-    target_entropy: float     # >= 0
+    action_entropy: float  # >= 0
+    target_entropy: float  # >= 0
 
     @classmethod
     def from_events(cls, events: Sequence[PolicyDecision]) -> DriftVector:
