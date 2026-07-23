@@ -59,17 +59,14 @@ def _extract_payload(target: str) -> str:
     field (RFC 1808), so we re-join them to preserve shell-chaining operators
     like `; ls` that land there.
     """
-    try:
-        parsed = urlparse(target)
-        if parsed.scheme in ("http", "https") and parsed.netloc:
-            payload = parsed.path or ""
-            if parsed.params:
-                payload += ";" + parsed.params
-            if parsed.query:
-                payload += "?" + parsed.query
-            return payload
-    except Exception:
-        pass
+    parsed = urlparse(target)
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        payload = parsed.path or ""
+        if parsed.params:
+            payload += ";" + parsed.params
+        if parsed.query:
+            payload += "?" + parsed.query
+        return payload
     return target
 
 
