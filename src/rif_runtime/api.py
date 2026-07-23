@@ -47,6 +47,14 @@ def evaluate(req: PolicyRequest):
     return runtime.evaluate(req)
 
 
+@app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
+def reset_posture():
+    # Must be registered before /v1/posture/{posture}, otherwise "reset" is
+    # captured as a Posture path param and FastAPI returns 422.
+    runtime.posture = Posture.normal
+    return {"posture": runtime.posture.value}
+
+
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture):
     runtime.posture = posture
@@ -138,14 +146,6 @@ def metasploit_token(payload: dict):
 @app.get("/v1/persistence/summary")
 def persistence_summary():
     return runtime.persisted_summary()
-
-
-@app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
-def reset_posture():
-    from rif_runtime.schemas import Posture
-
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
 
 
 @app.get("/v1/recovered-state")
