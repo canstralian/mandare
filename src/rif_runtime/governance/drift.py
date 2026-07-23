@@ -26,7 +26,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import Sequence
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from rif_runtime.schemas import PolicyDecision, Posture
 
@@ -41,12 +41,15 @@ _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
     ),
     # Timing / blind-injection helpers
     re.compile(r"\b(sleep|benchmark|pg_sleep|waitfor\s+delay)\b", re.IGNORECASE),
-    # Path traversal — two or more ../ or ..\  sequences
-    re.compile(r"(\.\.[\\/]){2,}"),
+    # Path traversal — two or more ../ or ..\ sequences anywhere in the string
+    # (consecutive *or* separated by a path segment, e.g. ../segment/../)
+    re.compile(r"(\.\.[\\/]).*(\.\.[\\/])"),
     # Shell interpreter references
     re.compile(r"\b(cmd\.exe|powershell|/bin/(sh|bash|zsh))\b", re.IGNORECASE),
-    # Shell chaining: ;  |  ` followed by at least one word character
-    re.compile(r"[;|`]\s*\w"),
+    # Shell chaining: semicolon/pipe require whitespace after to avoid false-positives
+    # on legitimate query separators like ?a=1;b=2.  Backtick substitution fires
+    # without a space because value`cmd` syntax has no delimiter.
+    re.compile(r"[|;]\s+\w|`\s*\w"),
     # Cross-site scripting
     re.compile(r"<\s*script\b", re.IGNORECASE),
 ]
@@ -66,7 +69,7 @@ def _extract_payload(target: str) -> str:
             payload += ";" + parsed.params
         if parsed.query:
             payload += "?" + parsed.query
-        return payload
+        return unquote(payload)
     return target
 
 

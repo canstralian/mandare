@@ -88,6 +88,7 @@ def test_adversarial_patterns_no_false_positive(safe: str):
         "1; DROP TABLE students",
         "cmd.exe /c whoami",
         "../../etc/passwd",
+        "../segment/../etc/passwd",  # non-consecutive traversal
         "<script>alert(1)</script>",
         "1 | cat /etc/shadow",
         "EXEC xp_cmdshell('whoami')",
@@ -144,6 +145,18 @@ def test_adversarial_score_partial_mix():
     clean = _decision(target="https://api.anthropic.com")
     dirty = _decision(target="https://host/?id=1 DROP TABLE users")
     assert _adversarial_score([clean, dirty]) == 0.5
+
+
+def test_adversarial_score_semicolon_query_param_no_false_positive():
+    # ?a=1;b=2 uses ; as a parameter separator with no whitespace — must not fire
+    events = [_decision(target="https://api.service.io/items?page=1;limit=10")]
+    assert _adversarial_score(events) == 0.0
+
+
+def test_adversarial_score_encoded_sql_in_target():
+    # Percent-encoded SELECT must be decoded before matching
+    events = [_decision(target="https://db.internal/q?x=%53ELECT%20*%20FROM%20users")]
+    assert _adversarial_score(events) == 1.0
 
 
 # ── DriftVector.from_events ──────────────────────────────────────────────────
