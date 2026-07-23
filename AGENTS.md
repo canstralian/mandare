@@ -10,6 +10,9 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
 - Dependencies are installed into a virtualenv at `.venv` (gitignored). Activate
   it before running anything: `source .venv/bin/activate`. The startup update
   script keeps it in sync with `pip install -e .` + `requirements-dev.txt`.
+- That bootstrap is defined in `.cursor/environment.json` (repo-owned), so setup
+  uses `python3` explicitly and does not depend on the base image providing a
+  bare `python` alias.
 - `python3 -m venv` requires the `python3.12-venv` system package. It is already
   present in the VM image; only reinstall it (`apt-get install -y python3.12-venv`)
   if venv creation ever fails on a fresh machine.
