@@ -9,7 +9,7 @@ version='0.2.2'
 dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
 
 [project.optional-dependencies]
-dev=['pytest','httpx','ruff','mypy','types-PyYAML','jsonschema[format]']
+dev=['pytest','httpx','ruff==0.15.22','mypy','types-PyYAML','jsonschema[format]']
 
 [project.scripts]
 rif='rif_runtime.cli:app'

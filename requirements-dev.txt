@@ -1,6 +1,8 @@
 pytest
 httpx
-ruff
+# Pinned: CI installs this unpinned and ruff 0.16.0 re-sorts imports / enables
+# new lints, turning main red with no code change. Bump deliberately.
+ruff==0.15.22
 mypy
 types-PyYAML
 jsonschema[format]
