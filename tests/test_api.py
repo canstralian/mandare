@@ -23,6 +23,21 @@ def test_graph_summary():
     assert "edges" in r.json()
 
 
+def test_mcp_invoke_is_dry_run_no_side_effects():
+    # /v1/mcp/invoke is unauthenticated, so it must simulate only: a would-be
+    # denial must not persist a decision or drive posture escalation.
+    from rif_runtime import api
+
+    before = api.runtime.decisions_store.count()
+    r = client.post(
+        "/v1/mcp/invoke",
+        json={"actor": "agent:test", "target": "https://blocked.example.com"},
+    )
+    assert r.status_code == 200
+    assert "decision" in r.json()
+    assert api.runtime.decisions_store.count() == before
+
+
 def test_posture_reset(monkeypatch):
     # Posture routes are guarded by ControlPlaneAuth (PR #41); configure a key
     # and pass it so this test still exercises #44's reset route-ordering fix.

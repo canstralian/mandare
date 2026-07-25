@@ -95,7 +95,10 @@ def mcp_invoke(payload: dict):
         target=payload.get("target", "unknown"),
         reason=payload.get("reason"),
     )
-    return runtime.evaluate(req)
+    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
+    # write to the decision log. The authenticated /v1/policy/evaluate is the
+    # recording path. See runtime.evaluate(record=...).
+    return runtime.evaluate(req, record=False)
 
 
 @app.get("/v1/mcp/metasploit/capabilities")
@@ -117,7 +120,10 @@ def metasploit_evaluate(payload: dict):
         )
     except (ValidationError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e))
-    outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token)
+    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
+    # write to the stores. Minting a capability token (the actual authorization)
+    # goes through the guarded /v1/mcp/metasploit/token.
+    outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token, record=False)
     return {
         "decision": outcome.decision,
         "evidence": outcome.evidence,

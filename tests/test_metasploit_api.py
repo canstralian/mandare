@@ -94,6 +94,24 @@ def test_token_route_requires_api_key():
     assert r.status_code in (401, 503)
 
 
+def test_evaluate_route_is_dry_run_no_side_effects():
+    # The unauthenticated /v1/mcp/metasploit/evaluate route must simulate only.
+    # session.create is a severe deny; recording it would escalate posture and
+    # append to the decision/evidence stores. Dry-run must do neither.
+    from rif_runtime import api
+
+    before_decisions = api.runtime.decisions_store.count()
+    before_evidence = api.runtime.evidence_store.count()
+    r = client.post(
+        "/v1/mcp/metasploit/evaluate",
+        json={"intent": {"capability": "session.create", "target": "10.10.10.5"}},
+    )
+    assert r.status_code == 200
+    assert r.json()["decision"]["decision"] == "deny"
+    assert api.runtime.decisions_store.count() == before_decisions
+    assert api.runtime.evidence_store.count() == before_evidence
+
+
 def test_runtime_severe_denial_escalates_posture():
     runtime = RIFRuntime()
     runtime.posture = Posture.normal
