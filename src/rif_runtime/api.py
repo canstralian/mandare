@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
+from .auth import ControlPlaneAuth
 from .runtime import RIFRuntime
 from .schemas import PolicyRequest, Posture
 from rif_runtime.agents.auditor import AuditorAgent
@@ -32,7 +33,7 @@ def environments():
     }
 
 
-@app.post("/v1/environment/{name}")
+@app.post("/v1/environment/{name}", dependencies=[ControlPlaneAuth])
 def set_environment(name: str):
     try:
         runtime.set_environment(name)
@@ -41,12 +42,12 @@ def set_environment(name: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@app.post("/v1/policy/evaluate")
+@app.post("/v1/policy/evaluate", dependencies=[ControlPlaneAuth])
 def evaluate(req: PolicyRequest):
     return runtime.evaluate(req)
 
 
-@app.post("/v1/posture/reset")
+@app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
 def reset_posture():
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
@@ -54,7 +55,7 @@ def reset_posture():
     return {"posture": runtime.posture.value}
 
 
-@app.post("/v1/posture/{posture}")
+@app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture):
     runtime.posture = posture
     return {"posture": runtime.posture}
@@ -94,7 +95,10 @@ def mcp_invoke(payload: dict):
         target=payload.get("target", "unknown"),
         reason=payload.get("reason"),
     )
-    return runtime.evaluate(req)
+    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
+    # write to the decision log. The authenticated /v1/policy/evaluate is the
+    # recording path. See runtime.evaluate(record=...).
+    return runtime.evaluate(req, record=False)
 
 
 @app.get("/v1/mcp/metasploit/capabilities")
@@ -116,7 +120,10 @@ def metasploit_evaluate(payload: dict):
         )
     except (ValidationError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e))
-    outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token)
+    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
+    # write to the stores. Minting a capability token (the actual authorization)
+    # goes through the guarded /v1/mcp/metasploit/token.
+    outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token, record=False)
     return {
         "decision": outcome.decision,
         "evidence": outcome.evidence,
@@ -126,7 +133,7 @@ def metasploit_evaluate(payload: dict):
     }
 
 
-@app.post("/v1/mcp/metasploit/token")
+@app.post("/v1/mcp/metasploit/token", dependencies=[ControlPlaneAuth])
 def metasploit_token(payload: dict):
     if "intent" not in payload:
         raise HTTPException(status_code=422, detail="missing 'intent' in payload")
@@ -157,13 +164,13 @@ def list_policies():
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 
-@app.put("/v1/policies/{rule_id}")
+@app.put("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
 def upsert_policy(rule_id: str, rule: PolicyRule):
     if rule.id != rule_id:
         rule = rule.model_copy(update={"id": rule_id})
     return runtime.policy_store.upsert(rule)
 
 
-@app.delete("/v1/policies/{rule_id}")
+@app.delete("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
 def delete_policy(rule_id: str):
     return {"deleted": runtime.policy_store.delete(rule_id)}
