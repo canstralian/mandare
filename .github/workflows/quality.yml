@@ -26,7 +26,9 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]" || pip install -e .
-          pip install ruff mypy pytest
+          # ruff pinned: unpinned installs pull 0.16.0, which re-sorts imports
+          # and enables new lints, turning main red with no code change.
+          pip install ruff==0.15.22 mypy pytest
 
       - run: ruff check .
       - run: ruff format --check .
