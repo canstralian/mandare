@@ -1,6 +1,7 @@
 from .telemetry import TelemetryStore
 from .posture import PostureManager
 
+
 class ReflexiveLoop:
     def __init__(self):
         self.telemetry = TelemetryStore()

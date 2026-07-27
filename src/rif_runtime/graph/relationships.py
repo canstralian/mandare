@@ -3,6 +3,7 @@ def actor_targets(graph, actor: str):
         return []
     return list(graph.graph.successors(actor))
 
+
 def denied_edges(graph):
     return [
         {"actor": u, "target": v, **data}

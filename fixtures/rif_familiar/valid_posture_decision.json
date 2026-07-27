@@ -1,0 +1,26 @@
+{
+  "schema_version": "rif-familiar.posture-decision/v0.1",
+  "decision_id": "pdec_01JABCDEF0123456789",
+  "evaluated_at": "2026-06-30T08:12:01Z",
+  "relay_id": "rif-edge-home",
+  "device_id": "rif-familiar-001",
+  "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "decision": "allow",
+  "posture": "normal",
+  "connectivity_state": "online",
+  "reason": {
+    "code": "PASSIVE_OBSERVATION_ACCEPTED",
+    "summary": "Passive aggregate observation accepted by the local relay.",
+    "matched_rule": "rif_familiar.passive_observation.allow",
+    "evidence_event_ids": ["obs_01JABCDEF0123456789"]
+  },
+  "operating_constraints": {
+    "scan_interval_seconds": 60,
+    "transport_enabled": true,
+    "queue_only": false
+  },
+  "integrity": {
+    "decision_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "relay_key_id": "kid_relay001a"
+  }
+}

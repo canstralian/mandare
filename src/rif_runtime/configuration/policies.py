@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from ..schemas import Decision
 from .store import JsonStore
 
 
 class PolicyRule(BaseModel):
     id: str
-    effect: str
+    effect: Decision
     action: str = "*"
     target: str = "*"
     reason: str = "configured policy rule"

@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 
+
 class JsonlStore:
     def __init__(self, path):
         self.path = Path(path)
