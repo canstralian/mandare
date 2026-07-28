@@ -28,6 +28,34 @@ def check(actor: str, action: str, target: str) -> None:
 
 
 @app.command()
+def kernel(
+    request: str,
+    actor: str = "human:operator",
+    environment: str | None = None,
+) -> None:
+    """Run one intent through the full kernel pipeline.
+
+    Uses the dependency-free echo engine: this exercises intent, identity,
+    context, governance, budget, routing, evidence, telemetry, and evolution
+    without needing a model provider configured.
+    """
+    import asyncio
+
+    from .execution import EchoExecutionEngine
+    from .kernel import RIFKernel
+    from .state import RuntimeState
+
+    state = RuntimeState()
+    if environment:
+        state.runtime.set_environment(environment)
+
+    k = RIFKernel(EchoExecutionEngine(), state=state)
+    result = asyncio.run(k.run(request, actor=actor))
+    print(result.summary())
+    print(k.summary())
+
+
+@app.command()
 def replay(
     decisions_path: str = typer.Argument(
         "data/decisions.jsonl",

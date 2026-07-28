@@ -27,12 +27,38 @@ Trust model: deny by default, environment-scoped allowed hosts, and a
 elevated -> restricted -> locked). A locked posture denies everything
 regardless of other rules.
 
+The kernel pipeline (`kernel.py`) wraps that circuit for model-backed
+execution — the agent is a managed capability, not the orchestrator:
+
+```
+Intent -> Context -> Governance -> State -> Budget -> Capability Router
+      -> Execution -> Evidence -> Telemetry -> Evolution
+```
+
+See `docs/adr-0009-execution-kernel.md`. Governance runs twice: once as
+pre-flight admission on the intent, and once per tool call through
+`CapabilityApprovalGate` — a model chooses its tool calls *after* admission,
+so approving the intent is not approving the actions.
+
 ## Layout
 
 ```
 src/rif_runtime/
   api.py                  FastAPI app, all HTTP routes (source of truth for the API surface)
-  cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`
+  cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`, `rif kernel`
+  kernel.py               RIFKernel — the pipeline orchestrator
+  intent.py               Intent (stage 1); digest pins it into the ledger
+  identity.py             IdentityResolver, TrustTier — unknown actors are untrusted
+  context.py              ContextAssembler — assembles instructions, fences untrusted text
+  budget.py               BudgetManager — per-intent ceilings by trust tier
+  capabilities.py         CapabilityRouter — narrows the offer; never authorises
+  execution.py            ExecutionEngine protocol, CapabilityApprovalGate, echo engine
+  evidence.py             EvidenceLedger — hash-chained, wraps audit.py
+  telemetry.py            Telemetry — execution metrics (distinct from governance/telemetry.py)
+  evolution.py            EvolutionQueue — proposals for an operator, never self-applied
+  paths.py                RIF_DATA_DIR resolution for every persisted store
+  adapters/               Execution engines per provider; SDKs imported lazily (extras)
+  governance/engine.py    GovernanceEngine — wraps PolicyEngine for the kernel
   runtime.py              RIFRuntime — wires config, policy engine, reflexive loop,
                            graph, and persistence together; one instance per process
   config.py               Loads config/environments.yaml into RuntimeConfig
@@ -153,6 +179,25 @@ RIF_API_KEY=smoke-key BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   posture and the denial-derived floor — it must never return a lower rung,
   or ordinary denial traffic would unlock a `locked` runtime. Standing a
   posture down is an explicit operator act (`POST /v1/posture/reset`).
+- **Capability names must be mapped into the `mcp.` action namespace.**
+  `governance/engine.py:capability_action` does this before every per-call
+  evaluation. Skip it and a capability like `exploit.run` reaches
+  `PolicyEngine` as an action matching no rule and no built-in constraint, so
+  it falls through to `default.allow` — silently ungoverned. Covered by
+  `tests/test_kernel.py::test_every_capability_lands_in_the_governed_action_namespace`.
+- **The kernel's governance runs twice, deliberately.** `evaluate(context)` is
+  pre-flight admission on the intent; `CapabilityApprovalGate` calls
+  `evaluate_capability` once per tool invocation during execution. Never
+  replace the gate with an auto-approval rule — the model picks its tool calls
+  after admission, from text that may be adversarial, so admitting the intent
+  is not authorising the actions.
+- **`rif_runtime` depends on no model vendor.** `execution.ExecutionEngine` is
+  a Protocol; provider SDKs live in `adapters/` behind lazy imports and extras
+  (`pip install -e '.[foundry]'`). `EchoExecutionEngine` exercises the whole
+  pipeline in CI without a provider. Don't add a vendor SDK to the core deps.
+- **Two telemetry modules, different jobs.** `governance/telemetry.py` tracks
+  *decisions* in a rolling window to drive posture; `telemetry.py` tracks
+  *executions* (tokens, latency, calls). They are not interchangeable.
 - **Version bump checklist.** `__version__` is derived from installed package
   metadata via `importlib.metadata.version("rif-runtime")` (single source of
   truth: `pyproject.toml`). When cutting a release, **only `pyproject.toml`

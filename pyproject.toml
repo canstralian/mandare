@@ -10,6 +10,9 @@ dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','type
 
 [project.optional-dependencies]
 dev=['pytest','httpx','ruff==0.15.22','mypy','types-PyYAML','jsonschema[format]']
+# Execution-engine adapters. The kernel depends on the ExecutionEngine protocol,
+# never on a model vendor, so provider SDKs stay out of the core install.
+foundry=['agent-framework','azure-identity','mcp']
 
 [project.scripts]
 rif='rif_runtime.cli:app'
