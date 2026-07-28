@@ -16,3 +16,11 @@ rif='rif_runtime.cli:app'
 
 [tool.setuptools.packages.find]
 where=['src']
+
+[tool.mypy]
+# Annotations on the runtime package are enforced, not advisory: without this
+# mypy skips the bodies of unannotated functions entirely, so an untyped
+# module silently opts out of checking.
+disallow_untyped_defs=true
+warn_unused_ignores=true
+warn_redundant_casts=true

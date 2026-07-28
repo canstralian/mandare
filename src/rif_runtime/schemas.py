@@ -25,6 +25,22 @@ class PolicyRequest(BaseModel):
     context: dict = Field(default_factory=dict)
 
 
+class McpInvokeRequest(BaseModel):
+    """Body for the unauthenticated ``POST /v1/mcp/invoke`` simulation route."""
+
+    actor: str = "agent:mcp"
+    target: str = "unknown"
+    reason: str | None = None
+
+    def to_policy_request(self) -> "PolicyRequest":
+        return PolicyRequest(
+            actor=self.actor,
+            action="mcp.invoke",
+            target=self.target,
+            reason=self.reason,
+        )
+
+
 class PolicyDecision(BaseModel):
     decision: Decision
     actor: str
