@@ -2,10 +2,10 @@ import typer
 import uvicorn
 from rich import print
 
-from .runtime import RIFRuntime
-from .replay import ReplayEngine
-from .schemas import PolicyRequest
 from .mcp.metasploit import GovernanceMode, MetasploitIntent
+from .replay import ReplayEngine
+from .runtime import RIFRuntime
+from .schemas import PolicyRequest
 
 app = typer.Typer()
 

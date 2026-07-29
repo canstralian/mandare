@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from rif_runtime.security import sha256_digest
 
-
 GENESIS_HASH = "0" * 64
 
 

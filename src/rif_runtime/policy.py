@@ -1,4 +1,5 @@
 from urllib.parse import urlparse
+
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
 
 NETWORK_ACTIONS = {"http.request", "api.call", "mcp.invoke", "package.install"}

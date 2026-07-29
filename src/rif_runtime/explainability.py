@@ -36,7 +36,7 @@ class DecisionExplanation(BaseModel):
             "network",
             "default",
         ),
-    ) -> "DecisionExplanation":
+    ) -> DecisionExplanation:
         return cls(
             request=request,
             decision=decision,

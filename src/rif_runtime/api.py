@@ -1,8 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
-from .governance.drift import recommend_correction
-from .runtime import RIFRuntime
-from .schemas import PolicyRequest, Posture
+
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.mcp.capabilities import capability_catalog
@@ -11,6 +9,10 @@ from rif_runtime.mcp.metasploit import (
     GovernanceMode,
     MetasploitIntent,
 )
+
+from .governance.drift import recommend_correction
+from .runtime import RIFRuntime
+from .schemas import PolicyRequest, Posture
 
 runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")

@@ -24,8 +24,8 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 from urllib.parse import unquote, urlparse
 
 from rif_runtime.schemas import PolicyDecision, Posture

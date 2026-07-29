@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+
 from rif_runtime.api import app
 
 client = TestClient(app)

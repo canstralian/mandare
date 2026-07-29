@@ -1,10 +1,10 @@
 import os
-import tomllib
 import warnings
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import pytest
+import tomllib
 
 import rif_runtime
 

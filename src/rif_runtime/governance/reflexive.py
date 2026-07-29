@@ -1,5 +1,5 @@
-from .telemetry import TelemetryStore
 from .posture import PostureManager
+from .telemetry import TelemetryStore
 
 
 class ReflexiveLoop:

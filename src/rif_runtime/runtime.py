@@ -1,14 +1,11 @@
 import threading
 
 from .config import load_config
-from .governance.drift import DriftVector
-from .governance.reflexive import ReflexiveLoop
-from .governance.posture import escalate_posture
-from .graph.memory import GovernanceGraph
-from .policy import PolicyEngine
-from .schemas import PolicyDecision, PolicyRequest, Posture
-from .storage.jsonl import JsonlStore
 from .configuration.policies import PolicyStore
+from .governance.drift import DriftVector
+from .governance.posture import escalate_posture
+from .governance.reflexive import ReflexiveLoop
+from .graph.memory import GovernanceGraph
 from .mcp.metasploit import (
     CapabilityToken,
     GovernanceMode,
@@ -16,6 +13,9 @@ from .mcp.metasploit import (
     MetasploitGovernor,
     MetasploitIntent,
 )
+from .policy import PolicyEngine
+from .schemas import PolicyDecision, PolicyRequest, Posture
+from .storage.jsonl import JsonlStore
 
 
 class RIFRuntime:
