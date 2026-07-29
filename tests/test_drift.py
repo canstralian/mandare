@@ -13,13 +13,12 @@ import pytest
 from rif_runtime.agents.orchestrator import OrchestratorAgent
 from rif_runtime.governance.drift import (
     _ADVERSARIAL_PATTERNS,
+    DriftVector,
     _adversarial_score,
     _entropy,
-    DriftVector,
     recommend_correction,
 )
 from rif_runtime.schemas import Decision, PolicyDecision, Posture
-
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -151,6 +150,26 @@ def test_adversarial_score_semicolon_query_param_no_false_positive():
     # ?a=1;b=2 uses ; as a parameter separator with no whitespace — must not fire
     events = [_decision(target="https://api.service.io/items?page=1;limit=10")]
     assert _adversarial_score(events) == 0.0
+
+
+def test_adversarial_score_matrix_param_no_false_positive():
+    # RFC 1808 matrix params like ;version=1 are rejoined by _extract_payload
+    # with no whitespace after ';' — must not be scored as shell chaining.
+    events = [_decision(target="https://api.service.io/resource;version=1")]
+    assert _adversarial_score(events) == 0.0
+
+
+def test_adversarial_score_semicolon_separators_do_not_escalate_correction():
+    # Benign ;-separated query/matrix traffic must keep adversarial_score at 0
+    # so recommend_correction is driven only by denial/entropy signals.
+    events = [
+        _decision(target="https://api.service.io/items?a=1;b=2"),
+        _decision(target="https://api.service.io/path;version=1"),
+        _decision(target="https://api.service.io/path;version=1?a=1;b=2"),
+    ]
+    vector = DriftVector.from_events(events)
+    assert vector.adversarial_score == 0.0
+    assert recommend_correction(vector) == Posture.normal
 
 
 def test_adversarial_score_encoded_sql_in_target():
