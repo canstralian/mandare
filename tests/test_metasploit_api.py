@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from rif_runtime.api import app
+from rif_runtime.auth import ENV_VAR
 from rif_runtime.mcp.metasploit import GovernanceMode, MetasploitIntent
 from rif_runtime.runtime import RIFRuntime
 from rif_runtime.schemas import Posture
@@ -41,7 +42,9 @@ def test_evaluate_route_denies_execution():
     assert body["decision"]["matched_rule"] == "msf.capability.execution_absent"
 
 
-def test_token_mint_then_broker_allow_route():
+def test_token_mint_then_broker_allow_route(monkeypatch):
+    monkeypatch.setenv(ENV_VAR, "test-key")
+    headers = {"X-API-Key": "test-key"}
     intent = {
         "capability": "module.execute",
         "target": "10.10.10.5",
@@ -50,6 +53,7 @@ def test_token_mint_then_broker_allow_route():
     token = client.post(
         "/v1/mcp/metasploit/token",
         json={"intent": intent, "approver": "human:alice"},
+        headers=headers,
     ).json()
     r = client.post(
         "/v1/mcp/metasploit/evaluate",
@@ -68,9 +72,44 @@ def test_evaluate_route_rejects_invalid_payload_with_422():
     assert r.status_code == 422
 
 
-def test_token_route_rejects_missing_intent_with_422():
-    r = client.post("/v1/mcp/metasploit/token", json={"approver": "human:alice"})
+def test_token_route_rejects_missing_intent_with_422(monkeypatch):
+    monkeypatch.setenv(ENV_VAR, "test-key")
+    headers = {"X-API-Key": "test-key"}
+    r = client.post(
+        "/v1/mcp/metasploit/token",
+        json={"approver": "human:alice"},
+        headers=headers,
+    )
     assert r.status_code == 422
+
+
+def test_token_route_requires_api_key():
+    r = client.post(
+        "/v1/mcp/metasploit/token",
+        json={
+            "intent": {"capability": "module.execute", "target": "10.10.10.5"},
+            "approver": "human:alice",
+        },
+    )
+    assert r.status_code in (401, 503)
+
+
+def test_evaluate_route_is_dry_run_no_side_effects():
+    # The unauthenticated /v1/mcp/metasploit/evaluate route must simulate only.
+    # session.create is a severe deny; recording it would escalate posture and
+    # append to the decision/evidence stores. Dry-run must do neither.
+    from rif_runtime import api
+
+    before_decisions = api.runtime.decisions_store.count()
+    before_evidence = api.runtime.evidence_store.count()
+    r = client.post(
+        "/v1/mcp/metasploit/evaluate",
+        json={"intent": {"capability": "session.create", "target": "10.10.10.5"}},
+    )
+    assert r.status_code == 200
+    assert r.json()["decision"]["decision"] == "deny"
+    assert api.runtime.decisions_store.count() == before_decisions
+    assert api.runtime.evidence_store.count() == before_evidence
 
 
 def test_runtime_severe_denial_escalates_posture():

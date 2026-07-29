@@ -42,7 +42,7 @@ class RIFRuntime:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
 
-    def evaluate(self, req: PolicyRequest):
+    def evaluate(self, req: PolicyRequest, record: bool = True):
         decision = self.policy.evaluate(
             req,
             self.environment_name,
@@ -50,6 +50,12 @@ class RIFRuntime:
             self.posture,
             self.policy_store.list(),
         )
+        # record=False is a side-effect-free dry run: return the computed
+        # decision without mutating posture or appending to the JSONL stores.
+        # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
+        # they cannot drive posture escalation or flood the audit log.
+        if not record:
+            return decision
         return self.record_decision(decision)
 
     def record_decision(self, decision: PolicyDecision) -> PolicyDecision:
@@ -78,6 +84,7 @@ class RIFRuntime:
         intent: MetasploitIntent,
         mode: GovernanceMode = GovernanceMode.read_only_firewall,
         token: CapabilityToken | None = None,
+        record: bool = True,
     ) -> GovernanceOutcome:
         # Serialise the read-modify-write of posture and the JSONL appends:
         # the API shares one RIFRuntime across FastAPI's sync threadpool.
@@ -89,6 +96,11 @@ class RIFRuntime:
                 posture=self.posture,
                 token=token,
             )
+            # record=False is a side-effect-free dry run (see evaluate()): the
+            # unauthenticated /v1/mcp/metasploit/evaluate route uses it so
+            # simulation cannot escalate posture or write to the stores.
+            if not record:
+                return outcome
             decision = outcome.decision
             self.governance_graph.record_decision(decision)
             old_posture = self.posture

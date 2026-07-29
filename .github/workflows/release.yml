@@ -46,3 +46,5 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+          # Mark release-candidate tags (e.g. v0.3.0rc1) so they don't publish as GA.
+          prerelease: ${{ contains(github.ref_name, 'rc') }}
