@@ -12,3 +12,6 @@ rif='rif_runtime.cli:app'
 
 [tool.setuptools.packages.find]
 where=['src']
+
+[tool.vercel]
+entrypoint = "src.rif_runtime.api:app"
