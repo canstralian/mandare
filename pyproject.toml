@@ -10,9 +10,20 @@ dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','type
 
 [project.optional-dependencies]
 dev=['pytest','httpx','ruff==0.15.22','mypy','types-PyYAML','jsonschema[format]']
+# Execution-engine adapters. The kernel depends on the ExecutionEngine protocol,
+# never on a model vendor, so provider SDKs stay out of the core install.
+foundry=['agent-framework','azure-identity','mcp']
 
 [project.scripts]
 rif='rif_runtime.cli:app'
 
 [tool.setuptools.packages.find]
 where=['src']
+
+[tool.mypy]
+# Annotations on the runtime package are enforced, not advisory: without this
+# mypy skips the bodies of unannotated functions entirely, so an untyped
+# module silently opts out of checking.
+disallow_untyped_defs=true
+warn_unused_ignores=true
+warn_redundant_casts=true

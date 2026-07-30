@@ -27,12 +27,38 @@ Trust model: deny by default, environment-scoped allowed hosts, and a
 elevated -> restricted -> locked). A locked posture denies everything
 regardless of other rules.
 
+The kernel pipeline (`kernel.py`) wraps that circuit for model-backed
+execution — the agent is a managed capability, not the orchestrator:
+
+```
+Intent -> Context -> Governance -> State -> Budget -> Capability Router
+      -> Execution -> Evidence -> Telemetry -> Evolution
+```
+
+See `docs/adr-0009-execution-kernel.md`. Governance runs twice: once as
+pre-flight admission on the intent, and once per tool call through
+`CapabilityApprovalGate` — a model chooses its tool calls *after* admission,
+so approving the intent is not approving the actions.
+
 ## Layout
 
 ```
 src/rif_runtime/
   api.py                  FastAPI app, all HTTP routes (source of truth for the API surface)
-  cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`
+  cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`, `rif kernel`
+  kernel.py               RIFKernel — the pipeline orchestrator
+  intent.py               Intent (stage 1); digest pins it into the ledger
+  identity.py             IdentityResolver, TrustTier — unknown actors are untrusted
+  context.py              ContextAssembler — assembles instructions, fences untrusted text
+  budget.py               BudgetManager — per-intent ceilings by trust tier
+  capabilities.py         CapabilityRouter — narrows the offer; never authorises
+  execution.py            ExecutionEngine protocol, CapabilityApprovalGate, echo engine
+  evidence.py             EvidenceLedger — hash-chained, wraps audit.py
+  telemetry.py            Telemetry — execution metrics (distinct from governance/telemetry.py)
+  evolution.py            EvolutionQueue — proposals for an operator, never self-applied
+  paths.py                RIF_DATA_DIR resolution for every persisted store
+  adapters/               Execution engines per provider; SDKs imported lazily (extras)
+  governance/engine.py    GovernanceEngine — wraps PolicyEngine for the kernel
   runtime.py              RIFRuntime — wires config, policy engine, reflexive loop,
                            graph, and persistence together; one instance per process
   config.py               Loads config/environments.yaml into RuntimeConfig
@@ -102,11 +128,12 @@ push/PR. `ruff format .` is also enforced (by `quality.yml`'s
 `ruff-mypy-pytest` job, separate from `ci.yml`); run it before committing so
 the repo stays uniformly formatted.
 
-Manual smoke test against a running server:
+Manual smoke test against a running server. `/v1/policy/evaluate` is
+auth-guarded, so the server and the script need the same key:
 
 ```bash
-rif serve &
-BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
+RIF_CONTROL_PLANE_API_KEYS=smoke-key rif serve &
+RIF_API_KEY=smoke-key BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 ```
 
 ## Conventions
@@ -139,12 +166,38 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   seeded `deny_unknown_by_default`) are intentionally skipped so they don't
   blanket-deny everything; they're inert placeholders until rule precedence
   for partial wildcards is designed.
-- **Docs lag the code.** `docs/API.md` lists `POST /v1/runtime/reset-posture`,
-  but the actual route in `api.py` is `POST /v1/posture/reset`. `README.md`
-  and `docs/RIF_RUNTIME_MVP.md` both describe the project with overlapping
-  but not identical endpoint lists. Treat `src/rif_runtime/api.py` as the
-  source of truth for the API surface, and update the docs when you change
-  routes.
+- **Docs lag the code.** `docs/API.md` has been reconciled with the real route
+  table (it previously listed a `POST /v1/runtime/reset-posture` that never
+  existed; the route is `POST /v1/posture/reset`). `README.md` and
+  `docs/RIF_RUNTIME_MVP.md` still describe the project with overlapping but
+  not identical endpoint lists. Treat `src/rif_runtime/api.py` as the source
+  of truth for the API surface, and update the docs when you change routes.
+- **Posture escalation is one-way.** `governance/posture.py` is the single
+  source of the ladder and its denial thresholds; `ReflexiveLoop` and
+  `ReplayEngine` both derive posture from it, so a replayed runtime lands on
+  the same rung as the live one. `next_posture` takes the max of the current
+  posture and the denial-derived floor — it must never return a lower rung,
+  or ordinary denial traffic would unlock a `locked` runtime. Standing a
+  posture down is an explicit operator act (`POST /v1/posture/reset`).
+- **Capability names must be mapped into the `mcp.` action namespace.**
+  `governance/engine.py:capability_action` does this before every per-call
+  evaluation. Skip it and a capability like `exploit.run` reaches
+  `PolicyEngine` as an action matching no rule and no built-in constraint, so
+  it falls through to `default.allow` — silently ungoverned. Covered by
+  `tests/test_kernel.py::test_every_capability_lands_in_the_governed_action_namespace`.
+- **The kernel's governance runs twice, deliberately.** `evaluate(context)` is
+  pre-flight admission on the intent; `CapabilityApprovalGate` calls
+  `evaluate_capability` once per tool invocation during execution. Never
+  replace the gate with an auto-approval rule — the model picks its tool calls
+  after admission, from text that may be adversarial, so admitting the intent
+  is not authorising the actions.
+- **`rif_runtime` depends on no model vendor.** `execution.ExecutionEngine` is
+  a Protocol; provider SDKs live in `adapters/` behind lazy imports and extras
+  (`pip install -e '.[foundry]'`). `EchoExecutionEngine` exercises the whole
+  pipeline in CI without a provider. Don't add a vendor SDK to the core deps.
+- **Two telemetry modules, different jobs.** `governance/telemetry.py` tracks
+  *decisions* in a rolling window to drive posture; `telemetry.py` tracks
+  *executions* (tokens, latency, calls). They are not interchangeable.
 - **Version bump checklist.** `__version__` is derived from installed package
   metadata via `importlib.metadata.version("rif-runtime")` (single source of
   truth: `pyproject.toml`). When cutting a release, **only `pyproject.toml`
@@ -154,17 +207,40 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   metadata before committing. The version consistency test
   (`tests/test_version.py`) will catch any drift when the package is
   installed (as CI always does via `pip install -e .` before `pytest`).
-- Tests that instantiate `RIFRuntime()` write real records into
-  `data/decisions.jsonl` and `data/posture_history.jsonl` (gitignored) as a
-  side effect — there's no fixture isolating this. `tests/test_policy_store.py`
-  is the one place that uses `tmp_path` correctly; follow that pattern for new
-  tests that touch persistent storage where isolation matters.
+- **State directory is relocatable.** Every persisted store resolves its path
+  through `rif_runtime.paths` (`RIF_DATA_DIR`, default `data/`). `tests/conftest.py`
+  points it at a tmp dir before any `rif_runtime` module is imported — module-level
+  `RIFRuntime()` construction in `api.py` means a fixture would be too late.
+  A full `pytest -q` therefore leaves the working tree clean; it previously
+  appended to the JSONL logs and rewrote the checked-in `data/policies.json`
+  through the `/v1/policies` routes. Prefer `tmp_path` (see
+  `tests/test_policy_store.py`) when a single test needs its own store.
 - `data/policies.json` is checked into git (it's the seed/default state);
   `data/*.jsonl` files are gitignored. Don't flip that.
 
 ## API surface (from `src/rif_runtime/api.py`)
 
+Routes marked **auth** require `X-API-Key` (see `auth.py`). Full table with
+request shapes: `docs/API.md`.
+
 ```
-GET  /
-GET  /\nGET  /health\nGET  /v1/environments\nPOST /v1/environment/{name}\nPOST /v1/policy/evaluate\nPOST /v1/posture/{posture}\nPOST /v1/posture/reset\nGET  /v1/graph/summary\nGET  /v1/telemetry/summary\nGET  /v1/persistence/summary\nGET  /v1/recovered-state\nGET  /v1/audit\nPOST /v1/mcp/invoke\nGET  /v1/mcp/metasploit/capabilities\nPOST /v1/mcp/metasploit/evaluate\nPOST /v1/mcp/metasploit/token\nGET  /v1/policies\nPUT  /v1/policies/{rule_id}\nDELETE /v1/policies/{rule_id}
+GET    /
+GET    /health
+GET    /v1/environments
+POST   /v1/environment/{name}            auth
+POST   /v1/policy/evaluate               auth
+POST   /v1/posture/reset                 auth
+POST   /v1/posture/{posture}             auth
+GET    /v1/graph/summary
+GET    /v1/telemetry/summary
+GET    /v1/persistence/summary
+GET    /v1/recovered-state
+GET    /v1/audit
+POST   /v1/mcp/invoke
+GET    /v1/mcp/metasploit/capabilities
+POST   /v1/mcp/metasploit/evaluate
+POST   /v1/mcp/metasploit/token          auth
+GET    /v1/policies
+PUT    /v1/policies/{rule_id}            auth
+DELETE /v1/policies/{rule_id}            auth
 ```

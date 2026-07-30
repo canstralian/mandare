@@ -1,22 +1,33 @@
+from __future__ import annotations
+
+from collections.abc import Iterable, Sequence
 from urllib.parse import urlparse
-from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
+
+from .configuration.policies import PolicyRule
+from .schemas import (
+    Decision,
+    EnvironmentProfile,
+    PolicyDecision,
+    PolicyRequest,
+    Posture,
+)
 
 NETWORK_ACTIONS = {"http.request", "api.call", "mcp.invoke", "package.install"}
 
 
-def host(target):
+def host(target: str) -> str:
     p = urlparse(target)
     return (p.hostname or target.split("/")[0]).lower()
 
 
-def allowed(h, patterns):
+def allowed(h: str, patterns: Iterable[str]) -> bool:
     return any(
         h == p.lower() or (p.startswith("*.") and h.endswith(p[1:].lower()))
         for p in patterns
     )
 
 
-def rule_matches(rule, req: PolicyRequest):
+def rule_matches(rule: PolicyRule, req: PolicyRequest) -> bool:
     if rule.action != "*" and rule.action != req.action:
         return False
     if rule.target == "*":
@@ -28,10 +39,19 @@ def rule_matches(rule, req: PolicyRequest):
 
 
 class PolicyEngine:
-    def evaluate(self, req: PolicyRequest, env_name, profile, posture, policy_rules=()):
+    def evaluate(
+        self,
+        req: PolicyRequest,
+        env_name: str,
+        profile: EnvironmentProfile,
+        posture: Posture,
+        policy_rules: Sequence[PolicyRule] = (),
+    ) -> PolicyDecision:
         if posture == Posture.locked:
             return self.deny(req, env_name, posture, "runtime locked", "posture.locked")
         for rule in policy_rules:
+            # Wildcard rules are inert placeholders until partial-wildcard
+            # precedence is designed; only fully-specific rules override.
             if rule.action == "*" or rule.target == "*":
                 continue
             if rule_matches(rule, req):
@@ -67,7 +87,7 @@ class PolicyEngine:
                 "MCP egress disabled",
                 "mcp.egress.disabled",
             )
-        if req.action in {"http.request", "api.call", "mcp.invoke", "package.install"}:
+        if req.action in NETWORK_ACTIONS:
             h = host(req.target)
             if profile.networking_type == "limited" and not allowed(
                 h, profile.allowed_hosts
@@ -90,7 +110,14 @@ class PolicyEngine:
             matched_rule="default.allow",
         )
 
-    def deny(self, req, env_name, posture, reason, rule):
+    def deny(
+        self,
+        req: PolicyRequest,
+        env_name: str,
+        posture: Posture,
+        reason: str,
+        rule: str,
+    ) -> PolicyDecision:
         return PolicyDecision(
             decision=Decision.deny,
             actor=req.actor,

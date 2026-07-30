@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import threading
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
+from ..paths import POLICIES_FILE, data_path
 from ..schemas import Decision
 from .store import JsonStore
 
@@ -36,21 +40,27 @@ DEFAULT_POLICIES = {
 
 
 class PolicyStore:
-    def __init__(self, path: str = "data/policies.json"):
-        self.store = JsonStore(path, DEFAULT_POLICIES)
+    def __init__(self, path: str | Path | None = None) -> None:
+        # Resolved per instance so RIF_DATA_DIR applies; see rif_runtime.paths.
+        self.store = JsonStore(path or data_path(POLICIES_FILE), DEFAULT_POLICIES)
+        # upsert/delete are read-modify-write over the whole file. The API
+        # shares one PolicyStore across FastAPI's sync threadpool, so two
+        # concurrent writes would otherwise race and lose a rule.
+        self._lock = threading.Lock()
 
     def list(self) -> list[PolicyRule]:
         return [PolicyRule.model_validate(row) for row in self.store.read()["rules"]]
 
     def upsert(self, rule: PolicyRule) -> PolicyRule:
-        rules = [r.model_dump() for r in self.list()]
-        kept = [r for r in rules if r["id"] != rule.id]
-        kept.append(rule.model_dump())
-        self.store.write({"rules": kept})
+        with self._lock:
+            kept = [r.model_dump() for r in self.list() if r.id != rule.id]
+            kept.append(rule.model_dump())
+            self.store.write({"rules": kept})
         return rule
 
     def delete(self, rule_id: str) -> bool:
-        rules = [r.model_dump() for r in self.list()]
-        kept = [r for r in rules if r["id"] != rule_id]
-        self.store.write({"rules": kept})
-        return len(kept) != len(rules)
+        with self._lock:
+            rules = self.list()
+            kept = [r.model_dump() for r in rules if r.id != rule_id]
+            self.store.write({"rules": kept})
+            return len(kept) != len(rules)
