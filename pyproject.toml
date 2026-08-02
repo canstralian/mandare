@@ -4,14 +4,18 @@ build-backend='setuptools.build_meta'
 
 [project]
 name='rif-runtime'
-version='0.2.2'
+# Bump with: scripts/bump-version.sh X.Y.Z
+version='0.3.0rc1'
 dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
 
 [project.optional-dependencies]
-dev=['pytest','httpx','ruff','mypy','types-PyYAML','jsonschema[format]']
+dev=['pytest','httpx','ruff==0.15.22','mypy','types-PyYAML','jsonschema[format]']
 
 [project.scripts]
 rif='rif_runtime.cli:app'
 
 [tool.setuptools.packages.find]
 where=['src']
+
+[tool.vercel]
+entrypoint = "src.rif_runtime.api:app"
