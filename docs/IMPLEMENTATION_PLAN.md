@@ -190,6 +190,7 @@ Add to `pyproject.toml`:
 ```toml
 [tool.mypy]
 python_version = "3.12"
+mypy_path = "src"
 packages = ["rif_runtime"]
 warn_return_any = true
 warn_unused_ignores = true
