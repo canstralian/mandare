@@ -1,21 +1,65 @@
 [build-system]
-requires=['setuptools']
-build-backend='setuptools.build_meta'
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name='rif-runtime'
-# Bump with: scripts/bump-version.sh X.Y.Z
-version='0.3.0rc1'
-dependencies=['fastapi','uvicorn[standard]','pydantic','pyyaml','networkx','typer','rich','httpx','cryptography']
+name = "rif-runtime"
+version = "0.3.0rc1"
+description = "Governed execution substrate for intelligent systems."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Stephen de Jager" }
+]
+keywords = [
+    "ai",
+    "runtime",
+    "governance",
+    "policy",
+    "evidence",
+    "replay",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+
+dependencies = []
 
 [project.optional-dependencies]
-dev=['pytest','httpx','ruff==0.15.22','mypy','types-PyYAML','jsonschema[format]']
+dev = [
+    "pytest>=8.4",
+    "mypy>=1.18",
+]
 
-[project.scripts]
-rif='rif_runtime.cli:app'
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
 
-[tool.setuptools.packages.find]
-where=['src']
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_return_any = true
+show_error_codes = true
+pretty = true
 
-[tool.vercel]
-entrypoint = "src.rif_runtime.api:app"
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 from .descriptor import ResourceCapabilityDescriptor
 from .exceptions import (
@@ -12,9 +12,6 @@ from .exceptions import (
 class ResourceCapabilityRegistry:
     """
     Registry of governed resource capability descriptors.
-
-    Registration is explicit.
-    Resolution is deterministic.
     """
 
     def __init__(
@@ -57,6 +54,9 @@ class ResourceCapabilityRegistry:
 
     def __contains__(self, name: object) -> bool:
         return isinstance(name, str) and name in self._capabilities
+
+    def __iter__(self) -> Iterator[ResourceCapabilityDescriptor]:
+        return iter(self._capabilities.values())
 
     def __len__(self) -> int:
         return len(self._capabilities)

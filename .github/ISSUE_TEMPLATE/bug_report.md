@@ -1,9 +1,6 @@
 ---
-name: Bug report
-title: "[Bug]: "
-labels: bug
+name: Bug Report
+about: Report incorrect runtime behaviour
 ---
-## Description
-## Reproduction
-## Expected
-## Actual
+
+...
