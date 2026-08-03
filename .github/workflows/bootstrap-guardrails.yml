@@ -1,0 +1,61 @@
+# Pre-merge guardrails for Cloud bootstrap (ADR-0027 G1 + light G4).
+# Full no-ensurepip harness (G2) is a follow-up; this job catches the
+# exact regression that caused INSTALL_FAILED on main.
+name: Bootstrap guardrails
+
+on:
+  pull_request:
+    paths:
+      - ".cursor/environment.json"
+      - "scripts/cloud-agent-install.sh"
+      - "scripts/bootstrap.sh"
+      - ".github/workflows/bootstrap-guardrails.yml"
+      - "docs/adr/ADR-0027-cloud-bootstrap-without-ensurepip.md"
+  push:
+    branches: [main]
+    paths:
+      - ".cursor/environment.json"
+      - "scripts/cloud-agent-install.sh"
+      - "scripts/bootstrap.sh"
+      - ".github/workflows/bootstrap-guardrails.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  environment-json-policy:
+    name: environment.json must use harden script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Forbid bare python3 -m venv as Cloud install
+        run: |
+          set -euo pipefail
+          cfg=".cursor/environment.json"
+          test -f "$cfg"
+          install_cmd="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["install"])' "$cfg")"
+          echo "install=$install_cmd"
+          case "$install_cmd" in
+            *cloud-agent-install.sh*|*bootstrap.sh*)
+              echo "OK: install delegates to supported script"
+              ;;
+            *)
+              echo "::error::install must call scripts/cloud-agent-install.sh (or bootstrap.sh)"
+              exit 1
+              ;;
+          esac
+          if echo "$install_cmd" | grep -q 'python3 -m venv'; then
+            echo "::error::bare python3 -m venv in environment.json install (ADR-0027)"
+            exit 1
+          fi
+
+      - name: Script acceptance contract present
+        run: |
+          set -euo pipefail
+          script="scripts/cloud-agent-install.sh"
+          test -x "$script" || test -f "$script"
+          grep -q 'rif-bootstrap-ok' "$script"
+          grep -q 'import fastapi' "$script"
+          grep -q 'venv_structurally_ok\|structurally valid' "$script"
+          echo "OK: acceptance marker + import gate + structural check"
