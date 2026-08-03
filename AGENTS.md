@@ -10,12 +10,13 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
 - Dependencies are installed into a virtualenv at `.venv` (gitignored). Activate
   it before running anything: `source .venv/bin/activate`. The startup update
   script keeps it in sync with `pip install -e .` + `requirements-dev.txt`.
-- That bootstrap is defined in `.cursor/environment.json` (repo-owned), so setup
-  uses `python3` explicitly and does not depend on the base image providing a
-  bare `python` alias.
-- `python3 -m venv` requires the `python3.12-venv` system package. It is already
-  present in the VM image; only reinstall it (`apt-get install -y python3.12-venv`)
-  if venv creation ever fails on a fresh machine.
+- That bootstrap is defined in `.cursor/environment.json` (repo-owned) and runs
+  `scripts/cloud-agent-install.sh`. Flow: reuse a healthy `.venv` → stdlib
+  `venv` if `ensurepip` works → already-installed `virtualenv` → else
+  `/usr/bin/python3 -m pip install --user virtualenv` and create `.venv`.
+  Do not rely on `apt-get install python3.12-venv`: many Cloud images omit
+  `ensurepip`, and restricted egress blocks Ubuntu archives. PyPI is
+  allowlisted; system pip is present even when `ensurepip` is not.
 - CI (`.github/workflows/ci.yml`) gates on three commands, run in this order:
   `ruff check src tests`, `mypy src/rif_runtime --ignore-missing-imports`,
   `pytest -q`. `quality.yml` also enforces `ruff format .` — run all four before
