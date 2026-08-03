@@ -4,6 +4,7 @@
       "action": "http.request",
       "effect": "allow",
       "id": "allow_known_model_hosts",
+      "metadata": {},
       "reason": "known model API host",
       "target": "api.anthropic.com"
     },
@@ -11,6 +12,7 @@
       "action": "*",
       "effect": "deny",
       "id": "deny_unknown_by_default",
+      "metadata": {},
       "reason": "deny by default",
       "target": "*"
     }
