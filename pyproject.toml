@@ -30,13 +30,34 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-dependencies = []
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pyyaml",
+    "networkx",
+    "typer",
+    "rich",
+    "httpx",
+    "cryptography",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4",
     "mypy>=1.18",
 ]
+
+[project.scripts]
+rif = "rif_runtime.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Vercel FastAPI builder looks for app in default locations; src/ layout needs
+# an explicit entrypoint (see https://vercel.com/docs/frameworks/backend/fastapi).
+[tool.vercel]
+entrypoint = "src.rif_runtime.api:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
