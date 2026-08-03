@@ -12,12 +12,15 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
   script keeps it in sync with `pip install -e .` + `requirements.txt` +
   `requirements-dev.txt` (`pyproject.toml` currently has empty `dependencies`).
 - That bootstrap is defined in `.cursor/environment.json` (repo-owned) and runs
-  `scripts/cloud-agent-install.sh`. Flow: reuse a healthy `.venv` → stdlib
+  `scripts/cloud-agent-install.sh` — the only supported install entrypoint.
+  Flow: reuse a structurally valid `.venv` (python + pip + activate) → stdlib
   `venv` if `ensurepip` works → already-installed `virtualenv` → else
-  `/usr/bin/python3 -m pip install --user virtualenv` and create `.venv`.
-  Do not rely on `apt-get install python3.12-venv`: many Cloud images omit
-  `ensurepip`, and restricted egress blocks Ubuntu archives. PyPI is
-  allowlisted; system pip is present even when `ensurepip` is not.
+  `/usr/bin/python3 -m pip install --user virtualenv` and create `.venv` →
+  install deps → acceptance gate (`import fastapi` / `rif_runtime`) and write
+  `.venv/.rif-bootstrap-ok`. Do not rely on `apt-get install python3.12-venv`:
+  many Cloud images omit `ensurepip`, and restricted egress blocks Ubuntu
+  archives. PyPI is allowlisted; system pip is present even when `ensurepip`
+  is not. Prefer linking docs to this script over copying shell snippets.
 - CI (`.github/workflows/ci.yml`) gates on three commands, run in this order:
   `ruff check src tests`, `mypy src/rif_runtime --ignore-missing-imports`,
   `pytest -q`. `quality.yml` also enforces `ruff format .` — run all four before
