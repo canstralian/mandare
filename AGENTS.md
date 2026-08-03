@@ -9,7 +9,8 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
 
 - Dependencies are installed into a virtualenv at `.venv` (gitignored). Activate
   it before running anything: `source .venv/bin/activate`. The startup update
-  script keeps it in sync with `pip install -e .` + `requirements-dev.txt`.
+  script keeps it in sync with `pip install -e .` + `requirements.txt` +
+  `requirements-dev.txt` (`pyproject.toml` currently has empty `dependencies`).
 - That bootstrap is defined in `.cursor/environment.json` (repo-owned) and runs
   `scripts/cloud-agent-install.sh`. Flow: reuse a healthy `.venv` → stdlib
   `venv` if `ensurepip` works → already-installed `virtualenv` → else

@@ -89,5 +89,7 @@ ensure_venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip
+# pyproject.toml currently declares no runtime deps; they live in requirements.txt.
 pip install -e .
+pip install -r requirements.txt
 pip install -r requirements-dev.txt
