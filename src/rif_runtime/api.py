@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
+
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.mcp.capabilities import capability_catalog
