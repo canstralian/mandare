@@ -12,7 +12,8 @@ from rif_runtime.mcp.metasploit import (
     MetasploitIntent,
 )
 
-from .auth import ControlPlaneAuth
+from .auth import ControlPlaneAuth, configure_lockout
+from .middleware import RateLimitMiddleware, RequestIDMiddleware
 from .replay import ReplayEngine
 from .runtime import RIFRuntime
 from .schemas import PolicyDecision, PolicyRequest, Posture
@@ -21,8 +22,31 @@ from .startup import register_config_startup
 runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")
 
+# ---------------------------------------------------------------------------
+# Security middleware (order matters: RequestID first so rate-limit responses
+# carry the header too).
+# ---------------------------------------------------------------------------
+
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(RateLimitMiddleware, rate=20.0, burst=40)
+
 # Wire configuration validation into app startup
 register_config_startup(app)
+
+
+@app.on_event("startup")
+def _configure_security() -> None:
+    """Apply security settings from rif.toml [security] at startup."""
+    from .config import get_settings
+
+    settings = get_settings()
+    # Security section is optional; fall back to built-in defaults.
+    security = getattr(settings, "security", None)
+    if security is not None:
+        configure_lockout(
+            attempts=security.auth_lockout_attempts,
+            window_seconds=security.auth_lockout_window_seconds,
+        )
 
 
 @app.get("/health")
@@ -58,8 +82,6 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 
 @app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
 def reset_posture() -> dict[str, Any]:
-    # Must be registered before /v1/posture/{posture}, otherwise "reset" is
-    # captured as a Posture path param and FastAPI returns 422.
     runtime.posture = Posture.normal
     return {"posture": runtime.posture.value}
 
@@ -104,9 +126,6 @@ def mcp_invoke(payload: dict[str, Any]) -> PolicyDecision:
         target=payload.get("target", "unknown"),
         reason=payload.get("reason"),
     )
-    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
-    # write to the decision log. The authenticated /v1/policy/evaluate is the
-    # recording path. See runtime.evaluate(record=...).
     return runtime.evaluate(req, record=False)
 
 
@@ -129,9 +148,6 @@ def metasploit_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
         )
     except (ValidationError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
-    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
-    # write to the stores. Minting a capability token (the actual authorization)
-    # goes through the guarded /v1/mcp/metasploit/token.
     outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token, record=False)
     return {
         "decision": outcome.decision,
@@ -148,9 +164,6 @@ def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
         raise HTTPException(status_code=422, detail="missing 'intent' in payload")
     try:
         intent = MetasploitIntent.model_validate(payload["intent"])
-        # TypeError, not just ValueError: int(None) and int({}) raise TypeError,
-        # so a null or object ttl_seconds would otherwise escape as a 500 while
-        # a non-numeric string correctly returned 422.
         ttl_seconds = int(payload.get("ttl_seconds", 600))
     except (ValidationError, TypeError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -168,8 +181,6 @@ def persistence_summary() -> dict[str, Any]:
 
 @app.get("/v1/recovered-state")
 def recovered_state() -> dict[str, Any]:
-    # Rebuilt from the persisted decision log, not from live runtime state, so
-    # the response is meaningful after a restart.
     return asdict(ReplayEngine().recover())
 
 
