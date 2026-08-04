@@ -19,6 +19,9 @@
 #   RIF_PROVIDER_ENDPOINT-> [provider] endpoint
 #   RIF_DATA_DIR         -> [paths] data_dir
 #   RIF_CONFIG_DIR       -> [paths] config_dir
+#   RIF_GOVERNANCE_ELEVATED_AT   -> [governance] posture_elevated_at
+#   RIF_GOVERNANCE_RESTRICTED_AT -> [governance] posture_restricted_at
+#   RIF_GOVERNANCE_LOCKED_AT     -> [governance] posture_locked_at
 
 [runtime]
 # Governance posture: normal | elevated | restricted | locked
@@ -54,3 +57,11 @@ data_dir = "data"
 
 # Directory for supplementary config files (environments.yaml, policies)
 config_dir = "config"
+
+[governance]
+# Denial-count thresholds for posture escalation.
+# When the number of denials in the observation window reaches these
+# thresholds, the runtime posture escalates accordingly.
+posture_elevated_at = 3
+posture_restricted_at = 10
+posture_locked_at = 20
