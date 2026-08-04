@@ -178,8 +178,9 @@ class TestSigningKeyDerivation:
             "RIF_SECRET_KEY": "my-app-secret",
         }
         with patch.dict(os.environ, env, clear=False):
-            # Remove explicit key if present
+            # Remove higher-priority keys if present
             os.environ.pop("RIF_MSF_SIGNING_KEY", None)
+            os.environ.pop("RIF_MSF_BROKER_KEY", None)
             from rif_runtime.mcp.metasploit import _derive_signing_key
 
             key = _derive_signing_key()
@@ -191,6 +192,7 @@ class TestSigningKeyDerivation:
         env = {"RIF_SECRET_KEY": "deterministic-test"}
         with patch.dict(os.environ, env, clear=False):
             os.environ.pop("RIF_MSF_SIGNING_KEY", None)
+            os.environ.pop("RIF_MSF_BROKER_KEY", None)
             from rif_runtime.mcp.metasploit import _derive_signing_key
 
             key1 = _derive_signing_key()
