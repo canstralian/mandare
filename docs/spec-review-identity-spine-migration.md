@@ -114,9 +114,9 @@ Replay reconstructs the full chain — `Run → Decision(s) → Execution(s) →
 | Component | Current keys on `execution_id` | Action required | Route classification |
 |---|---|---|---|
 | GovernanceLedger | Yes | Re-key `execution_id` → `run_id`. Apply `SERIALIZABLE` isolation / advisory lock. | Split: lock fix is **Track A**; re-key is **Track B** |
-| PostureManager | Yes (via `execution_id` epoch) | Re-key posture transitions to `run_id`. | **Track B** |
+| PostureManager | Yes — posture transitions recorded in `data/posture_history.jsonl` carry only `{"old_posture", "new_posture"}` fields today; no `run_id` or `execution_id` is written at the point of escalation (`runtime.py:77-79`). The escalation epoch is therefore correlated to an `execution_id` only implicitly, via temporal proximity to the surrounding decision row in `decisions.jsonl`. The `ReflexiveLoop` derives denial counts from a 60-minute rolling `TelemetryStore` window — it never persists a correlation key. | Re-key posture transition records to include `run_id` (and optionally the triggering `decision_id`) at the time of write (`runtime.py:record_decision`). Update `ReplayEngine` to consume `run_id` when replaying posture history. Hardcoded thresholds (3 / 10 / 20 denials) in `PostureManager.next_posture` are out of scope for the re-key but should move to config as a coupled Track B cleanup. | **Track B** |
 | AuthorityEngine / PolicyEngine | No | Reverse default-allow to fail-closed (`allowed=False`). | **Track A** (PR #41) |
-| EvidenceBundle / Observation | Yes | Re-key and unroll into granular `Observation` rows under `run_id`. | **Track B** |
+| EvidenceBundle / Observation | Yes — `EvidenceEvent` (`mcp/metasploit.py:154-166`) records a self-generated `decision_id` (a fresh `uuid4()` independent of the `PolicyDecision.timestamp`, not correlated to a `run_id`). Fields: `decision_id`, `intent_hash`, `tool`, `requested_capability`, `policy_decision`, `scope_id`, `contract_hash`, `matched_rule`, `timestamp`, `signature`. Appended to `data/metasploit_evidence.jsonl` (`runtime.py:112`). Each `EvidenceEvent` maps 1-to-1 to a `GovernanceOutcome`/`PolicyDecision` but carries no `run_id`, `execution_id`, or FK to the parent `decisions.jsonl` row. The general-purpose `PolicyDecision` persisted to `decisions.jsonl` has the same gap — no `run_id` field in `schemas.PolicyDecision`. | Add `run_id` field to `PolicyDecision` schema (and therefore to every row in `decisions.jsonl`). Add a matching `run_id` to `EvidenceEvent`, derived from the owning `Run`. Unroll coarse `EvidenceBundle` semantics into per-`Execution` `Observation` rows referencing the parent `run_id` per the normative hierarchy (Section 2). Update `MetasploitGovernor._sign_evidence` to accept and embed `run_id`; update `RIFRuntime.evaluate_metasploit` to pass it through. | **Track B** |
 | Control-Plane API | Yes | Implement `ControlPlaneAuth` header check. Update path params to `run_id` with deprecation alias per Section 7. | Split: auth is **Track A** (PR #41); re-key is **Track B** |
 
 This table is the primary deliverable evidence for the Traceability Report. The two Track A items above (GovernanceLedger lock, control-plane auth) execute immediately and independently of this review's ratification — see Section 14.
@@ -153,7 +153,7 @@ This document is ratified when:
 - [ ] Section 5: event-type enumeration and downstream-consumer inventory completed.
 - [ ] Section 6: replay preservation confirmed for all existing recorded runs (or legacy runs explicitly scoped as non-replayable).
 - [ ] Section 7: confirmed no external consumer contract outside this repo is silently broken by the rename.
-- [ ] Section 8: PostureManager and EvidenceBundle/Observation audit detail populated in the compatibility matrix.
+- [x] Section 8: PostureManager and EvidenceBundle/Observation audit detail populated in the compatibility matrix.
 - [ ] Section 9: golden-test fixture enumeration (regenerate vs. frozen-legacy) completed.
 - [ ] ADR-0010 is updated to reference this document as its implementation authority.
 - [ ] Specification Governor (or acting equivalent) signs off.
