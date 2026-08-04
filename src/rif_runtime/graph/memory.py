@@ -10,6 +10,12 @@ class GovernanceGraph:
         self.graph = nx.MultiDiGraph()
 
     def record_decision(self, decision: PolicyDecision) -> None:
+        """
+        Record a policy decision in the governance graph.
+        
+        Parameters:
+        	decision (PolicyDecision): The policy decision to record.
+        """
         self.graph.add_node(decision.actor, type="actor")
         self.graph.add_node(decision.target, type="target")
         self.graph.add_edge(
@@ -27,6 +33,12 @@ class GovernanceGraph:
         )
 
     def summary(self) -> dict[str, Any]:
+        """Summarize the number of nodes and edges in the governance graph.
+        
+        Returns:
+            dict[str, Any]: A mapping containing the graph's node count under
+                ``"nodes"`` and edge count under ``"edges"``.
+        """
         return {
             "nodes": self.graph.number_of_nodes(),
             "edges": self.graph.number_of_edges(),

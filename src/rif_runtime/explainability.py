@@ -37,6 +37,16 @@ class DecisionExplanation(BaseModel):
             "default",
         ),
     ) -> DecisionExplanation:
+        """
+        Construct an explanation for a policy decision and its evaluation context.
+        
+        Parameters:
+            environment_snapshot (dict[str, Any]): Environment state captured during evaluation.
+            precedence (tuple[str, ...]): Ordered sources used to determine the decision.
+        
+        Returns:
+            DecisionExplanation: An explanation containing the request, decision, posture states, environment snapshot, and precedence order.
+        """
         return cls(
             request=request,
             decision=decision,

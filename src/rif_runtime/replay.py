@@ -22,6 +22,11 @@ class ReplayEngine:
         self.decisions_path = Path(decisions_path)
 
     def _rows(self) -> list[dict[str, Any]]:
+        """Read and parse all nonblank decision records from the configured log file.
+        
+        Returns:
+        	list[dict[str, Any]]: Parsed decision records, or an empty list when the log file does not exist.
+        """
         import json
 
         if not self.decisions_path.exists():
@@ -34,10 +39,15 @@ class ReplayEngine:
         return rows
 
     def replay_graph(self, rows: list[dict[str, Any]] | None = None) -> GovernanceGraph:
-        """Rebuild the governance graph, optionally from an already-loaded log.
-
-        Passing ``rows`` lets a caller that has already read the decision log
-        reuse that snapshot instead of re-reading the file.
+        """
+        Rebuild the governance graph from decision-log records.
+        
+        Parameters:
+            rows (list[dict[str, Any]] | None): Optional preloaded decision-log records.
+                When omitted, records are read from the configured file.
+        
+        Returns:
+            GovernanceGraph: The reconstructed governance graph.
         """
         graph = GovernanceGraph()
         for row in self._rows() if rows is None else rows:
@@ -48,6 +58,13 @@ class ReplayEngine:
         # Read the log once and derive both the counts and the graph from that
         # single snapshot: decisions.jsonl is appended to concurrently, so two
         # separate reads could report totals that disagree with each other.
+        """
+        Recover historical decision state from the decision log.
+        
+        Returns:
+            RecoveredState: Historical decision and denial counts, graph node and
+                edge counts, and the posture derived from the denial count.
+        """
         rows = self._rows()
         graph = self.replay_graph(rows)
         denials = sum(1 for row in rows if row.get("decision") == "deny")

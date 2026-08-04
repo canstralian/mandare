@@ -14,11 +14,29 @@ NETWORK_ACTIONS = {"http.request", "api.call", "mcp.invoke", "package.install"}
 
 
 def host(target: str) -> str:
+    """Extract the lowercase hostname from a URL or target string.
+    
+    Parameters:
+    	target (str): URL or network target to parse.
+    
+    Returns:
+    	str: The lowercase hostname, or the first path segment when no hostname is available.
+    """
     p = urlparse(target)
     return (p.hostname or target.split("/")[0]).lower()
 
 
 def allowed(h: str, patterns: Iterable[str]) -> bool:
+    """
+    Determine whether a hostname matches any allowed host pattern.
+    
+    Parameters:
+    	h (str): Hostname to evaluate.
+    	patterns (Iterable[str]): Hostnames or wildcard patterns to compare against.
+    
+    Returns:
+    	bool: `true` if the hostname matches an exact or `*.` wildcard pattern, `false` otherwise.
+    """
     return any(
         h == p.lower() or (p.startswith("*.") and h.endswith(p[1:].lower()))
         for p in patterns
@@ -26,6 +44,16 @@ def allowed(h: str, patterns: Iterable[str]) -> bool:
 
 
 def rule_matches(rule: PolicyRule, req: PolicyRequest) -> bool:
+    """
+    Determine whether a policy rule matches a request's action and target.
+    
+    Parameters:
+        rule (PolicyRule): Policy rule to evaluate.
+        req (PolicyRequest): Request to compare with the rule.
+    
+    Returns:
+        bool: `true` if the rule matches the request, `false` otherwise.
+    """
     if rule.action != "*" and rule.action != req.action:
         return False
     if rule.target == "*":
@@ -45,6 +73,19 @@ class PolicyEngine:
         posture: Posture,
         policy_rules: Sequence[PolicyRule] = (),
     ) -> PolicyDecision:
+        """
+        Evaluate a policy request against the current posture, environment profile, and policy rules.
+        
+        Parameters:
+            req (PolicyRequest): Request to evaluate.
+            env_name (str): Name of the environment associated with the request.
+            profile (EnvironmentProfile): Environment settings governing network and package access.
+            posture (Posture): Current runtime security posture.
+            policy_rules (Sequence[PolicyRule]): Specific policy rules to consider.
+        
+        Returns:
+            PolicyDecision: The resulting allow or deny decision, including its reason and matched rule.
+        """
         if posture == Posture.locked:
             return self.deny(req, env_name, posture, "runtime locked", "posture.locked")
         for rule in policy_rules:
@@ -114,6 +155,19 @@ class PolicyEngine:
         reason: str,
         rule: str,
     ) -> PolicyDecision:
+        """
+        Create a deny decision for a policy request.
+        
+        Parameters:
+        	req (PolicyRequest): The request to deny.
+        	env_name (str): The environment associated with the request.
+        	posture (Posture): The current security posture.
+        	reason (str): The reason for denying the request.
+        	rule (str): The identifier of the matching policy rule.
+        
+        Returns:
+        	PolicyDecision: A denial decision containing the request context and supplied policy details.
+        """
         return PolicyDecision(
             decision=Decision.deny,
             actor=req.actor,

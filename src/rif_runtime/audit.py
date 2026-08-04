@@ -23,10 +23,20 @@ class AuditRecord:
 
 
 def utc_now_iso() -> str:
+    """Return the current UTC time in ISO 8601 format."""
     return datetime.now(UTC).isoformat()
 
 
 def calculate_hash(record: AuditRecord) -> str:
+    """
+    Calculate the SHA-256 hash for an audit record.
+    
+    Parameters:
+    	record (AuditRecord): The record whose identifying and audit fields are hashed.
+    
+    Returns:
+    	str: The record's SHA-256 digest.
+    """
     return sha256_digest(
         {
             "event_id": record.event_id,

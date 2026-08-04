@@ -105,6 +105,20 @@ def verify_secret(secret: str, record: dict[str, str | int]) -> bool:
 
 
 def normalize_for_json(value: Any) -> Any:
+    """
+    Convert supported values into canonical JSON-compatible values.
+    
+    Parameters:
+        value (Any): The value to normalize.
+    
+    Returns:
+        Any: A normalized value with stringified dictionary keys, ISO-formatted
+            datetimes, string UUIDs, URL-safe Base64-encoded bytes, and recursively
+            normalized sequences.
+    
+    Raises:
+        TypeError: If the value has an unsupported type.
+    """
     if isinstance(value, dict):
         return {str(key): normalize_for_json(inner) for key, inner in value.items()}
     if isinstance(value, list | tuple):
@@ -146,6 +160,15 @@ def should_redact_key(key: str) -> bool:
 
 
 def redact_secrets(value: Any) -> Any:
+    """
+    Recursively redact sensitive values in dictionaries and sequences.
+    
+    Parameters:
+    	value (Any): The value to process.
+    
+    Returns:
+    	Any: A copy with sensitive dictionary values replaced by "[REDACTED]"; lists and tuples are returned as lists.
+    """
     if isinstance(value, dict):
         return {
             key: "[REDACTED]" if should_redact_key(str(key)) else redact_secrets(inner)

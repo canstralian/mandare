@@ -47,7 +47,7 @@ def test_version_matches_pyproject() -> None:
 
 
 def test_read_version_from_pyproject_path_resolution() -> None:
-    """_read_version_from_pyproject() resolves pyproject.toml via the 3-parent path."""
+    """Verify that the project version is read from the repository's pyproject.toml."""
     from rif_runtime._version import _read_version_from_pyproject
 
     pyproject = Path(__file__).parent.parent / "pyproject.toml"

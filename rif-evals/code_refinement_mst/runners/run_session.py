@@ -31,6 +31,14 @@ from rif_runtime.security import sha256_digest
 
 
 def _enum_value(value: object) -> object:
+    """Return the underlying value of an enum-like object.
+    
+    Parameters:
+        value (object): The value to inspect.
+    
+    Returns:
+        object: The object's `value` attribute when present; otherwise, the original value.
+    """
     return value.value if hasattr(value, "value") else value
 
 

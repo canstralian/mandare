@@ -134,11 +134,26 @@ class CapabilityToken(BaseModel):
         # A token deserialised from a naive ISO string would otherwise raise a
         # TypeError when compared against the timezone-aware ``now`` in the
         # broker, and would sign inconsistently across environments.
+        """
+        Normalize a timestamp to UTC.
+        
+        Parameters:
+            value (datetime): The timestamp to normalize.
+        
+        Returns:
+            datetime: The equivalent timestamp with UTC timezone information.
+        """
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
 
     def signing_payload(self) -> dict[str, Any]:
+        """
+        Build the canonical payload used to sign the capability token.
+        
+        Returns:
+        	dict[str, Any]: Token metadata with timestamps serialized as ISO 8601 strings.
+        """
         return {
             "token_id": self.token_id,
             "capability": self.capability,
@@ -177,6 +192,14 @@ class GovernanceOutcome:
 def _string_params(value: Any) -> list[str]:
     # Recurse through nested containers so a string buried in a sub-dict or
     # list cannot smuggle an injected instruction past the scanner.
+    """Extract all string values from nested dictionaries and collection values.
+    
+    Parameters:
+    	value (Any): The value to inspect recursively.
+    
+    Returns:
+    	list[str]: The string values found within the value.
+    """
     if isinstance(value, str):
         return [value]
     if isinstance(value, dict):
@@ -218,6 +241,17 @@ class MetasploitGovernor:
         approver: str,
         ttl_seconds: int = 600,
     ) -> CapabilityToken:
+        """
+        Create a signed, time-limited capability token for a governance intent.
+        
+        Parameters:
+        	intent (MetasploitIntent): The capability request authorized by the token.
+        	approver (str): The identity approving the request.
+        	ttl_seconds (int): The token validity duration in seconds.
+        
+        Returns:
+        	CapabilityToken: A signed token bound to the intent's capability, target, scope, and intent hash.
+        """
         issued = datetime.now(UTC)
         token = CapabilityToken(
             capability=intent.capability,
@@ -241,6 +275,20 @@ class MetasploitGovernor:
         token: CapabilityToken | None = None,
         now: datetime | None = None,
     ) -> GovernanceOutcome:
+        """
+        Evaluate a Metasploit intent against the selected governance mode and posture.
+        
+        Parameters:
+            intent (MetasploitIntent): Proposed capability request to evaluate.
+            mode (GovernanceMode): Governance lane used for the evaluation.
+            env_name (str): Environment name recorded in the governance evidence.
+            posture (Posture): Current runtime security posture.
+            token (CapabilityToken | None): Capability approval used for broker authorization.
+            now (datetime | None): Timestamp used for token validation and evidence.
+        
+        Returns:
+            GovernanceOutcome: Policy decision, signed evidence, severity, and simulation status.
+        """
         now = now or datetime.now(UTC)
         simulated = mode == GovernanceMode.shadow
         capability_class = classify(intent.capability)

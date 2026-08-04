@@ -42,13 +42,17 @@ class TemplateAgent:
         reason: str | None = None,
         context: dict[str, Any] | None = None,
     ) -> PolicyRequest:
-        """Build a request for the runtime to evaluate.
-
-        Args:
-            action: Governed action name, e.g. ``http.request``.
-            target: The host, URL, package, or tool being acted on.
-            reason: Optional intent string recorded for the audit trail.
-            context: Optional extra metadata for policy evaluation.
+        """
+        Build a policy request for runtime evaluation.
+        
+        Parameters:
+            action (str): Governed action name, such as ``http.request``.
+            target (str): Host, URL, package, or tool being acted on.
+            reason (str | None): Optional intent recorded for the audit trail.
+            context (dict[str, Any] | None): Optional metadata for policy evaluation.
+        
+        Returns:
+            PolicyRequest: A request containing the agent identity and supplied details.
         """
         return PolicyRequest(
             actor=self.name,

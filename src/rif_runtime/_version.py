@@ -9,6 +9,13 @@ def _read_version_from_pyproject() -> str | None:
     # Depth assumption: src/rif_runtime/_version.py is exactly 3 directories below
     # the repo root (root/src/rif_runtime/_version.py). Only valid in source/editable
     # checkouts — built wheels go through importlib.metadata instead.
+    """
+    Read the package version from the project's ``pyproject.toml`` file.
+    
+    Returns:
+        str | None: The configured project version, or ``None`` if the file is
+            unavailable, required metadata is missing, or the TOML is invalid.
+    """
     try:
         import tomllib
         from pathlib import Path

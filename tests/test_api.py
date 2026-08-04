@@ -29,6 +29,17 @@ def test_graph_summary():
 
 
 def _decision_row(actor, target, decision="allow"):
+    """
+    Build a decision-log record with the specified actor, target, and decision.
+    
+    Parameters:
+    	actor: The actor associated with the decision.
+    	target: The target of the request.
+    	decision: The decision recorded for the request.
+    
+    Returns:
+    	dict: A decision-log record containing the supplied values and fixed test metadata.
+    """
     return {
         "decision": decision,
         "actor": actor,

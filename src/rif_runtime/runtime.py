@@ -35,14 +35,38 @@ class RIFRuntime:
 
     @property
     def profile(self) -> EnvironmentProfile:
+        """
+        Return the profile for the active environment.
+        
+        Returns:
+            EnvironmentProfile: The active environment's configuration profile.
+        """
         return self.config.environments[self.environment_name]
 
     def set_environment(self, name: str) -> None:
+        """Switches the active runtime environment.
+        
+        Parameters:
+        	name (str): Name of a configured environment.
+        
+        Raises:
+        	ValueError: If the environment is not configured.
+        """
         if name not in self.config.environments:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
+        """
+        Evaluate a policy request in the active environment.
+        
+        Parameters:
+            req (PolicyRequest): The policy request to evaluate.
+            record (bool): Whether to record the decision and apply its posture effects.
+        
+        Returns:
+            PolicyDecision: The resulting policy decision.
+        """
         decision = self.policy.evaluate(
             req,
             self.environment_name,
@@ -88,6 +112,16 @@ class RIFRuntime:
     ) -> GovernanceOutcome:
         # Serialise the read-modify-write of posture and the JSONL appends:
         # the API shares one RIFRuntime across FastAPI's sync threadpool.
+        """
+        Evaluate a Metasploit intent under the active environment and governance posture.
+        
+        Parameters:
+            intent (MetasploitIntent): The Metasploit action to evaluate.
+            record (bool): Whether to persist the decision, evidence, and posture transition.
+        
+        Returns:
+            GovernanceOutcome: The governance decision and associated evidence.
+        """
         with self._lock:
             outcome = self.metasploit.evaluate(
                 intent,
@@ -118,15 +152,31 @@ class RIFRuntime:
             return outcome
 
     def graph_summary(self) -> dict[str, Any]:
+        """Return a summary of the current governance graph.
+        
+        Returns:
+        	dict[str, Any]: Governance graph summary data.
+        """
         return self.governance_graph.summary()
 
     def telemetry_summary(self) -> dict[str, Any]:
+        """
+        Summarize recent denials and the total number of telemetry events.
+        
+        Returns:
+        	dict[str, Any]: A summary containing the denial count from the last 60 minutes and the total event count.
+        """
         return {
             "recent_denials_60m": self.reflexive.telemetry.denial_count(minutes=60),
             "event_count": len(self.reflexive.telemetry.events),
         }
 
     def persisted_summary(self) -> dict[str, Any]:
+        """Summarize persisted decisions and posture transitions.
+        
+        Returns:
+        	dict[str, Any]: Counts of stored decisions and posture transitions, grouped decision counts by result, and grouped decision counts by matched rule.
+        """
         return {
             "decisions_total": self.decisions_store.count(),
             "posture_transitions_total": self.posture_store.count(),
@@ -135,6 +185,12 @@ class RIFRuntime:
         }
 
     def audit_summary(self) -> dict[str, Any]:
+        """
+        Summarize the runtime's current environment, posture, live governance state, and persisted statistics.
+        
+        Returns:
+        	dict[str, Any]: A summary containing the active environment, current posture, live graph and telemetry data, and persisted storage statistics.
+        """
         return {
             "environment": self.environment_name,
             "posture": self.posture.value
