@@ -79,7 +79,8 @@ class ServerSection(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    host: str = "0.0.0.0"
+    # Default bind for local/dev servers; operators override via rif.toml / RIF_HOST.
+    host: str = "0.0.0.0"  # nosec B104
     port: int = 8000
     root_path: str = ""
 
