@@ -1,0 +1,2 @@
+{"decision": "allow", "actor": "agent:orchestrator", "action": "http.request", "target": "https://api.anthropic.com", "environment": "RIF_Runtime", "posture": "normal", "reason": "allowed host", "matched_rule": "network.allowed_host", "timestamp": "2026-01-01T00:00:00+00:00"}
+{"decision": "allow", "actor": "agent:auditor", "action": "package.install", "target": "requests", "environment": "RIF_Runtime", "posture": "normal", "reason": "allowed package", "matched_rule": "package.allowed", "timestamp": "2026-01-01T00:00:01+00:00"}
