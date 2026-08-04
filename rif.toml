@@ -1,0 +1,56 @@
+# RIF Runtime Configuration
+# =========================
+# This is the canonical configuration file for the RIF runtime.
+# All keys shown below are the supported set; unknown keys will cause
+# a startup validation error.
+#
+# Every value can be overridden by a RIF_* environment variable.
+# Env vars take precedence over file values.
+#
+# Env-var mapping:
+#   RIF_POSTURE          -> [runtime] posture
+#   RIF_ENVIRONMENT      -> [runtime] environment
+#   RIF_CLOUD_EGRESS     -> [runtime] cloud_egress
+#   RIF_SERVER_HOST      -> [server] host
+#   RIF_SERVER_PORT      -> [server] port
+#   RIF_SERVER_ROOT_PATH -> [server] root_path
+#   RIF_PROVIDER_MODE    -> [provider] mode
+#   RIF_PROVIDER_MODEL   -> [provider] model
+#   RIF_PROVIDER_ENDPOINT-> [provider] endpoint
+#   RIF_DATA_DIR         -> [paths] data_dir
+#   RIF_CONFIG_DIR       -> [paths] config_dir
+
+[runtime]
+# Governance posture: normal | elevated | restricted | locked
+posture = "normal"
+
+# Active environment name (must match an entry in environments.yaml)
+environment = "production"
+
+# Allow outbound network calls to cloud services. Defaults to false (air-gapped).
+cloud_egress = false
+
+[server]
+# FastAPI / Uvicorn bind settings
+host = "0.0.0.0"
+port = 8000
+
+# ASGI root_path for reverse-proxy deployments (e.g. "/api/v1")
+root_path = ""
+
+[provider]
+# Execution mode: local | remote | hybrid
+mode = "local"
+
+# Model identifier passed to the provider backend
+model = "default"
+
+# Provider API endpoint URL (leave empty for local-only mode)
+endpoint = ""
+
+[paths]
+# Directory for runtime data (decisions, evidence, posture history)
+data_dir = "data"
+
+# Directory for supplementary config files (environments.yaml, policies)
+config_dir = "config"
