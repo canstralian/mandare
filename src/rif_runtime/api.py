@@ -1,8 +1,9 @@
+from dataclasses import asdict
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
-from .auth import ControlPlaneAuth
-from .runtime import RIFRuntime
-from .schemas import PolicyRequest, Posture
+
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.mcp.capabilities import capability_catalog
@@ -12,12 +13,17 @@ from rif_runtime.mcp.metasploit import (
     MetasploitIntent,
 )
 
+from .auth import ControlPlaneAuth
+from .replay import ReplayEngine
+from .runtime import RIFRuntime
+from .schemas import PolicyDecision, PolicyRequest, Posture
+
 runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")
 
 
 @app.get("/health")
-def health():
+def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "environment": runtime.environment_name,
@@ -26,7 +32,7 @@ def health():
 
 
 @app.get("/v1/environments")
-def environments():
+def environments() -> dict[str, Any]:
     return {
         "current": runtime.environment_name,
         "environments": runtime.config.environments,
@@ -34,21 +40,21 @@ def environments():
 
 
 @app.post("/v1/environment/{name}", dependencies=[ControlPlaneAuth])
-def set_environment(name: str):
+def set_environment(name: str) -> dict[str, Any]:
     try:
         runtime.set_environment(name)
         return {"current": runtime.environment_name}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.post("/v1/policy/evaluate", dependencies=[ControlPlaneAuth])
-def evaluate(req: PolicyRequest):
+def evaluate(req: PolicyRequest) -> PolicyDecision:
     return runtime.evaluate(req)
 
 
 @app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
-def reset_posture():
+def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
     runtime.posture = Posture.normal
@@ -56,13 +62,13 @@ def reset_posture():
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
-def posture(posture: Posture):
+def posture(posture: Posture) -> dict[str, Any]:
     runtime.posture = posture
     return {"posture": runtime.posture}
 
 
 @app.get("/")
-def root():
+def root() -> dict[str, Any]:
     return {
         "name": "RIF Runtime",
         "status": "online",
@@ -71,22 +77,22 @@ def root():
 
 
 @app.get("/v1/graph/summary")
-def graph_summary():
+def graph_summary() -> dict[str, Any]:
     return runtime.graph_summary()
 
 
 @app.get("/v1/telemetry/summary")
-def telemetry_summary():
+def telemetry_summary() -> dict[str, Any]:
     return runtime.telemetry_summary()
 
 
 @app.get("/v1/audit")
-def audit():
+def audit() -> dict[str, Any]:
     return AuditorAgent().audit(runtime)
 
 
 @app.post("/v1/mcp/invoke")
-def mcp_invoke(payload: dict):
+def mcp_invoke(payload: dict[str, Any]) -> PolicyDecision:
     from rif_runtime.schemas import PolicyRequest
 
     req = PolicyRequest(
@@ -102,12 +108,12 @@ def mcp_invoke(payload: dict):
 
 
 @app.get("/v1/mcp/metasploit/capabilities")
-def metasploit_capabilities():
+def metasploit_capabilities() -> dict[str, Any]:
     return capability_catalog()
 
 
 @app.post("/v1/mcp/metasploit/evaluate")
-def metasploit_evaluate(payload: dict):
+def metasploit_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         intent = MetasploitIntent.model_validate(payload.get("intent", payload))
         mode = GovernanceMode(
@@ -119,7 +125,7 @@ def metasploit_evaluate(payload: dict):
             else None
         )
     except (ValidationError, ValueError) as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
     # Unauthenticated simulation route: dry-run so it cannot mutate posture or
     # write to the stores. Minting a capability token (the actual authorization)
     # goes through the guarded /v1/mcp/metasploit/token.
@@ -134,14 +140,17 @@ def metasploit_evaluate(payload: dict):
 
 
 @app.post("/v1/mcp/metasploit/token", dependencies=[ControlPlaneAuth])
-def metasploit_token(payload: dict):
+def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
     if "intent" not in payload:
         raise HTTPException(status_code=422, detail="missing 'intent' in payload")
     try:
         intent = MetasploitIntent.model_validate(payload["intent"])
+        # TypeError, not just ValueError: int(None) and int({}) raise TypeError,
+        # so a null or object ttl_seconds would otherwise escape as a 500 while
+        # a non-numeric string correctly returned 422.
         ttl_seconds = int(payload.get("ttl_seconds", 600))
-    except (ValidationError, ValueError) as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    except (ValidationError, TypeError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     return runtime.metasploit.mint_token(
         intent,
         approver=payload.get("approver", "human:operator"),
@@ -150,27 +159,29 @@ def metasploit_token(payload: dict):
 
 
 @app.get("/v1/persistence/summary")
-def persistence_summary():
+def persistence_summary() -> dict[str, Any]:
     return runtime.persisted_summary()
 
 
 @app.get("/v1/recovered-state")
-def recovered_state():
-    return runtime.recovered_summary()
+def recovered_state() -> dict[str, Any]:
+    # Rebuilt from the persisted decision log, not from live runtime state, so
+    # the response is meaningful after a restart.
+    return asdict(ReplayEngine().recover())
 
 
 @app.get("/v1/policies")
-def list_policies():
+def list_policies() -> dict[str, Any]:
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 
 @app.put("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
-def upsert_policy(rule_id: str, rule: PolicyRule):
+def upsert_policy(rule_id: str, rule: PolicyRule) -> PolicyRule:
     if rule.id != rule_id:
         rule = rule.model_copy(update={"id": rule_id})
     return runtime.policy_store.upsert(rule)
 
 
 @app.delete("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
-def delete_policy(rule_id: str):
+def delete_policy(rule_id: str) -> dict[str, Any]:
     return {"deleted": runtime.policy_store.delete(rule_id)}

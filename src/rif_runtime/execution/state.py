@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ExecutionState(str, Enum):
+class ExecutionState(StrEnum):
     """
     Lifecycle states for a governed execution.
 

@@ -25,9 +25,7 @@ class CapabilityRegistry:
 
     def register(self, capability: Capability) -> None:
         if capability.name in self._capabilities:
-            raise ValueError(
-                f"Capability already registered: {capability.name}"
-            )
+            raise ValueError(f"Capability already registered: {capability.name}")
 
         self._capabilities[capability.name] = capability
 
@@ -35,9 +33,7 @@ class CapabilityRegistry:
         try:
             return self._capabilities[name]
         except KeyError as exc:
-            raise CapabilityNotFoundError(
-                f"Unknown capability: {name}"
-            ) from exc
+            raise CapabilityNotFoundError(f"Unknown capability: {name}") from exc
 
     def __contains__(self, name: object) -> bool:
         return name in self._capabilities

@@ -14,7 +14,7 @@ this file is the version-controlled source of truth (see ADR-0007).
 - Timestamps: `created_at timestamptz not null default now()`;
   `updated_at timestamptz` maintained by trigger where rows are mutable.
 - Enumerations are Postgres `enum` types (`decision`, `posture`,
-  `environment`, ...) matching the runtime's `str, Enum` Pydantic types so
+  `environment`, ...) matching the runtime's `StrEnum` Pydantic types so
   values serialize identically in both systems.
 - Append-only tables (`executions`, `execution_logs`) are never updated or
   deleted — they are the durable form of today's `decisions.jsonl` /

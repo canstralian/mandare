@@ -15,7 +15,8 @@ def _read_version_from_pyproject() -> str | None:
 
         _pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
         with _pyproject.open("rb") as _f:
-            return tomllib.load(_f)["project"]["version"]
+            version: str = tomllib.load(_f)["project"]["version"]
+            return version
     except (FileNotFoundError, KeyError, tomllib.TOMLDecodeError):
         return None
 
