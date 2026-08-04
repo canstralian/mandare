@@ -3,7 +3,6 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
-
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.mcp.capabilities import capability_catalog
@@ -18,9 +17,13 @@ from .governance.drift import recommend_correction
 from .replay import ReplayEngine
 from .runtime import RIFRuntime
 from .schemas import PolicyDecision, PolicyRequest, Posture
+from .startup import register_config_startup
 
 runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")
+
+# Wire configuration validation into app startup
+register_config_startup(app)
 
 
 @app.get("/health")
