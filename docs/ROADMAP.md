@@ -2,9 +2,9 @@
 
 ## North star
 
-RIF Runtime is a governed execution substrate for agents and tools. Natural-language intent becomes a visible, policy-evaluated command object before any capability is invoked. Every decision should be explainable through evidence, posture, policy precedence, and execution outcome.
+RIF Runtime is a governed execution substrate for technical builders wiring agents, scripts, MCP tools, and deployment automation into real systems. Natural-language or programmatic intent becomes a visible, policy-evaluated command object before any capability is invoked. Every decision should be explainable through evidence, posture, policy precedence, and execution outcome.
 
-RIF is not an autonomous agent framework; it is a governance and execution substrate for agents.
+RIF is not an autonomous agent framework; it is the control boundary around agents and automation you already run.
 
 ## Status
 
@@ -19,6 +19,8 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 ## Current foundation
 
+The project is optimized for local inspection first, then cloud or edge deployment once the control loop is trusted. The current foundation includes:
+
 - governance runtime and reflexive loop;
 - persistence primitives and durable decision history;
 - MCP interception boundary;
@@ -28,7 +30,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 ## Milestone 1 — Deterministic governance core
 
-**Goal:** make every runtime decision reconstructable.
+**Goal:** make every runtime decision reconstructable from code, config, and persisted records.
 
 - Stabilize the causal-path/explainability contract.
 - Define policy precedence and frozen environment snapshots.
@@ -37,7 +39,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 ## Milestone 2 — Evidence and retrieval
 
-**Goal:** attach relevant history and policy context without making retrieval authoritative.
+**Goal:** attach relevant history and policy context without making retrieval authoritative or opaque.
 
 - Introduce an EvidenceRecord schema.
 - Add pluggable embedding and reranking adapters.
@@ -46,7 +48,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 ## Milestone 3 — Reflexive healing
 
-**Goal:** diagnose and test bounded repairs.
+**Goal:** diagnose and test bounded repairs while keeping operators in the promotion path.
 
 - Define `FailureEvent`, `Diagnosis`, `RepairProposal`, and `VerificationResult` schemas.
 - Add scanner/SARIF and GitHub Actions adapters.
@@ -55,7 +57,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 ## Milestone 4 — Controlled evolution
 
-**Goal:** make architecture and policy changes reviewable promotions, not silent drift.
+**Goal:** make architecture and policy changes reviewable promotions, not silent drift hidden inside agent output.
 
 - Define `EvolutionProposal` and promotion criteria.
 - Require threat model, evaluation, rollback plan, and approval metadata.
@@ -64,7 +66,7 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 ## Milestone 5 — Reference Space
 
-**Goal:** publish a reproducible demonstration of RIF's governance thesis.
+**Goal:** publish a reproducible demonstration of RIF's governance thesis for builders who want to inspect the loop end to end before trusting it.
 
 - Deploy a Hugging Face Space with a Gradio interface.
 - Demonstrate intent evaluation, explainability, Diagnosis, RepairProposal, and EvidenceRecord visualization.
