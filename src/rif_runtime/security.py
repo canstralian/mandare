@@ -6,7 +6,7 @@ import hmac
 import json
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -110,7 +110,7 @@ def normalize_for_json(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [normalize_for_json(item) for item in value]
     if isinstance(value, datetime):
-        return value.astimezone(timezone.utc).isoformat()
+        return value.astimezone(UTC).isoformat()
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, bytes):

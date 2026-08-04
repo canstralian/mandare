@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+
 from rif_runtime.api import app
 from rif_runtime.auth import ENV_VAR
 
@@ -21,6 +22,22 @@ def test_graph_summary():
     r = client.get("/v1/graph/summary")
     assert r.status_code == 200
     assert "edges" in r.json()
+
+
+def test_recovered_state():
+    # Regression: this route previously called a non-existent
+    # runtime.recovered_summary() and returned 500 on every request.
+    r = client.get("/v1/recovered-state")
+    assert r.status_code == 200
+    body = r.json()
+    for key in (
+        "historical_decisions",
+        "historical_denials",
+        "graph_nodes",
+        "graph_edges",
+        "last_posture",
+    ):
+        assert key in body
 
 
 def test_mcp_invoke_is_dry_run_no_side_effects():

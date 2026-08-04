@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ResourceKind(str, Enum):
+class ResourceKind(StrEnum):
     """
     Categories of addressable resources.
 

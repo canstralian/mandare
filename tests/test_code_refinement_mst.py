@@ -1,8 +1,8 @@
-from rif_runtime.runtime import RIFRuntime
-
 from run_session import ScriptedAgent, run_session
 from sandbox_exec import run_in_sandbox
 from score import score_session
+
+from rif_runtime.runtime import RIFRuntime
 
 
 def test_score_session_no_regression():

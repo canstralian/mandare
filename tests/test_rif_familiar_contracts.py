@@ -5,7 +5,6 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts" / "rif_familiar"
 FIXTURES = ROOT / "fixtures" / "rif_familiar"
