@@ -145,8 +145,11 @@ def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
         raise HTTPException(status_code=422, detail="missing 'intent' in payload")
     try:
         intent = MetasploitIntent.model_validate(payload["intent"])
+        # TypeError, not just ValueError: int(None) and int({}) raise TypeError,
+        # so a null or object ttl_seconds would otherwise escape as a 500 while
+        # a non-numeric string correctly returned 422.
         ttl_seconds = int(payload.get("ttl_seconds", 600))
-    except (ValidationError, ValueError) as e:
+    except (ValidationError, TypeError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return runtime.metasploit.mint_token(
         intent,
