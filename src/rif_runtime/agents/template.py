@@ -7,6 +7,8 @@ and consume ``PolicyDecision`` results — they never bypass the policy
 engine or talk to targets directly.
 """
 
+from typing import Any
+
 from rif_runtime.schemas import PolicyDecision, PolicyRequest
 
 
@@ -38,7 +40,7 @@ class TemplateAgent:
         action: str,
         target: str,
         reason: str | None = None,
-        context: dict | None = None,
+        context: dict[str, Any] | None = None,
     ) -> PolicyRequest:
         """Build a request for the runtime to evaluate.
 

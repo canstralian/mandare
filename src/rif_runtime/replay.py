@@ -33,15 +33,23 @@ class ReplayEngine:
                 rows.append(json.loads(line))
         return rows
 
-    def replay_graph(self) -> GovernanceGraph:
+    def replay_graph(self, rows: list[dict[str, Any]] | None = None) -> GovernanceGraph:
+        """Rebuild the governance graph, optionally from an already-loaded log.
+
+        Passing ``rows`` lets a caller that has already read the decision log
+        reuse that snapshot instead of re-reading the file.
+        """
         graph = GovernanceGraph()
-        for row in self._rows():
+        for row in self._rows() if rows is None else rows:
             graph.record_decision(self._decision_from_row(row))
         return graph
 
     def recover(self) -> RecoveredState:
+        # Read the log once and derive both the counts and the graph from that
+        # single snapshot: decisions.jsonl is appended to concurrently, so two
+        # separate reads could report totals that disagree with each other.
         rows = self._rows()
-        graph = self.replay_graph()
+        graph = self.replay_graph(rows)
         denials = sum(1 for row in rows if row.get("decision") == "deny")
         return RecoveredState(
             historical_decisions=len(rows),

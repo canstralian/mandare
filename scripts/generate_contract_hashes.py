@@ -7,7 +7,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts" / "rif_familiar"
 SCHEMA_NAMES = (

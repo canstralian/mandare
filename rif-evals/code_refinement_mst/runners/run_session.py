@@ -21,13 +21,13 @@ import importlib
 import json
 from pathlib import Path
 
+from sandbox_exec import run_in_sandbox
+from score import score_session
+
 from rif_runtime.audit import utc_now_iso
 from rif_runtime.runtime import RIFRuntime
 from rif_runtime.schemas import Decision, PolicyDecision, PolicyRequest
 from rif_runtime.security import sha256_digest
-
-from sandbox_exec import run_in_sandbox
-from score import score_session
 
 
 def _enum_value(value: object) -> object:

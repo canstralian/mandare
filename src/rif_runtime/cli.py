@@ -11,12 +11,12 @@ app = typer.Typer()
 
 
 @app.command()
-def serve(host: str = "127.0.0.1", port: int = 8000):
+def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     uvicorn.run("rif_runtime.api:app", host=host, port=port, reload=True)
 
 
 @app.command()
-def check(actor: str, action: str, target: str):
+def check(actor: str, action: str, target: str) -> None:
     r = RIFRuntime()
     print(
         r.evaluate(
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
 
 @app.command()
-def replay(decisions_path: str = "data/decisions.jsonl"):
+def replay(decisions_path: str = "data/decisions.jsonl") -> None:
     state = ReplayEngine(decisions_path).recover()
     print(state.__dict__)
 
@@ -42,7 +42,7 @@ def msf_check(
     mode: str = "read_only_firewall",
     actor: str = "agent:metasploit",
     scope_id: str = "unscoped",
-):
+) -> None:
     r = RIFRuntime()
     intent = MetasploitIntent(
         actor=actor, capability=capability, target=target, scope_id=scope_id

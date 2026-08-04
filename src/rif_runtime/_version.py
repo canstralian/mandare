@@ -10,13 +10,13 @@ def _read_version_from_pyproject() -> str | None:
     # the repo root (root/src/rif_runtime/_version.py). Only valid in source/editable
     # checkouts — built wheels go through importlib.metadata instead.
     try:
-        from pathlib import Path
-
         import tomllib
+        from pathlib import Path
 
         _pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
         with _pyproject.open("rb") as _f:
-            return tomllib.load(_f)["project"]["version"]
+            version: str = tomllib.load(_f)["project"]["version"]
+            return version
     except (FileNotFoundError, KeyError, tomllib.TOMLDecodeError):
         return None
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from .identity import ResourceKind
 
 
-class ResourceEffect(str, Enum):
+class ResourceEffect(StrEnum):
     """
     Categories of governed operations performed on resources.
     """

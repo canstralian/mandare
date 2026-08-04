@@ -123,8 +123,11 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 - `RIFRuntime` is constructed fresh per process/test (`RIFRuntime()`), not a
   singleton with DI — tests instantiate it directly and rely on real files
   under `data/`.
-- Enums (`Decision`, `Posture`) are `str, Enum` so they serialize cleanly and
-  compare equal to plain strings (tests assert `r.posture == "elevated"`).
+- Enums (`Decision`, `Posture`, …) subclass `enum.StrEnum` so they serialize
+  cleanly and compare equal to plain strings (tests assert
+  `r.posture == "elevated"`). Note that unlike the older `str, Enum` form,
+  `str(Posture.normal)` is `"normal"`, not `"Posture.normal"` — the audit log
+  in `posture_history.jsonl` records the bare value.
 - Environment profiles are config-driven (`config/environments.yaml`), not
   hardcoded; add new environments there rather than branching in code.
 

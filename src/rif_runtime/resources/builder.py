@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from typing import Any
 
 from .repository import RepositoryResource, RepositorySnapshot
 from .scanner import RepositoryScanner
@@ -36,9 +37,6 @@ class RepositorySnapshotBuilder:
         )
 
     @staticmethod
-    def _content_hash(modules: tuple, tests: tuple) -> str:
-        payload = (
-            f"{len(modules)}:"
-            f"{len(tests)}"
-        )
+    def _content_hash(modules: tuple[Any, ...], tests: tuple[Any, ...]) -> str:
+        payload = f"{len(modules)}:{len(tests)}"
         return sha256(payload.encode("utf-8")).hexdigest()

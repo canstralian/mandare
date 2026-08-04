@@ -14,7 +14,8 @@ class JsonStore:
             self.write(default)
 
     def read(self) -> dict[str, Any]:
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        data: dict[str, Any] = json.loads(self.path.read_text(encoding="utf-8"))
+        return data
 
     def write(self, data: dict[str, Any]) -> None:
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")

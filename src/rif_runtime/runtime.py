@@ -1,4 +1,5 @@
 import threading
+from typing import Any
 
 from .config import load_config
 from .configuration.policies import PolicyStore
@@ -14,12 +15,12 @@ from .mcp.metasploit import (
     MetasploitIntent,
 )
 from .policy import PolicyEngine
-from .schemas import PolicyDecision, PolicyRequest, Posture
+from .schemas import EnvironmentProfile, PolicyDecision, PolicyRequest, Posture
 from .storage.jsonl import JsonlStore
 
 
 class RIFRuntime:
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = load_config()
         self.environment_name = self.config.default_environment
         self.posture = Posture.normal
@@ -34,15 +35,15 @@ class RIFRuntime:
         self._lock = threading.Lock()
 
     @property
-    def profile(self):
+    def profile(self) -> EnvironmentProfile:
         return self.config.environments[self.environment_name]
 
-    def set_environment(self, name):
+    def set_environment(self, name: str) -> None:
         if name not in self.config.environments:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
 
-    def evaluate(self, req: PolicyRequest, record: bool = True):
+    def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
         decision = self.policy.evaluate(
             req,
             self.environment_name,
@@ -117,16 +118,16 @@ class RIFRuntime:
                 )
             return outcome
 
-    def graph_summary(self):
+    def graph_summary(self) -> dict[str, Any]:
         return self.governance_graph.summary()
 
-    def telemetry_summary(self):
+    def telemetry_summary(self) -> dict[str, Any]:
         return {
             "recent_denials_60m": self.reflexive.telemetry.denial_count(minutes=60),
             "event_count": len(self.reflexive.telemetry.events),
         }
 
-    def persisted_summary(self):
+    def persisted_summary(self) -> dict[str, Any]:
         return {
             "decisions_total": self.decisions_store.count(),
             "posture_transitions_total": self.posture_store.count(),
@@ -138,7 +139,7 @@ class RIFRuntime:
         events = self.reflexive.telemetry.recent(minutes=60)
         return DriftVector.from_events(events)
 
-    def audit_summary(self):
+    def audit_summary(self) -> dict[str, Any]:
         return {
             "environment": self.environment_name,
             "posture": self.posture.value
