@@ -1,0 +1,35 @@
+name: resource-engineer
+
+kind: cursor-agent
+
+description: Owns immutable resource contracts.
+
+owns:
+  - src/rif_runtime/resources
+
+responsibilities:
+  - resources
+  - contracts
+  - snapshots
+
+inputs:
+  - architecture
+
+outputs:
+  - python
+  - tests
+
+depends_on:
+  - runtime-architect
+
+blocks:
+  - provider-engineer
+
+quality_gates:
+  - pytest
+  - mypy
+
+invariants:
+  - Immutable models.
+  - No provider imports.
+  - Deterministic behaviour.
