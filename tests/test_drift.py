@@ -6,7 +6,7 @@ keywords that legitimately appear in test source code.
 """
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -38,7 +38,7 @@ def _decision(
         posture=Posture.normal,
         reason=reason,
         matched_rule="default.allow",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 
@@ -69,7 +69,8 @@ def test_entropy_grows_with_diversity():
 @pytest.mark.parametrize(
     "safe",
     [
-        "elasticsearch",  # 'select' embedded in a longer word — no boundary after 'select'
+        # 'select' embedded in a longer word — no boundary after 'select'
+        "elasticsearch",
         "executor.run()",  # 'exec' is a prefix; 'u' immediately follows
         "selectAll(items)",  # camelCase prefix — no boundary after 'select'
     ],
@@ -307,7 +308,7 @@ def test_orchestrator_choose_correction_normal():
 
 
 def test_orchestrator_choose_correction_delegates_to_recommend():
-    """_choose_correction must not contain parallel thresholds — it must call recommend_correction."""
+    """_choose_correction has no parallel thresholds; it calls recommend_correction."""
     agent = OrchestratorAgent()
     vectors = [
         DriftVector(0.0, 0.0, 1.0, 1.0),
