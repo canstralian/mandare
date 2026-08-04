@@ -107,7 +107,7 @@ def verify_secret(secret: str, record: dict[str, str | int]) -> bool:
 def normalize_for_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): normalize_for_json(inner) for key, inner in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [normalize_for_json(item) for item in value]
     if isinstance(value, datetime):
         return value.astimezone(UTC).isoformat()
@@ -115,7 +115,7 @@ def normalize_for_json(value: Any) -> Any:
         return str(value)
     if isinstance(value, bytes):
         return encode_bytes(value)
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, str | int | float | bool):
         return value
     raise TypeError(f"unsupported canonical JSON type: {type(value).__name__}")
 
@@ -151,6 +151,6 @@ def redact_secrets(value: Any) -> Any:
             key: "[REDACTED]" if should_redact_key(str(key)) else redact_secrets(inner)
             for key, inner in value.items()
         }
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [redact_secrets(item) for item in value]
     return value

@@ -184,7 +184,7 @@ def _string_params(value: Any) -> list[str]:
         for inner in value.values():
             collected.extend(_string_params(inner))
         return collected
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         collected = []
         for item in value:
             collected.extend(_string_params(item))
