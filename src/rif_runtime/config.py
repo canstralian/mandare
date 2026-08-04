@@ -15,6 +15,10 @@ Env-var mapping (section flattened with underscore, uppercased):
   [provider] endpoint      -> RIF_PROVIDER_ENDPOINT
   [paths]   data_dir       -> RIF_DATA_DIR
   [paths]   config_dir     -> RIF_CONFIG_DIR
+  [security] rate_limit_rps             -> RIF_RATE_LIMIT_RPS
+  [security] rate_limit_burst           -> RIF_RATE_LIMIT_BURST
+  [security] auth_lockout_attempts      -> RIF_AUTH_LOCKOUT_ATTEMPTS
+  [security] auth_lockout_window_seconds-> RIF_AUTH_LOCKOUT_WINDOW_SECONDS
 """
 
 from __future__ import annotations
@@ -106,6 +110,48 @@ class PathsSection(BaseModel):
     config_dir: str = "config"
 
 
+class SecuritySection(BaseModel):
+    """Security hardening knobs (rate limiting + auth lockout).
+
+    All values are optional and fall back to safe defaults.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rate_limit_rps: float = 20.0
+    rate_limit_burst: int = 40
+    auth_lockout_attempts: int = 10
+    auth_lockout_window_seconds: float = 60.0
+
+    @field_validator("rate_limit_rps")
+    @classmethod
+    def _rps_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("rate_limit_rps must be positive")
+        return v
+
+    @field_validator("rate_limit_burst")
+    @classmethod
+    def _burst_positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("rate_limit_burst must be >= 1")
+        return v
+
+    @field_validator("auth_lockout_attempts")
+    @classmethod
+    def _attempts_positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("auth_lockout_attempts must be >= 1")
+        return v
+
+    @field_validator("auth_lockout_window_seconds")
+    @classmethod
+    def _window_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("auth_lockout_window_seconds must be positive")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Top-level settings
 # ---------------------------------------------------------------------------
@@ -123,6 +169,7 @@ class RifSettings(BaseModel):
     server: ServerSection = ServerSection()
     provider: ProviderSection = ProviderSection()
     paths: PathsSection = PathsSection()
+    security: SecuritySection = SecuritySection()
 
     def safe_summary(self) -> dict[str, Any]:
         """Return a secret-safe dict suitable for logging at startup.
@@ -153,6 +200,10 @@ _ENV_MAP: dict[str, tuple[str, str]] = {
     "RIF_PROVIDER_ENDPOINT": ("provider", "endpoint"),
     "RIF_DATA_DIR": ("paths", "data_dir"),
     "RIF_CONFIG_DIR": ("paths", "config_dir"),
+    "RIF_RATE_LIMIT_RPS": ("security", "rate_limit_rps"),
+    "RIF_RATE_LIMIT_BURST": ("security", "rate_limit_burst"),
+    "RIF_AUTH_LOCKOUT_ATTEMPTS": ("security", "auth_lockout_attempts"),
+    "RIF_AUTH_LOCKOUT_WINDOW_SECONDS": ("security", "auth_lockout_window_seconds"),
 }
 
 
@@ -166,14 +217,17 @@ def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def _coerce_env_value(raw: str, section: str, key: str) -> str | int | bool:
+def _coerce_env_value(raw: str, section: str, key: str) -> str | int | float | bool:
     """Best-effort coercion so env vars match expected TOML types."""
     # Boolean fields
     if key == "cloud_egress":
         return raw.lower() in ("1", "true", "yes")
     # Integer fields
-    if key == "port":
+    if key in ("port", "rate_limit_burst", "auth_lockout_attempts"):
         return int(raw)
+    # Float fields
+    if key in ("rate_limit_rps", "auth_lockout_window_seconds"):
+        return float(raw)
     return raw
 
 
