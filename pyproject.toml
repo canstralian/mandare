@@ -51,6 +51,10 @@ dev = [
     # though ci.yml (which installs requirements-dev.txt) passes.
     "jsonschema[format]>=4.25,<5.0",
     "rfc3339-validator>=0.1.4,<0.2",
+    # PyYAML ships no py.typed. mypy 1.x reports import-untyped for it even
+    # under --ignore-missing-imports (2.x silences it), so ci.yml fails without
+    # this while quality.yml passes.
+    "types-PyYAML>=6.0,<7.0",
 ]
 
 [project.scripts]
