@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
+
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.mcp.capabilities import capability_catalog
@@ -13,6 +14,7 @@ from rif_runtime.mcp.metasploit import (
 )
 
 from .auth import ControlPlaneAuth, configure_lockout
+from .config import get_settings
 from .middleware import RateLimitMiddleware, RequestIDMiddleware
 from .replay import ReplayEngine
 from .runtime import RIFRuntime
@@ -23,12 +25,20 @@ runtime = RIFRuntime()
 app = FastAPI(title="RIF Runtime", version="0.1.0")
 
 # ---------------------------------------------------------------------------
-# Security middleware (order matters: RequestID first so rate-limit responses
-# carry the header too).
+# Security middleware
+#
+# Starlette runs middleware in *reverse* add order (last added = outermost).
+# Add RateLimit first (inner), then RequestID last (outer) so 429 responses
+# still carry X-Request-ID.
 # ---------------------------------------------------------------------------
 
+_security = get_settings().security
+app.add_middleware(
+    RateLimitMiddleware,
+    rate=_security.rate_limit_rps,
+    burst=_security.rate_limit_burst,
+)
 app.add_middleware(RequestIDMiddleware)
-app.add_middleware(RateLimitMiddleware, rate=20.0, burst=40)
 
 # Wire configuration validation into app startup
 register_config_startup(app)
@@ -37,8 +47,6 @@ register_config_startup(app)
 @app.on_event("startup")
 def _configure_security() -> None:
     """Apply security settings from rif.toml [security] at startup."""
-    from .config import get_settings
-
     settings = get_settings()
     # Security section is optional; fall back to built-in defaults.
     security = getattr(settings, "security", None)

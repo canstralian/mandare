@@ -28,7 +28,6 @@ from rif_runtime.auth import (
 )
 from rif_runtime.middleware import RateLimitMiddleware, RequestIDMiddleware
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -42,11 +41,15 @@ def _echo_app(request: Request) -> JSONResponse:
 
 @pytest.fixture()
 def client_with_middleware() -> TestClient:
-    """TestClient against a tiny Starlette app with both middlewares."""
+    """TestClient against a tiny Starlette app with both middlewares.
+
+    Starlette runs middleware in reverse add order, so RateLimit is added
+    first (inner) and RequestID last (outer) — matching production wiring.
+    """
     app = Starlette(routes=[Route("/echo", _echo_app)])
-    app.add_middleware(RequestIDMiddleware)
     app.add_middleware(RateLimitMiddleware, rate=5.0, burst=5)
-    return TestClient(app, raise_server_errors=True)
+    app.add_middleware(RequestIDMiddleware)
+    return TestClient(app, raise_server_exceptions=True)
 
 
 @pytest.fixture(autouse=True)
@@ -108,10 +111,11 @@ class TestRateLimitMiddleware:
         assert resp.status_code == 429
         assert "Retry-After" in resp.headers
         assert resp.json()["detail"] == "rate limit exceeded"
+        # RequestID is outermost, so 429 responses still carry the header.
+        assert "x-request-id" in resp.headers
+        assert len(resp.headers["x-request-id"]) == 36
 
-    def test_bucket_refills_over_time(
-        self, client_with_middleware: TestClient
-    ) -> None:
+    def test_bucket_refills_over_time(self, client_with_middleware: TestClient) -> None:
         # Exhaust burst
         for _ in range(5):
             client_with_middleware.get("/echo")

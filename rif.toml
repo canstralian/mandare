@@ -61,6 +61,9 @@ config_dir = "config"
 
 [security]
 # Per-IP token-bucket rate limiter (applied via RateLimitMiddleware).
+# Identity is request.client.host (direct peer). Behind a reverse proxy this
+# collapses to the proxy IP unless TLS terminates in-process; do not enable
+# naive X-Forwarded-For trust here — put edge rate limits in front if needed.
 # Sustained requests per second allowed per client IP.
 rate_limit_rps = 20
 

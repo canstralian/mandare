@@ -1,33 +1,23 @@
 """The Metasploit MCP governor: firewall, shadow harness, and lab broker.
 
 Three governance lanes share one ordered decision procedure. The order of the
-checks *is* the answer to "which authority bounds the agent?" questions that
-auditors ask:
+checks *is* the answer to "which authority boundary prevented escalation":
 
-1. **Firewall** - pre-execution hard deny (posture gates, banned modules,
-   IP target restrictions).  Evaluated first so we never even simulate
-   something that policy forbids.
-2. **Shadow Harness** - post-gate, pre-execution simulation.  If the runtime
-   posture allows the intent, we still shadow-run it first and record the
-   predicted blast radius.  Only then does the real execution proceed.
-3. **Lab Broker** - dynamic lab provisioning for destructive intents that
-   pass the firewall but whose blast radius is above the auto-approve
-   threshold.
+1. ``posture.locked``            — a locked runtime denies everything.
+2. injection / NL-authority      — untrusted instructions are quarantined; a
+                                   natural-language assertion is never authority.
+3. read-only capability          — security knowledge is always permitted.
+4. consequential capability      — requires authority the lane may not grant:
+     * read-only firewall lane   — denied outright (execution authority absent).
+     * shadow lane               — denied and simulated; never reaches the tool.
+     * lab-broker lane           — permitted only with a valid, time-bound,
+                                   target-pinned, dual-authorised capability
+                                   token whose intent hash still matches.
 
-Capability tokens (short-lived, scoped authorisation) bridge human-in-the-loop
-approval and agent autonomy: the operator mints a token for a specific intent,
-and the agent can act within that scope without re-prompting.
+Every decision produces a signed evidence event.
 
-Signing key stability
----------------------
-Prior to this PR the signing key was generated fresh on every process start,
-which broke webhook signature verification across restarts.  Now the key is
-resolved via (highest priority first):
-
-1. ``RIF_MSF_SIGNING_KEY`` env var (explicit, for operators who rotate keys).
-2. HKDF derivation from ``RIF_SECRET_KEY`` (stable across restarts; requires
-   only the app-level secret to be set).
-3. Secure random fallback (legacy behaviour, logs a warning).
+Signing key stability: resolved via ``RIF_MSF_SIGNING_KEY``, legacy
+``RIF_MSF_BROKER_KEY``, HKDF from ``RIF_SECRET_KEY``, or a random fallback.
 """
 
 from __future__ import annotations
@@ -37,43 +27,51 @@ import hmac
 import logging
 import os
 import secrets
-import time
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
+from uuid import uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+from ..schemas import Decision, PolicyDecision, Posture
+from ..security import hmac_signature, sha256_digest
+from .capabilities import (
+    CapabilityClass,
+    classify,
+    contract_hash,
+    is_severe,
+)
 
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Signing key derivation
-# ---------------------------------------------------------------------------
-
-
 def _derive_signing_key() -> str:
-    """Resolve the webhook/event signing key.
+    """Resolve the Metasploit evidence/token signing key.
 
     Priority:
-      1. RIF_MSF_SIGNING_KEY env var (explicit operator override).
-      2. HKDF(SHA-256) from RIF_SECRET_KEY (stable across restarts).
-      3. Random fallback (logs warning; breaks cross-restart verification).
+      1. ``RIF_MSF_SIGNING_KEY`` (explicit operator override).
+      2. Legacy ``RIF_MSF_BROKER_KEY`` (backward compatible).
+      3. HKDF(SHA-256) from ``RIF_SECRET_KEY`` (stable across restarts).
+      4. Secure random fallback (logs a warning; breaks cross-restart verify).
     """
     explicit = os.environ.get("RIF_MSF_SIGNING_KEY")
     if explicit:
         return explicit
 
+    legacy = os.environ.get("RIF_MSF_BROKER_KEY")
+    if legacy:
+        return legacy
+
     app_secret = os.environ.get("RIF_SECRET_KEY")
     if app_secret:
         # HKDF-Extract then Expand (RFC 5869), single output block.
-        # Using stdlib hmac + hashlib (no new dependencies).
         prk = hmac.new(
             key=b"rif-msf-signing",  # salt (domain separation)
             msg=app_secret.encode(),
             digestmod=hashlib.sha256,
         ).digest()
-        # Expand with info="msf-event-signing-v1"
         okm = hmac.new(
             key=prk,
             msg=b"msf-event-signing-v1" + b"\x01",
@@ -82,317 +80,427 @@ def _derive_signing_key() -> str:
         return okm.hex()
 
     logger.warning(
-        "Neither RIF_MSF_SIGNING_KEY nor RIF_SECRET_KEY is set; "
-        "generating an ephemeral signing key (will not survive restart)."
+        "Neither RIF_MSF_SIGNING_KEY, RIF_MSF_BROKER_KEY, nor RIF_SECRET_KEY "
+        "is set; generating an ephemeral signing key (will not survive restart)."
     )
     return secrets.token_hex(32)
 
 
-# ---------------------------------------------------------------------------
-# Enums & schemas
-# ---------------------------------------------------------------------------
+# Natural-language authority assertions and prompt-injection markers. None of
+# these confer authority; their presence in operator text, imported recon, or
+# tool parameters quarantines the request.
+INJECTION_PATTERNS: tuple[str, ...] = (
+    "ignore previous",
+    "ignore all previous",
+    "ignore the above",
+    "disregard previous",
+    "disregard the above",
+    "new instructions",
+    "system prompt",
+    "you are now",
+    "you are authorised",
+    "you are authorized",
+    "you are permitted",
+    "skip safeguards",
+    "skip the safeguards",
+    "skip governance",
+    "bypass policy",
+    "bypass the policy",
+    "bypass governance",
+    "disable governance",
+    "disable the policy",
+    "override policy",
+    "override the policy",
+    "grant yourself",
+    "elevate your",
+    "as an administrator",
+    "act as root",
+    "no restrictions",
+    "without approval",
+)
 
 
 class GovernanceMode(StrEnum):
-    """Operating modes for the Metasploit governor."""
+    """Which containment lane evaluates a Metasploit intent."""
 
     read_only_firewall = "read_only_firewall"
-    shadow_harness = "shadow_harness"
+    shadow = "shadow"
     lab_broker = "lab_broker"
-    full = "full"
-
-
-class IntentSeverity(StrEnum):
-    low = "low"
-    medium = "medium"
-    high = "high"
-    critical = "critical"
 
 
 class MetasploitIntent(BaseModel):
-    """Structured representation of what an agent wants to do via Metasploit."""
+    """A proposed Metasploit MCP call, as seen by the governor.
 
-    module: str
+    ``capability`` is the concrete tool method (e.g. ``module.search``); free
+    natural language lives in ``text`` and imported/untrusted material in
+    ``untrusted_context`` — neither participates in the signed intent hash.
+    """
+
+    actor: str = "agent:metasploit"
+    tool: str = "msfmcpd"
+    capability: str
     target: str
-    options: dict[str, Any] = {}
-    reason: str | None = None
-    severity: IntentSeverity = IntentSeverity.medium
+    scope_id: str = "unscoped"
+    text: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    untrusted_context: str | None = None
+
+    def intent_hash(self) -> str:
+        return sha256_digest(
+            {
+                "tool": self.tool,
+                "capability": self.capability,
+                "target": self.target,
+                "scope_id": self.scope_id,
+                "params": self.params,
+            }
+        )
 
 
 class CapabilityToken(BaseModel):
-    """Short-lived scoped authorisation token."""
+    """A short-lived, single-capability, target-pinned execution grant.
 
-    token_id: str
+    Minted only after signed human approval. Binds one capability to one target
+    and to the exact intent hash approved, and expires quickly so stale
+    authority cannot be reused.
+    """
+
+    token_id: str = Field(default_factory=lambda: str(uuid4()))
+    capability: str
+    target: str
+    scope_id: str
     intent_hash: str
     approver: str
-    issued_at: float
-    expires_at: float
-    revoked: bool = False
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime
+    signature: str = ""
 
-    @property
-    def is_valid(self) -> bool:
-        return not self.revoked and time.time() < self.expires_at
+    @field_validator("issued_at", "expires_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, value: datetime) -> datetime:
+        # A token deserialised from a naive ISO string would otherwise raise a
+        # TypeError when compared against the timezone-aware ``now`` in the
+        # broker, and would sign inconsistently across environments.
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+    def signing_payload(self) -> dict[str, Any]:
+        return {
+            "token_id": self.token_id,
+            "capability": self.capability,
+            "target": self.target,
+            "scope_id": self.scope_id,
+            "intent_hash": self.intent_hash,
+            "approver": self.approver,
+            "issued_at": self.issued_at.isoformat(),
+            "expires_at": self.expires_at.isoformat(),
+        }
 
 
-class GovernanceOutcome(BaseModel):
-    """Result of a governance evaluation."""
+class EvidenceEvent(BaseModel):
+    """Signed, replayable record of one governance decision."""
 
-    decision: str  # "allow", "deny", "simulate"
-    evidence: list[str] = []
-    simulated: bool = False
-    severe: bool = False
-    lab_required: bool = False
-
-
-class GovernanceEvent(BaseModel):
-    """Auditable event emitted after every governance decision."""
-
-    event_id: str
+    decision_id: str
+    intent_hash: str
+    tool: str
+    requested_capability: str
+    policy_decision: str
+    scope_id: str
+    contract_hash: str
+    matched_rule: str
     timestamp: str
-    intent: MetasploitIntent
-    outcome: GovernanceOutcome
-    mode: GovernanceMode
-    signature: str | None = None
+    signature: str = ""
 
 
-# ---------------------------------------------------------------------------
-# Governor
-# ---------------------------------------------------------------------------
+@dataclass
+class GovernanceOutcome:
+    decision: PolicyDecision
+    evidence: EvidenceEvent
+    severe: bool
+    simulated: bool
+
+
+def _string_params(value: Any) -> list[str]:
+    # Recurse through nested containers so a string buried in a sub-dict or
+    # list cannot smuggle an injected instruction past the scanner.
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        collected: list[str] = []
+        for inner in value.values():
+            collected.extend(_string_params(inner))
+        return collected
+    if isinstance(value, list | tuple | set):
+        collected = []
+        for item in value:
+            collected.extend(_string_params(item))
+        return collected
+    return []
+
+
+def scan_for_injection(*texts: str | None) -> list[str]:
+    """Return the injection/authority-assertion phrases found in ``texts``."""
+
+    hits: list[str] = []
+    for text in texts:
+        if not text:
+            continue
+        lowered = text.lower()
+        for pattern in INJECTION_PATTERNS:
+            if pattern in lowered and pattern not in hits:
+                hits.append(pattern)
+    return hits
 
 
 class MetasploitGovernor:
-    """Central governance engine for Metasploit MCP operations."""
-
-    # Modules unconditionally denied regardless of posture.
-    BANNED_MODULES: frozenset[str] = frozenset(
-        {
-            "exploit/multi/handler",
-            "post/multi/gather/ssh_creds",
-            "exploit/windows/smb/ms17_010_eternalblue",
-        }
-    )
-
-    # IP ranges never allowed as targets (CIDR-lite, /8 only for simplicity).
-    BLOCKED_TARGET_PREFIXES: tuple[str, ...] = (
-        "10.",
-        "172.16.",
-        "192.168.",
-        "127.",
-    )
-
-    def __init__(self, posture: str = "normal") -> None:
-        self.posture = posture
-        self.signing_key: str = _derive_signing_key()
-        self._event_log: list[GovernanceEvent] = []
-        self._tokens: dict[str, CapabilityToken] = {}
-
-    # ------------------------------------------------------------------
-    # Firewall
-    # ------------------------------------------------------------------
-
-    def _check_firewall(self, intent: MetasploitIntent) -> GovernanceOutcome | None:
-        """Hard-deny check. Returns an outcome only if denied."""
-        if intent.module in self.BANNED_MODULES:
-            return GovernanceOutcome(
-                decision="deny",
-                evidence=[f"module '{intent.module}' is banned by policy"],
-                severe=True,
-            )
-
-        if self.posture in ("restricted", "locked"):
-            return GovernanceOutcome(
-                decision="deny",
-                evidence=[
-                    f"posture '{self.posture}' blocks all Metasploit operations"
-                ],
-                severe=False,
-            )
-
-        for prefix in self.BLOCKED_TARGET_PREFIXES:
-            if intent.target.startswith(prefix):
-                return GovernanceOutcome(
-                    decision="deny",
-                    evidence=[
-                        f"target '{intent.target}' is in a blocked IP range"
-                    ],
-                    severe=True,
-                )
-
-        return None  # No firewall objection
-
-    # ------------------------------------------------------------------
-    # Shadow Harness
-    # ------------------------------------------------------------------
-
-    def _shadow_simulate(self, intent: MetasploitIntent) -> GovernanceOutcome:
-        """Simulate the intent and assess blast radius."""
-        is_severe = intent.severity in (IntentSeverity.high, IntentSeverity.critical)
-        return GovernanceOutcome(
-            decision="simulate",
-            evidence=[
-                f"shadow simulation of '{intent.module}' against '{intent.target}'",
-                f"severity={intent.severity.value}",
-            ],
-            simulated=True,
-            severe=is_severe,
-            lab_required=is_severe,
-        )
-
-    # ------------------------------------------------------------------
-    # Lab Broker
-    # ------------------------------------------------------------------
-
-    def _assess_lab_need(
-        self, intent: MetasploitIntent, shadow: GovernanceOutcome
-    ) -> GovernanceOutcome:
-        """Decide whether a lab environment is required."""
-        if shadow.lab_required:
-            return GovernanceOutcome(
-                decision="deny",
-                evidence=shadow.evidence
-                + ["lab environment required but not provisioned"],
-                severe=shadow.severe,
-                lab_required=True,
-                simulated=True,
-            )
-        return GovernanceOutcome(
-            decision="allow",
-            evidence=shadow.evidence + ["blast radius acceptable; proceeding"],
-            simulated=True,
-            severe=False,
-        )
-
-    # ------------------------------------------------------------------
-    # Capability tokens
-    # ------------------------------------------------------------------
-
-    def _intent_hash(self, intent: MetasploitIntent) -> str:
-        """Deterministic hash of an intent for token binding."""
-        payload = f"{intent.module}:{intent.target}:{sorted(intent.options.items())}"
-        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+    def __init__(self, signing_key: str | None = None) -> None:
+        self.signing_key = signing_key or _derive_signing_key()
 
     def mint_token(
         self,
         intent: MetasploitIntent,
-        approver: str = "human:operator",
+        approver: str,
         ttl_seconds: int = 600,
     ) -> CapabilityToken:
-        """Mint a scoped capability token for a specific intent."""
-        now = time.time()
+        issued = datetime.now(UTC)
         token = CapabilityToken(
-            token_id=secrets.token_hex(16),
-            intent_hash=self._intent_hash(intent),
+            capability=intent.capability,
+            target=intent.target,
+            scope_id=intent.scope_id,
+            intent_hash=intent.intent_hash(),
             approver=approver,
-            issued_at=now,
-            expires_at=now + ttl_seconds,
+            issued_at=issued,
+            expires_at=issued + timedelta(seconds=ttl_seconds),
         )
-        self._tokens[token.token_id] = token
-        return token
-
-    def _validate_token(
-        self, intent: MetasploitIntent, token: CapabilityToken | None
-    ) -> bool:
-        """Validate that a token authorises this specific intent."""
-        if token is None:
-            return False
-        stored = self._tokens.get(token.token_id)
-        if stored is None or not stored.is_valid:
-            return False
-        return stored.intent_hash == self._intent_hash(intent)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+        signature = hmac_signature(token.signing_payload(), self.signing_key)
+        return token.model_copy(update={"signature": signature})
 
     def evaluate(
         self,
         intent: MetasploitIntent,
-        mode: GovernanceMode = GovernanceMode.full,
+        *,
+        mode: GovernanceMode = GovernanceMode.read_only_firewall,
+        env_name: str = "RIF_Runtime",
+        posture: Posture = Posture.normal,
         token: CapabilityToken | None = None,
+        now: datetime | None = None,
     ) -> GovernanceOutcome:
-        """Run the full governance pipeline for an intent."""
+        now = now or datetime.now(UTC)
+        simulated = mode == GovernanceMode.shadow
+        capability_class = classify(intent.capability)
+        severe = is_severe(intent.capability)
 
-        # Step 0: valid capability token bypasses shadow + lab (but not firewall).
-        has_token = self._validate_token(intent, token)
+        if posture == Posture.locked:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "runtime locked",
+                "posture.locked",
+                severe=False,
+                simulated=simulated,
+            )
 
-        # Step 1: Firewall (always runs).
-        firewall_result = self._check_firewall(intent)
-        if firewall_result is not None:
-            self._record_event(intent, firewall_result, mode)
-            return firewall_result
+        injection = scan_for_injection(
+            intent.text,
+            intent.untrusted_context,
+            *_string_params(intent.params),
+        )
+        if injection:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                f"quarantined untrusted instruction: {', '.join(injection)}",
+                "msf.injection.quarantined",
+                severe=True,
+                simulated=simulated,
+            )
+
+        if capability_class == CapabilityClass.read_only:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.allow,
+                "read-only capability: security knowledge, not authority",
+                "msf.capability.read_only",
+                severe=False,
+                simulated=simulated,
+            )
 
         if mode == GovernanceMode.read_only_firewall:
-            outcome = GovernanceOutcome(
-                decision="allow", evidence=["firewall passed (read-only mode)"]
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "execution authority absent under read-only firewall",
+                "msf.capability.execution_absent",
+                severe=severe,
+                simulated=simulated,
             )
-            self._record_event(intent, outcome, mode)
-            return outcome
 
-        # Step 2: Shadow harness.
-        shadow = self._shadow_simulate(intent)
-        if mode == GovernanceMode.shadow_harness:
-            self._record_event(intent, shadow, mode)
-            return shadow
-
-        # Step 3: Lab broker (skipped if valid token held).
-        if has_token:
-            outcome = GovernanceOutcome(
-                decision="allow",
-                evidence=shadow.evidence + ["capability token valid; lab bypassed"],
+        if mode == GovernanceMode.shadow:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "shadow lane: high-impact action simulated, never executed",
+                "msf.shadow.denied",
+                severe=severe,
                 simulated=True,
-                severe=False,
             )
-        else:
-            outcome = self._assess_lab_need(intent, shadow)
 
-        self._record_event(intent, outcome, mode)
-        return outcome
+        return self._evaluate_broker(intent, env_name, posture, token, now, severe)
 
-    # ------------------------------------------------------------------
-    # Event recording
-    # ------------------------------------------------------------------
-
-    def _compute_signature(
-        self, payload: dict[str, Any], key: str
-    ) -> str:
-        """HMAC-SHA256 signature over the JSON-serialised event payload."""
-        import json as _json
-
-        canonical = _json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        return hmac.new(
-            key.encode(), canonical.encode(), hashlib.sha256
-        ).hexdigest()
-
-    def _record_event(
+    def _evaluate_broker(
         self,
         intent: MetasploitIntent,
-        outcome: GovernanceOutcome,
-        mode: GovernanceMode,
-    ) -> None:
-        """Record an auditable governance event with HMAC signature."""
-        event = GovernanceEvent(
-            event_id=secrets.token_hex(8),
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            intent=intent,
-            outcome=outcome,
-            mode=mode,
+        env_name: str,
+        posture: Posture,
+        token: CapabilityToken | None,
+        now: datetime,
+        severe: bool,
+    ) -> GovernanceOutcome:
+        if token is None:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "no signed human approval token presented",
+                "msf.broker.approval_absent",
+                severe=severe,
+                simulated=False,
+            )
+
+        expected = hmac_signature(token.signing_payload(), self.signing_key)
+        if not token.signature or not hmac.compare_digest(token.signature, expected):
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "capability token signature invalid",
+                "msf.broker.signature_invalid",
+                severe=True,
+                simulated=False,
+            )
+
+        if now >= token.expires_at:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "capability token expired: authority is time-bound",
+                "msf.broker.token_expired",
+                severe=severe,
+                simulated=False,
+            )
+
+        if token.capability != intent.capability:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "token authorises a different capability class",
+                "msf.broker.capability_mismatch",
+                severe=severe,
+                simulated=False,
+            )
+
+        if token.target != intent.target:
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "target not pinned to the approved lab asset",
+                "msf.broker.target_pinned",
+                severe=True,
+                simulated=False,
+            )
+
+        if token.intent_hash != intent.intent_hash():
+            return self._finish(
+                intent,
+                env_name,
+                posture,
+                Decision.deny,
+                "signed intent hash no longer matches the request",
+                "msf.broker.intent_mismatch",
+                severe=True,
+                simulated=False,
+            )
+
+        return self._finish(
+            intent,
+            env_name,
+            posture,
+            Decision.allow,
+            "bounded lab action authorised by capability token",
+            "msf.broker.authorized",
+            severe=False,
+            simulated=False,
         )
-        # Sign the event (excluding the signature field itself).
-        sig = self._compute_signature(
+
+    def _finish(
+        self,
+        intent: MetasploitIntent,
+        env_name: str,
+        posture: Posture,
+        decision: Decision,
+        reason: str,
+        rule: str,
+        *,
+        severe: bool,
+        simulated: bool,
+    ) -> GovernanceOutcome:
+        policy_decision = PolicyDecision(
+            decision=decision,
+            actor=intent.actor,
+            action=f"mcp.metasploit.{intent.capability}",
+            target=intent.target,
+            environment=env_name,
+            posture=posture,
+            reason=reason,
+            matched_rule=rule,
+        )
+        return GovernanceOutcome(
+            decision=policy_decision,
+            evidence=self._sign_evidence(intent, policy_decision),
+            severe=severe and decision == Decision.deny,
+            simulated=simulated,
+        )
+
+    def _sign_evidence(
+        self, intent: MetasploitIntent, decision: PolicyDecision
+    ) -> EvidenceEvent:
+        event = EvidenceEvent(
+            decision_id=str(uuid4()),
+            intent_hash=intent.intent_hash(),
+            tool=intent.tool,
+            requested_capability=intent.capability,
+            policy_decision=decision.decision.value,
+            scope_id=intent.scope_id,
+            contract_hash=contract_hash(),
+            matched_rule=decision.matched_rule,
+            timestamp=decision.timestamp.isoformat(),
+        )
+        signature = hmac_signature(
             event.model_dump(exclude={"signature"}), self.signing_key
         )
-        event.signature = sig
-        self._event_log.append(event)
+        return event.model_copy(update={"signature": signature})
 
-    @property
-    def event_log(self) -> list[GovernanceEvent]:
-        return list(self._event_log)
-
-    def verify_event(self, event: GovernanceEvent) -> bool:
-        """Verify the HMAC signature of a recorded event."""
-        expected = self._compute_signature(
+    def verify_evidence(self, event: EvidenceEvent) -> bool:
+        expected = hmac_signature(
             event.model_dump(exclude={"signature"}), self.signing_key
         )
-        return bool(event.signature) and hmac.compare_digest(
-            event.signature, expected
-        )
+        return bool(event.signature) and hmac.compare_digest(event.signature, expected)

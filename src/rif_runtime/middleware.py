@@ -6,10 +6,9 @@ Both middleware classes use only stdlib + starlette (shipped with FastAPI).
 
 from __future__ import annotations
 
-import time
 import threading
+import time
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +19,8 @@ from starlette.middleware.base import (
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+# Soft cap on tracked client IPs to bound memory under IP rotation.
+_MAX_BUCKETS = 10_000
 
 # ---------------------------------------------------------------------------
 # Request ID Middleware
@@ -39,7 +40,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
         # Stash on request state so downstream code can access it.
-        request.state.request_id = request_id  # type: ignore[attr-defined]
+        request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
@@ -66,6 +67,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         rate: tokens added per second (requests/second sustained rate).
         burst: maximum bucket capacity (peak burst tolerance).
 
+    Client identity uses ``request.client.host`` (the direct peer). Behind a
+    reverse proxy this is the proxy IP for every request, so the bucket
+    collapses to a single shared limit unless the process is the TLS
+    terminator. Trusted ``X-Forwarded-For`` parsing is intentionally not
+    enabled by default (spoofable); put rate limiting at the edge or terminate
+    TLS in-process if per-client limits are required.
+
     Returns HTTP 429 with a ``Retry-After`` header when the bucket is empty.
     """
 
@@ -77,18 +85,42 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         burst: int = 40,
     ) -> None:
         super().__init__(app)
-        self._rate = rate
-        self._burst = burst
-        self._buckets: dict[str, _TokenBucket] = defaultdict(
-            lambda: _TokenBucket(
-                tokens=float(burst), last_refill=time.monotonic()
-            )
-        )
+        if rate <= 0:
+            raise ValueError("rate must be positive")
+        if burst < 1:
+            raise ValueError("burst must be >= 1")
+        self._rate = float(rate)
+        self._burst = int(burst)
+        self._buckets: dict[str, _TokenBucket] = {}
         self._global_lock = threading.Lock()
 
     def _get_bucket(self, ip: str) -> _TokenBucket:
         with self._global_lock:
-            return self._buckets[ip]
+            bucket = self._buckets.get(ip)
+            if bucket is not None:
+                return bucket
+            if len(self._buckets) >= _MAX_BUCKETS:
+                self._evict_stale_unlocked()
+            # If still full after eviction, drop an arbitrary entry.
+            if len(self._buckets) >= _MAX_BUCKETS:
+                self._buckets.pop(next(iter(self._buckets)))
+            bucket = _TokenBucket(
+                tokens=float(self._burst), last_refill=time.monotonic()
+            )
+            self._buckets[ip] = bucket
+            return bucket
+
+    def _evict_stale_unlocked(self) -> None:
+        """Drop buckets idle longer than time-to-refill a full burst."""
+        idle_ttl = max(60.0, float(self._burst) / self._rate)
+        now = time.monotonic()
+        stale = [
+            key
+            for key, bucket in self._buckets.items()
+            if (now - bucket.last_refill) > idle_ttl
+        ]
+        for key in stale:
+            del self._buckets[key]
 
     def _consume(self, ip: str) -> bool:
         """Try to consume one token. Returns True if allowed."""

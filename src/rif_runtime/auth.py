@@ -32,15 +32,14 @@ logger = logging.getLogger("rif_runtime.auth")
 
 _lockout_lock = threading.Lock()
 _failed_attempts: dict[str, deque[float]] = {}
+_MAX_TRACKED_IPS = 10_000
 
 # Defaults; overridden at startup from rif.toml [security] section.
 _LOCKOUT_ATTEMPTS: int = 10
 _LOCKOUT_WINDOW_SECONDS: float = 60.0
 
 
-def configure_lockout(
-    *, attempts: int = 10, window_seconds: float = 60.0
-) -> None:
+def configure_lockout(*, attempts: int = 10, window_seconds: float = 60.0) -> None:
     """Configure lockout thresholds (called during app startup)."""
     global _LOCKOUT_ATTEMPTS, _LOCKOUT_WINDOW_SECONDS  # noqa: PLW0603
     _LOCKOUT_ATTEMPTS = attempts
@@ -64,6 +63,9 @@ def _record_failure(ip: str) -> None:
     """Record a failed auth attempt for the given IP."""
     with _lockout_lock:
         if ip not in _failed_attempts:
+            if len(_failed_attempts) >= _MAX_TRACKED_IPS:
+                # Drop an arbitrary idle entry to bound memory under IP rotation.
+                _failed_attempts.pop(next(iter(_failed_attempts)))
             _failed_attempts[ip] = deque()
         _failed_attempts[ip].append(time.monotonic())
 
@@ -95,15 +97,20 @@ def _digest(value: str) -> bytes:
     return hashlib.sha256(value.encode("utf-8")).digest()
 
 
+def _sanitize_log_token(value: str) -> str:
+    """Strip CR/LF so user-controlled values cannot forge log lines."""
+    return value.replace("\r", "").replace("\n", "")
+
+
 def _log_auth_failure(request: Request, reason: str) -> None:
     """Emit a structured log entry for an authentication failure."""
     request_id = getattr(request.state, "request_id", "unknown")
     client_ip = request.client.host if request.client else "unknown"
-    path = request.url.path
+    path = _sanitize_log_token(request.url.path)
     entry = {
         "event": "auth_failure",
-        "request_id": request_id,
-        "ip": client_ip,
+        "request_id": _sanitize_log_token(str(request_id)),
+        "ip": _sanitize_log_token(client_ip),
         "path": path,
         "reason": reason,
     }
@@ -150,12 +157,15 @@ def require_api_key(
     # Evaluate every comparison (fixed-length digests, so no ValueError on
     # length mismatch) before checking the outcome, so the check takes the
     # same time regardless of which configured key -- if any -- matches.
-    matches = [
-        hmac.compare_digest(candidate, _digest(key)) for key in configured
-    ]
+    matches = [hmac.compare_digest(candidate, _digest(key)) for key in configured]
     if not x_api_key or not any(matches):
-        _record_failure(client_ip)
-        _log_auth_failure(request, "invalid_key")
+        # Only count toward lockout when a key was actually supplied — missing
+        # headers are misconfiguration/probes, not brute-force guessing.
+        if x_api_key is not None:
+            _record_failure(client_ip)
+        _log_auth_failure(
+            request, "invalid_key" if x_api_key is not None else "missing_key"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid or missing API key",
