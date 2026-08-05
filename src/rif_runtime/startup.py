@@ -7,6 +7,7 @@ to wire in configuration loading and validation at startup.
 from __future__ import annotations
 
 import logging
+from typing import Any, cast
 
 from fastapi import FastAPI
 
@@ -26,8 +27,9 @@ def register_config_startup(app: FastAPI) -> None:
             logger.critical("Configuration validation failed: %s", exc)
             raise SystemExit(1) from exc
 
-        # Store on app.state so route handlers can access if needed
-        app.state.settings = settings  # type: ignore[attr-defined]
+        # Store on app.state so route handlers can access if needed.
+        state = cast(Any, app.state)
+        state.settings = settings
 
         logger.info(
             "RIF runtime configuration loaded: %s",
