@@ -169,5 +169,75 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 
 ```
 GET  /
-GET  /\nGET  /health\nGET  /v1/environments\nPOST /v1/environment/{name}\nPOST /v1/policy/evaluate\nPOST /v1/posture/{posture}\nPOST /v1/posture/reset\nGET  /v1/graph/summary\nGET  /v1/telemetry/summary\nGET  /v1/persistence/summary\nGET  /v1/recovered-state\nGET  /v1/audit\nPOST /v1/mcp/invoke\nGET  /v1/mcp/metasploit/capabilities\nPOST /v1/mcp/metasploit/evaluate\nPOST /v1/mcp/metasploit/token\nGET  /v1/policies\nPUT  /v1/policies/{rule_id}\nDELETE /v1/policies/{rule_id}
+GET  /health
+GET  /v1/environments
+POST /v1/environment/{name}
+POST /v1/policy/evaluate
+POST /v1/posture/{posture}
+POST /v1/posture/reset
+GET  /v1/graph/summary
+GET  /v1/telemetry/summary
+GET  /v1/persistence/summary
+GET  /v1/recovered-state
+GET  /v1/audit
+POST /v1/mcp/invoke
+GET  /v1/mcp/metasploit/capabilities
+POST /v1/mcp/metasploit/evaluate
+POST /v1/mcp/metasploit/token
+GET  /v1/policies
+PUT  /v1/policies/{rule_id}
+DELETE /v1/policies/{rule_id}
+```
+
+## Dataset Foundry
+
+This repository also hosts the Dataset Foundry: a governed, configuration-driven dataset
+engineering platform built on RIF Runtime.
+
+The Dataset Foundry transforms registered source datasets into reproducible, license-verified,
+quality-scored training dataset builds. All effectful operations route through the RIF Runtime
+policy engine.
+
+**Operational contract for coding agents working on Dataset Foundry:**
+
+1. **Architecture before implementation.** Read `docs/specifications/DATASET_FOUNDRY_SPEC.md`
+   and the relevant agent definition in `docs/agents/` before writing code.
+
+2. **Configuration before code.** New datasets → `configs/datasets/`. New chunkers →
+   `configs/chunkers/`. New profiles → `configs/profiles/`. Pipeline code must not branch on
+   dataset identity.
+
+3. **Specification before PR.** A new pipeline stage, schema type, or plugin API change
+   requires a specification update and ADR before implementation.
+
+4. **Immutable artifacts.** `DatasetRecord`, `DatasetChunk`, `DatasetManifest`, and
+   `DatasetBuild` are immutable after creation. Stages return new objects; they never mutate
+   inputs.
+
+5. **Governance before I/O.** Every effectful operation calls
+   `context.governance.evaluate(request)` before executing. Denied operations raise
+   `GovernanceDenied`; they do not silently skip.
+
+6. **Full lineage.** Every stage reports to `LineageCollector`. A stage without a
+   `TransformationRecord` is incomplete.
+
+7. **License first.** No dataset enters the registry without a classified license config.
+   No record with `license_status=incompatible` appears in any export artifact.
+
+8. **No publication without human review.** Publishing to HuggingFace Hub requires License
+   Governor and Quality Reviewer sign-off. The `hf_exporter` enforces a PUBLISH governance
+   evaluation; the policy must be explicitly configured to allow it.
+
+Key documentation:
+
+```
+docs/INDEX.md                              Navigation index for all docs
+docs/PROJECT_MANIFEST.md                   What the Dataset Foundry is
+docs/DEVELOPMENT_WORKFLOW.md               How to contribute
+docs/specifications/DATASET_FOUNDRY_SPEC.md  Platform-level specification
+docs/specifications/DATASET_SCHEMA.md     Canonical object model
+docs/specifications/PIPELINE_SPEC.md      Build pipeline specification
+docs/adr/ADR-0028-dataset-foundry-architecture.md  Why it is built this way
+docs/agents/                               Specialized agent role definitions
+docs/runbooks/                             Step-by-step operational procedures
 ```
