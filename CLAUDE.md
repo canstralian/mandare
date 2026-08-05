@@ -33,8 +33,10 @@ regardless of other rules.
 src/rif_runtime/
   api.py                  FastAPI app, all HTTP routes (source of truth for the API surface)
   cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`
-  runtime.py              RIFRuntime — wires config, policy engine, reflexive loop,
-                           graph, and persistence together; one instance per process
+  runtime.py              RIFRuntime — composition root: wires config, policy
+                          engine, reflexive loop, graph, replay, and persistence;
+                          one instance per process. HTTP/CLI are transports
+                          (ADR-0028).
   config.py               Loads config/environments.yaml into RuntimeConfig
   policy.py               PolicyEngine — the actual allow/deny decision logic
   schemas.py               Pydantic models: PolicyRequest, PolicyDecision, Decision,

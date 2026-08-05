@@ -47,6 +47,7 @@ def test_recovered_state(tmp_path, monkeypatch):
     #
     # Seeded through tmp_path rather than the shared data/decisions.jsonl so
     # the counts below are deterministic and unaffected by other tests.
+    # Replay is owned by RIFRuntime; inject via runtime.replay (ADR-0028).
     log = tmp_path / "decisions.jsonl"
     rows = [
         _decision_row("agent:a", "https://x.example.com"),
@@ -55,9 +56,7 @@ def test_recovered_state(tmp_path, monkeypatch):
     ]
     log.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
 
-    monkeypatch.setattr(
-        api, "ReplayEngine", lambda *a, **kw: ReplayEngine(str(log)), raising=True
-    )
+    monkeypatch.setattr(api.runtime, "replay", ReplayEngine(str(log)))
 
     r = client.get("/v1/recovered-state")
     assert r.status_code == 200

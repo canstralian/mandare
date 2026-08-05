@@ -20,9 +20,10 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 ## Current foundation
 
 - governance runtime and reflexive loop;
+- `RIFRuntime` as composition root (transports adapt; see ADR-0028);
 - persistence primitives and durable decision history;
 - MCP interception boundary;
-- policy, posture, graph, telemetry, and audit surfaces;
+- policy, posture, graph, telemetry, replay recovery, and audit surfaces;
 - explainability regression tests;
 - CI, release, secret scanning, dependency review, code-quality, and security-scanning workflows.
 

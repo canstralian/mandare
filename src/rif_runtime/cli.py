@@ -25,14 +25,12 @@ def check(actor: str, action: str, target: str) -> None:
     )
 
 
-if __name__ == "__main__":
-    app()
-
-
 @app.command()
 def replay(decisions_path: str = "data/decisions.jsonl") -> None:
-    state = ReplayEngine(decisions_path).recover()
-    print(state.__dict__)
+    # Inject a path-scoped ReplayEngine so CLI forensic replay does not depend
+    # on the default data/decisions.jsonl location.
+    r = RIFRuntime(replay=ReplayEngine(decisions_path))
+    print(r.recovered_state())
 
 
 @app.command("msf-check")
@@ -50,3 +48,7 @@ def msf_check(
     outcome = r.evaluate_metasploit(intent, mode=GovernanceMode(mode))
     print(outcome.decision.model_dump_json(indent=2))
     print(outcome.evidence.model_dump_json(indent=2))
+
+
+if __name__ == "__main__":
+    app()
