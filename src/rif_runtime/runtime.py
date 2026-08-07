@@ -43,20 +43,30 @@ class RIFRuntime:
         self.environment_name = name
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
-        decision = self.policy.evaluate(
-            req,
-            self.environment_name,
-            self.profile,
-            self.posture,
-            self.policy_store.list(),
-        )
         # record=False is a side-effect-free dry run: return the computed
         # decision without mutating posture or appending to the JSONL stores.
         # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
         # they cannot drive posture escalation or flood the audit log.
         if not record:
-            return decision
-        return self.record_decision(decision)
+            return self.policy.evaluate(
+                req,
+                self.environment_name,
+                self.profile,
+                self.posture,
+                self.policy_store.list(),
+            )
+        # Hold the lock across evaluate+record so the posture stamped on the
+        # decision matches the posture RMW that follows (no TOCTOU under the
+        # FastAPI sync threadpool).
+        with self._lock:
+            decision = self.policy.evaluate(
+                req,
+                self.environment_name,
+                self.profile,
+                self.posture,
+                self.policy_store.list(),
+            )
+            return self._record_decision_unlocked(decision)
 
     def record_decision(self, decision: PolicyDecision) -> PolicyDecision:
         """Feed an already-computed decision through the governance circuit.
@@ -67,6 +77,13 @@ class RIFRuntime:
         `PolicyEngine.evaluate()` itself but should still drive posture
         escalation and land in the audit trail.
         """
+        # Same lock as evaluate_metasploit: FastAPI's sync threadpool can run
+        # concurrent evaluates against one RIFRuntime, and posture RMW + JSONL
+        # appends must not interleave.
+        with self._lock:
+            return self._record_decision_unlocked(decision)
+
+    def _record_decision_unlocked(self, decision: PolicyDecision) -> PolicyDecision:
         self.governance_graph.record_decision(decision)
         old_posture = self.posture
         self.posture = self.reflexive.observe(decision, self.posture)
@@ -78,6 +95,14 @@ class RIFRuntime:
                 {"old_posture": str(old_posture), "new_posture": str(self.posture)}
             )
         return decision
+
+    def reset_posture(self) -> Posture:
+        """Return to ``normal`` and clear denial pressure so reset sticks."""
+
+        with self._lock:
+            self.posture = Posture.normal
+            self.reflexive.telemetry.clear()
+            return self.posture
 
     def evaluate_metasploit(
         self,

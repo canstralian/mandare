@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
+
 from rif_runtime.agents.auditor import AuditorAgent
 from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.mcp.capabilities import capability_catalog
@@ -60,8 +61,9 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
+    # Clear the telemetry window as well: otherwise residual denials in the
+    # 60m rolling window re-escalate on the next observe.
+    return {"posture": runtime.reset_posture().value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
