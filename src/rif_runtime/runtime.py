@@ -88,11 +88,16 @@ class RIFRuntime:
         old_posture = self.posture
         self.posture = self.reflexive.observe(decision, self.posture)
 
-        self.decisions_store.append(decision.model_dump())
+        # mode="json" keeps the ledger JSON-native (ISO timestamps) so forensic
+        # replay does not depend on json.dumps(..., default=str) coercion.
+        self.decisions_store.append(decision.model_dump(mode="json"))
 
         if old_posture != self.posture:
             self.posture_store.append(
-                {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                {
+                    "old_posture": str(old_posture),
+                    "new_posture": str(self.posture),
+                }
             )
         return decision
 
@@ -133,12 +138,15 @@ class RIFRuntime:
             if outcome.severe:
                 self.posture = escalate_posture(self.posture)
 
-            self.decisions_store.append(decision.model_dump())
-            self.evidence_store.append(outcome.evidence.model_dump())
+            self.decisions_store.append(decision.model_dump(mode="json"))
+            self.evidence_store.append(outcome.evidence.model_dump(mode="json"))
 
             if old_posture != self.posture:
                 self.posture_store.append(
-                    {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                    {
+                        "old_posture": str(old_posture),
+                        "new_posture": str(self.posture),
+                    }
                 )
             return outcome
 
