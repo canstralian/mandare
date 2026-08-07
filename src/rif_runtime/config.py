@@ -76,11 +76,10 @@ class ServerSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Binding all interfaces is the useful default for the containerised
-    # deployment this config contract targets; operators narrow it via
-    # [server] host or RIF_SERVER_HOST.  Note that `rif serve` independently
-    # defaults to 127.0.0.1 (cli.py), so the two entry points disagree —
-    # reconciling them is a deliberate follow-up, not something to change
-    # silently while clearing a lint finding.
+    # deployment this config contract targets; operators narrow it with
+    # [server] host in rif.toml or RIF_SERVER_HOST.  This is the single source
+    # of truth for the bind address — `rif serve` reads it rather than carrying
+    # its own default (see cli.py).
     host: str = "0.0.0.0"  # nosec B104
     port: int = 8000
     root_path: str = ""

@@ -2,6 +2,7 @@ import typer
 import uvicorn
 from rich import print
 
+from .config import get_settings
 from .mcp.metasploit import GovernanceMode, MetasploitIntent
 from .replay import ReplayEngine
 from .runtime import RIFRuntime
@@ -11,8 +12,22 @@ app = typer.Typer()
 
 
 @app.command()
-def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
-    uvicorn.run("rif_runtime.api:app", host=host, port=port, reload=True)
+def serve(host: str | None = None, port: int | None = None) -> None:
+    """Run the API server.
+
+    Bind address comes from the configuration contract ([server] host/port in
+    rif.toml, or RIF_SERVER_HOST / RIF_SERVER_PORT); --host and --port override
+    it for a single invocation.  config.py is the single source of truth here —
+    this command previously hardcoded 127.0.0.1 and disagreed with the
+    contract's default.
+    """
+    server = get_settings().server
+    uvicorn.run(
+        "rif_runtime.api:app",
+        host=server.host if host is None else host,
+        port=server.port if port is None else port,
+        reload=True,
+    )
 
 
 @app.command()
