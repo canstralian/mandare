@@ -26,8 +26,9 @@ def register_config_startup(app: FastAPI) -> None:
             logger.critical("Configuration validation failed: %s", exc)
             raise SystemExit(1) from exc
 
-        # Store on app.state so route handlers can access if needed
-        app.state.settings = settings  # type: ignore[attr-defined]
+        # Store on app.state so route handlers can access if needed.
+        # Starlette's State accepts arbitrary attributes; no ignore needed.
+        app.state.settings = settings
 
         logger.info(
             "RIF runtime configuration loaded: %s",
