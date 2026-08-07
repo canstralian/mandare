@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import typer
 
 from rif_runtime import cli
 from rif_runtime.config import reset_settings
@@ -70,6 +71,20 @@ def test_serve_reads_host_and_port_from_env(
     assert captured_uvicorn["host"] == "10.0.0.7"
     assert captured_uvicorn["port"] == 9002
     assert isinstance(captured_uvicorn["port"], int)
+
+
+@pytest.mark.parametrize("bad_port", [0, -1, 70000])
+def test_explicit_port_is_validated(
+    captured_uvicorn: dict[str, Any], bad_port: int
+) -> None:
+    """An out-of-range --port is rejected, not forwarded to uvicorn.
+
+    Overrides bypassed ServerSection._port_range before, so `--port 70000`
+    reached uvicorn and failed there with a far less useful message.
+    """
+    with pytest.raises(typer.BadParameter):
+        cli.serve(port=bad_port)
+    assert captured_uvicorn == {}
 
 
 def test_explicit_flags_beat_config(

@@ -1,8 +1,11 @@
+from typing import Any
+
 import typer
 import uvicorn
+from pydantic import ValidationError
 from rich import print
 
-from .config import get_settings
+from .config import ServerSection, get_settings
 from .mcp.metasploit import GovernanceMode, MetasploitIntent
 from .replay import ReplayEngine
 from .runtime import RIFRuntime
@@ -21,13 +24,23 @@ def serve(host: str | None = None, port: int | None = None) -> None:
     this command previously hardcoded 127.0.0.1 and disagreed with the
     contract's default.
     """
-    server = get_settings().server
-    uvicorn.run(
-        "rif_runtime.api:app",
-        host=server.host if host is None else host,
-        port=server.port if port is None else port,
-        reload=True,
-    )
+    overrides: dict[str, Any] = {}
+    if host is not None:
+        overrides["host"] = host
+    if port is not None:
+        overrides["port"] = port
+
+    # Re-validate through ServerSection rather than passing the flags straight
+    # to uvicorn: overrides must clear the same checks as configured values, or
+    # `--port 70000` reaches uvicorn and fails with a much worse message.
+    try:
+        server = ServerSection.model_validate(
+            get_settings().server.model_dump() | overrides
+        )
+    except ValidationError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    uvicorn.run("rif_runtime.api:app", host=server.host, port=server.port, reload=True)
 
 
 @app.command()
