@@ -3,6 +3,7 @@ from typing import Any
 
 from .config import load_config
 from .configuration.policies import PolicyStore
+from .evidence import EvidenceLedger
 from .governance.posture import escalate_posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
@@ -27,7 +28,11 @@ class RIFRuntime:
         self.policy_store = PolicyStore()
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
-        self.decisions_store = JsonlStore("data/decisions.jsonl")
+        # EvidenceLedger owns the decisions.jsonl store and adds the v1
+        # causal envelope on every append. decisions_store remains the
+        # underlying JsonlStore for count/summary helpers.
+        self.evidence_ledger = EvidenceLedger("data/decisions.jsonl")
+        self.decisions_store = self.evidence_ledger.store
         self.posture_store = JsonlStore("data/posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore("data/metasploit_evidence.jsonl")
@@ -88,9 +93,10 @@ class RIFRuntime:
         old_posture = self.posture
         self.posture = self.reflexive.observe(decision, self.posture)
 
-        # mode="json" keeps the ledger JSON-native (ISO timestamps) so forensic
-        # replay does not depend on json.dumps(..., default=str) coercion.
-        self.decisions_store.append(decision.model_dump(mode="json"))
+        # Evidence ledger appends a v1 causal envelope (schema_version,
+        # sequence, previous_hash, record_hash) around the JSON-native
+        # decision payload. Legacy rows without the envelope stay readable.
+        self.evidence_ledger.append_decision(decision)
 
         if old_posture != self.posture:
             self.posture_store.append(
@@ -138,7 +144,7 @@ class RIFRuntime:
             if outcome.severe:
                 self.posture = escalate_posture(self.posture)
 
-            self.decisions_store.append(decision.model_dump(mode="json"))
+            self.evidence_ledger.append_decision(decision)
             self.evidence_store.append(outcome.evidence.model_dump(mode="json"))
 
             if old_posture != self.posture:

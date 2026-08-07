@@ -38,11 +38,26 @@ def replay(
     if verify:
         report = engine.verify()
         print(report.as_dict())
-        if report.invalid_rows or not report.deterministic:
+        if report.invalid_rows or not report.deterministic or not report.chain_ok:
             raise typer.Exit(code=1)
         return
     state = engine.recover()
     print(state.__dict__)
+
+
+@app.command("evidence-export")
+def evidence_export(
+    decisions_path: str = "data/decisions.jsonl",
+    indent: int = typer.Option(2, help="JSON indent; 0 for compact."),
+) -> None:
+    """Export the decision evidence ledger as stable, sorted-key JSON."""
+
+    from .evidence import EvidenceLedger
+
+    text = EvidenceLedger(decisions_path).export_stable_json(
+        indent=None if indent <= 0 else indent
+    )
+    print(text)
 
 
 @app.command("msf-check")

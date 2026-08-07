@@ -98,11 +98,13 @@ def test_recover_twice_is_bit_identical_for_valid_log(tmp_path):
 def test_runtime_persists_json_native_timestamps(tmp_path, monkeypatch):
     # Decisions written by RIFRuntime must be JSON-native ISO timestamps so
     # forensic tools do not depend on default=str coercion.
+    from rif_runtime.evidence import EvidenceLedger
     from rif_runtime.storage.jsonl import JsonlStore
 
     decisions = tmp_path / "decisions.jsonl"
     runtime = RIFRuntime()
-    runtime.decisions_store = JsonlStore(decisions)
+    runtime.evidence_ledger = EvidenceLedger(decisions)
+    runtime.decisions_store = runtime.evidence_ledger.store
     runtime.posture_store = JsonlStore(tmp_path / "posture_history.jsonl")
     runtime.evidence_store = JsonlStore(tmp_path / "metasploit_evidence.jsonl")
 
@@ -116,5 +118,7 @@ def test_runtime_persists_json_native_timestamps(tmp_path, monkeypatch):
     line = decisions.read_text(encoding="utf-8").strip().splitlines()[-1]
     row = json.loads(line)
     assert "T" in row["timestamp"]  # ISO-8601 from mode="json"
+    assert row["schema_version"] == "rif.evidence.decision/v1"
     # Round-trip through replay validation
     assert ReplayEngine(str(decisions)).verify().invalid_rows == 0
+    assert ReplayEngine(str(decisions)).verify().chain_ok is True

@@ -175,6 +175,21 @@ def recovered_state() -> dict[str, Any]:
     return asdict(ReplayEngine().recover())
 
 
+@app.get("/v1/evidence/export")
+def evidence_export() -> dict[str, Any]:
+    """Stable JSON export of the decision evidence ledger (append order)."""
+
+    import json
+
+    ledger = runtime.evidence_ledger
+    chain = ledger.verify_chain()
+    return {
+        "schema_version": "rif.evidence.export/v1",
+        "records": json.loads(ledger.export_stable_json(indent=None)),
+        "chain": chain.as_dict(),
+    }
+
+
 @app.get("/v1/policies")
 def list_policies() -> dict[str, Any]:
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
