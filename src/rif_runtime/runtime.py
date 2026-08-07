@@ -1,7 +1,8 @@
 import threading
+from pathlib import Path
 from typing import Any
 
-from .config import load_config
+from .config import get_settings, load_config
 from .configuration.policies import PolicyStore
 from .governance.posture import escalate_posture
 from .governance.reflexive import ReflexiveLoop
@@ -21,16 +22,17 @@ from .storage.jsonl import JsonlStore
 class RIFRuntime:
     def __init__(self) -> None:
         self.config = load_config()
+        data_dir = Path(get_settings().paths.data_dir)
         self.environment_name = self.config.default_environment
         self.posture = Posture.normal
         self.policy = PolicyEngine()
         self.policy_store = PolicyStore()
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
-        self.decisions_store = JsonlStore("data/decisions.jsonl")
-        self.posture_store = JsonlStore("data/posture_history.jsonl")
+        self.decisions_store = JsonlStore(data_dir / "decisions.jsonl")
+        self.posture_store = JsonlStore(data_dir / "posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
-        self.evidence_store = JsonlStore("data/metasploit_evidence.jsonl")
+        self.evidence_store = JsonlStore(data_dir / "metasploit_evidence.jsonl")
         self._lock = threading.Lock()
 
     @property
