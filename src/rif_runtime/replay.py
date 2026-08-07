@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .governance.posture import posture_for_denials
 from .graph.memory import GovernanceGraph
-from .schemas import Decision, PolicyDecision, Posture
+from .schemas import PolicyDecision
 
 
 @dataclass
@@ -56,26 +57,11 @@ class ReplayEngine:
             historical_denials=denials,
             graph_nodes=graph.summary()["nodes"],
             graph_edges=graph.summary()["edges"],
-            last_posture=self._posture_from_denials(denials).value,
+            last_posture=posture_for_denials(denials).value,
         )
 
     def _decision_from_row(self, row: dict[str, Any]) -> PolicyDecision:
-        return PolicyDecision(
-            decision=Decision(row["decision"]),
-            actor=row["actor"],
-            action=row["action"],
-            target=row["target"],
-            environment=row["environment"],
-            posture=Posture(row["posture"]),
-            reason=row["reason"],
-            matched_rule=row["matched_rule"],
-        )
-
-    def _posture_from_denials(self, denials: int) -> Posture:
-        if denials >= 20:
-            return Posture.locked
-        if denials >= 10:
-            return Posture.restricted
-        if denials >= 3:
-            return Posture.elevated
-        return Posture.normal
+        # model_validate preserves persisted timestamps (and accepts both ISO
+        # and the legacy space-separated form from json.dumps(..., default=str)).
+        # Manual field picking dropped timestamp and minted a fresh now().
+        return PolicyDecision.model_validate(row)
