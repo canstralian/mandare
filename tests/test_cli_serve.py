@@ -56,13 +56,20 @@ def test_serve_reads_host_from_rif_toml(
     assert captured_uvicorn["port"] == 9001
 
 
-def test_serve_reads_host_from_env(
+def test_serve_reads_host_and_port_from_env(
     captured_uvicorn: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """RIF_SERVER_HOST overrides the contract default."""
+    """RIF_SERVER_HOST / RIF_SERVER_PORT override the contract defaults.
+
+    Port is asserted as an int: env vars arrive as strings and go through
+    _coerce_env_value, so a regression there would hand uvicorn "9002".
+    """
     monkeypatch.setenv("RIF_SERVER_HOST", "10.0.0.7")
+    monkeypatch.setenv("RIF_SERVER_PORT", "9002")
     cli.serve()
     assert captured_uvicorn["host"] == "10.0.0.7"
+    assert captured_uvicorn["port"] == 9002
+    assert isinstance(captured_uvicorn["port"], int)
 
 
 def test_explicit_flags_beat_config(
