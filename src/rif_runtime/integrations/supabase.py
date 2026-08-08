@@ -16,10 +16,13 @@ deployments without any configuration changes.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 _MISSING_PKG = (
     "supabase package not installed — run: pip install 'rif-runtime[supabase]'"
@@ -112,7 +115,7 @@ def write_evidence(run_id: str, kind: str, payload: dict[str, Any]) -> None:
             {"run_id": run_id, "kind": kind, "payload": payload}
         ).execute()
     except Exception:
-        pass
+        logger.warning("supabase: evidence write failed [%s]", run_id, exc_info=True)
 
 
 def write_run(run_id: str, identity_id: str, run_status: str, prompt: str) -> None:
@@ -132,7 +135,7 @@ def write_run(run_id: str, identity_id: str, run_status: str, prompt: str) -> No
             }
         ).execute()
     except Exception:
-        pass
+        logger.warning("supabase: run write failed [%s]", run_id, exc_info=True)
 
 
 def update_run_status(run_id: str, run_status: str) -> None:
@@ -147,7 +150,7 @@ def update_run_status(run_id: str, run_status: str) -> None:
             "run_id", run_id
         ).execute()
     except Exception:
-        pass
+        logger.warning("supabase: status update failed [%s]", run_id, exc_info=True)
 
 
 def reset_clients() -> None:
