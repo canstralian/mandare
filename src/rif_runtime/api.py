@@ -65,7 +65,6 @@ def _require_identity(credentials: _BearerCredentials) -> str:
 
 IdentityId = Annotated[str, Depends(_require_identity)]
 
-
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {
