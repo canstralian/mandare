@@ -4,16 +4,15 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
 
-from rif_runtime.agents.auditor import AuditorAgent
-from rif_runtime.configuration.policies import PolicyRule
-from rif_runtime.mcp.capabilities import capability_catalog
-from rif_runtime.mcp.metasploit import (
+from .agents.auditor import AuditorAgent
+from .auth import ControlPlaneAuth
+from .configuration.policies import PolicyRule
+from .mcp.capabilities import capability_catalog
+from .mcp.metasploit import (
     CapabilityToken,
     GovernanceMode,
     MetasploitIntent,
 )
-
-from .auth import ControlPlaneAuth
 from .replay import ReplayEngine
 from .runtime import RIFRuntime
 from .schemas import PolicyDecision, PolicyRequest, Posture
