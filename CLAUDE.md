@@ -32,7 +32,7 @@ Current version: **0.3.0rc1** (source of truth: `pyproject.toml`).
 
 ## Layout
 
-```
+```text
 src/rif_runtime/
   api.py                   FastAPI app — all HTTP routes (source of truth for the API surface)
   cli.py                   Typer CLI: `rif serve`, `rif check`, `rif replay`
@@ -258,8 +258,9 @@ minted by `POST /v1/mcp/metasploit/token` after explicit human approval. The tok
 binds one capability to one target and to a specific `intent_hash`; any mismatch
 (capability, target, intent, expiry, or signature) results in a denial.
 
-Every governance decision produces a signed `EvidenceEvent` that is appended to
-`data/metasploit_evidence.jsonl`. The `contract_hash()` embedded in each event is a
+Every recorded governance decision produces a signed `EvidenceEvent` that is appended to
+`data/metasploit_evidence.jsonl`. Dry-run evaluations (`/v1/mcp/invoke`,
+`/v1/mcp/metasploit/evaluate`) use `record=False` and do not write this log. The `contract_hash()` embedded in each event is a
 stable SHA-256 digest of the capability taxonomy, allowing decisions to be
 replayed against the exact contract that produced them.
 
@@ -268,7 +269,7 @@ replayed against the exact contract that produced them.
 The `execution/` module formalises the boundary between policy evaluation and
 capability execution:
 
-```
+```text
 PolicyEngine.evaluate() -> PolicyDecision (allow)
   -> ExecutionManifest  (actor, capability, action, target, parameters)
   -> ExecutionKernel.execute(manifest)
@@ -333,8 +334,8 @@ executing → recording_evidence → completed/failed/denied`) independently of
   posture history, Metasploit evidence) or `JsonStore` (whole-file JSON with
   atomic temp-file replace: policies). Don't hand-roll file I/O elsewhere.
 - `RIFRuntime` is constructed fresh per process/test (`RIFRuntime()`), not a
-  singleton with DI — tests instantiate it directly and rely on real files under
-  `data/`.
+  singleton with DI. Tests that touch persistent storage use isolated temporary
+  paths, following the `tmp_path` pattern (see `tests/test_policy_store.py`).
 - Enums (`Decision`, `Posture`, `ExecutionStatus`, …) subclass `enum.StrEnum` so they
   serialize cleanly and compare equal to plain strings.
 - `from __future__ import annotations` is present in all new modules; use it in
@@ -402,7 +403,7 @@ executing → recording_evidence → completed/failed/denied`) independently of
 
 `[auth]` = requires `X-API-Key` header via `ControlPlaneAuth`.
 
-```
+```text
 GET    /
 GET    /health
 GET    /v1/environments
