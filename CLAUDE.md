@@ -385,6 +385,16 @@ executing → recording_evidence → completed/failed/denied`) independently of
   keys or invalid values, the FastAPI startup hook raises `SystemExit(1)` before
   the server accepts traffic. This is intentional: a misconfigured runtime should
   not silently start.
+- **`record_decision()` is not protected by `_lock`.** `RIFRuntime._lock`
+  (`threading.Lock`) is held only inside `evaluate_metasploit()`. The
+  `evaluate()` → `record_decision()` path — which mutates `governance_graph`,
+  `posture`, and `decisions_store` — runs without the lock, so concurrent
+  `POST /v1/policy/evaluate` requests can race on posture transitions and JSONL
+  appends. Adding `with self._lock:` around the body of `record_decision()` is
+  safe (no deadlock: `evaluate_metasploit` inlines its recording rather than
+  calling `record_decision`), but has not been done yet. Until fixed, avoid
+  issuing parallel policy-evaluate requests in tests or production code that
+  depends on strict posture ordering.
 
 ## CI workflows
 
