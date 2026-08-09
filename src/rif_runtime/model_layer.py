@@ -39,7 +39,11 @@ class LocalModel:
         except (URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise LocalModelError(f"{self.name} inference failed: {exc}") from exc
 
-        text = body.get("response") or body.get("content")
+        if not isinstance(body, dict):
+            raise LocalModelError(f'{self.name} returned non-object JSON response')
+        if 'error' in body:
+            raise LocalModelError(f'{self.name} returned error: {body["error"]}')
+        text = body.get('response') or body.get('content')
         if not isinstance(text, str) or not text.strip():
             raise LocalModelError(f"{self.name} returned no text response")
         return text.strip()
