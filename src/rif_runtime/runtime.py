@@ -79,7 +79,7 @@ class RIFRuntime:
 
             if old_posture != self.posture:
                 self.posture_store.append(
-                    {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                    {"old_posture": str(old_posture), "new_posture": str(self.posture)},
                 )
             return decision
 
