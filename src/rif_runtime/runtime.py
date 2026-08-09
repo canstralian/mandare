@@ -23,7 +23,12 @@ class RIFRuntime:
     def __init__(self) -> None:
         self.config = load_config()
         data_dir = Path(get_settings().paths.data_dir)
-        self.environment_name = self.config.default_environment
+        _settings_env = get_settings().runtime.environment
+        self.environment_name = (
+            _settings_env
+            if _settings_env in self.config.environments
+            else self.config.default_environment
+        )
         self.posture = Posture.normal
         self.policy = PolicyEngine()
         self.policy_store = PolicyStore(str(data_dir / "policies.json"))
@@ -34,6 +39,14 @@ class RIFRuntime:
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore(data_dir / "metasploit_evidence.jsonl")
         self._lock = threading.RLock()
+        # Restore last known posture from persisted history so a restart
+        # honours a previously locked (or escalated) runtime.
+        _transitions = self.posture_store.read_all()
+        if _transitions:
+            try:
+                self.posture = Posture(_transitions[-1]["new_posture"])
+            except (ValueError, KeyError):
+                pass
 
     @property
     def profile(self) -> EnvironmentProfile:
