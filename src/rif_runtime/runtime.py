@@ -26,14 +26,14 @@ class RIFRuntime:
         self.environment_name = self.config.default_environment
         self.posture = Posture.normal
         self.policy = PolicyEngine()
-        self.policy_store = PolicyStore()
+        self.policy_store = PolicyStore(str(data_dir / "policies.json"))
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
         self.decisions_store = JsonlStore(data_dir / "decisions.jsonl")
         self.posture_store = JsonlStore(data_dir / "posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore(data_dir / "metasploit_evidence.jsonl")
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     @property
     def profile(self) -> EnvironmentProfile:
@@ -45,20 +45,21 @@ class RIFRuntime:
         self.environment_name = name
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
-        decision = self.policy.evaluate(
-            req,
-            self.environment_name,
-            self.profile,
-            self.posture,
-            self.policy_store.list(),
-        )
-        # record=False is a side-effect-free dry run: return the computed
-        # decision without mutating posture or appending to the JSONL stores.
-        # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
-        # they cannot drive posture escalation or flood the audit log.
-        if not record:
-            return decision
-        return self.record_decision(decision)
+        with self._lock:
+            decision = self.policy.evaluate(
+                req,
+                self.environment_name,
+                self.profile,
+                self.posture,
+                self.policy_store.list(),
+            )
+            # record=False is a side-effect-free dry run: return the computed
+            # decision without mutating posture or appending to the JSONL stores.
+            # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
+            # they cannot drive posture escalation or flood the audit log.
+            if not record:
+                return decision
+            return self.record_decision(decision)
 
     def record_decision(self, decision: PolicyDecision) -> PolicyDecision:
         """Feed an already-computed decision through the governance circuit.
@@ -69,17 +70,18 @@ class RIFRuntime:
         `PolicyEngine.evaluate()` itself but should still drive posture
         escalation and land in the audit trail.
         """
-        self.governance_graph.record_decision(decision)
-        old_posture = self.posture
-        self.posture = self.reflexive.observe(decision, self.posture)
+        with self._lock:
+            self.governance_graph.record_decision(decision)
+            old_posture = self.posture
+            self.posture = self.reflexive.observe(decision, self.posture)
 
-        self.decisions_store.append(decision.model_dump())
+            self.decisions_store.append(decision.model_dump())
 
-        if old_posture != self.posture:
-            self.posture_store.append(
-                {"old_posture": str(old_posture), "new_posture": str(self.posture)}
-            )
-        return decision
+            if old_posture != self.posture:
+                self.posture_store.append(
+                    {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                )
+            return decision
 
     def evaluate_metasploit(
         self,
