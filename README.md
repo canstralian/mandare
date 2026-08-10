@@ -20,6 +20,8 @@ RIF Runtime is a governed execution substrate for agents and tools. It compiles 
 
 - [Roadmap](docs/ROADMAP.md)
 - [Reflexive Evolution Pipeline](docs/REFLEXIVE_EVOLUTION.md)
+- [Changelog](CHANGELOG.md) · [Release process](RELEASE.md) · [Compatibility](docs/COMPATIBILITY.md)
+- [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture-v1.md)
 
 ## Run
 

@@ -1,0 +1,265 @@
+name: Deterministic Replay Test Matrix
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Nightly full matrix test
+    - cron: '0 2 * * *'
+
+env:
+  PYTHONHASHSEED: 0  # Ensure deterministic hashing
+  PYTHONDONTWRITEBYTECODE: 1
+
+jobs:
+  determinism-linux:
+    name: Determinism - Linux (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install -q -e ".[dev]"
+          pip install -q hypothesis jsonschema msgpack
+      
+      - name: Run golden tests (Linux)
+        run: |
+          pytest tests/test_determinism_golden.py -v \
+            --tb=short \
+            --golden-fixtures fixtures/golden/ \
+            --export-hashes output/linux_py${{ matrix.python-version }}_hashes.json
+        env:
+          RIF_TEST_PLATFORM: linux
+          RIF_TEST_PYTHON_VERSION: ${{ matrix.python-version }}
+      
+      - name: Run property tests (Hypothesis)
+        run: |
+          pytest tests/test_determinism_properties.py -v \
+            --hypothesis-seed=0 \
+            --hypothesis-profile=ci
+        env:
+          PYTHONHASHSEED: 0
+      
+      - name: Upload hash export
+        uses: actions/upload-artifact@v3
+        with:
+          name: hash-exports-linux-py${{ matrix.python-version }}
+          path: output/linux_py${{ matrix.python-version }}_hashes.json
+  
+  determinism-windows:
+    name: Determinism - Windows (Python 3.12)
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install -q -e ".[dev]"
+          pip install -q hypothesis jsonschema msgpack
+      
+      - name: Run golden tests (Windows)
+        run: |
+          pytest tests/test_determinism_golden.py -v `
+            --tb=short `
+            --golden-fixtures fixtures/golden/ `
+            --export-hashes output/windows_py312_hashes.json
+        env:
+          RIF_TEST_PLATFORM: windows
+          RIF_TEST_PYTHON_VERSION: '3.12'
+          PYTHONHASHSEED: 0
+      
+      - name: Verify line ending handling
+        run: |
+          python -c "
+          import pathlib
+          golden_dir = pathlib.Path('fixtures/golden')
+          for fixture in golden_dir.glob('*.json'):
+              with open(fixture, 'rb') as f:
+                  content = f.read()
+              if b'\r\n' in content:
+                  print(f'ERROR: {fixture} has CRLF line endings')
+                  exit(1)
+          print('OK: All fixtures use LF line endings')
+          "
+      
+      - name: Upload hash export
+        uses: actions/upload-artifact@v3
+        with:
+          name: hash-exports-windows-py312
+          path: output/windows_py312_hashes.json
+  
+  determinism-macos:
+    name: Determinism - macOS (Python 3.12)
+    runs-on: macos-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install -q -e ".[dev]"
+          pip install -q hypothesis jsonschema msgpack
+      
+      - name: Run golden tests (macOS)
+        run: |
+          pytest tests/test_determinism_golden.py -v \
+            --tb=short \
+            --golden-fixtures fixtures/golden/ \
+            --export-hashes output/macos_py312_hashes.json
+        env:
+          RIF_TEST_PLATFORM: macos
+          RIF_TEST_PYTHON_VERSION: '3.12'
+          PYTHONHASHSEED: 0
+      
+      - name: Upload hash export
+        uses: actions/upload-artifact@v3
+        with:
+          name: hash-exports-macos-py312
+          path: output/macos_py312_hashes.json
+  
+  compare-hashes:
+    name: Compare Cross-Platform Hashes
+    needs: [determinism-linux, determinism-windows, determinism-macos]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all hash exports
+        uses: actions/download-artifact@v3
+        with:
+          path: all-hashes/
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Compare hashes across platforms
+        run: |
+          python scripts/compare_hashes.py all-hashes/
+        env:
+          PYTHONHASHSEED: 0
+      
+      - name: Generate comparison report
+        if: always()
+        run: |
+          python scripts/generate_hash_report.py all-hashes/ > hash_comparison_report.txt
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: hash-comparison-report
+          path: hash_comparison_report.txt
+      
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('hash_comparison_report.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## Deterministic Replay Test Results\n\n```\n' + report + '\n```'
+            });
+  
+  flaky-test-detection:
+    name: Flaky Test Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install -q -e ".[dev]"
+          pip install -q hypothesis pytest-repeat
+      
+      - name: Run tests multiple times to detect flakiness
+        run: |
+          pytest tests/test_determinism_golden.py -v \
+            --count=5 \
+            --tb=short
+        env:
+          PYTHONHASHSEED: 0
+      
+      - name: Generate flakiness report
+        if: always()
+        run: |
+          pytest tests/test_determinism_golden.py -v \
+            --count=10 \
+            --tb=line \
+            --hypothesis-seed=random \
+            --junitxml=junit.xml || true
+          python scripts/analyze_flakiness.py junit.xml
+
+  performance-baseline:
+    name: Performance Baseline
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install -q -e ".[dev]"
+          pip install -q pytest-benchmark
+      
+      - name: Run performance benchmarks
+        run: |
+          pytest tests/test_determinism_performance.py -v \
+            --benchmark-only \
+            --benchmark-json=benchmark.json
+      
+      - name: Store benchmark
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'pytest'
+          output-file-path: benchmark.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+      
+      - name: Compare with baseline
+        run: |
+          python scripts/compare_benchmarks.py benchmark.json
