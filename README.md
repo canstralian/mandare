@@ -30,6 +30,16 @@ pip install -e .
 rif serve
 ```
 
+CLI (no server required for a single decision):
+
+```bash
+rif --help
+rif check agent:test http.request https://api.anthropic.com/v1/messages
+rif status
+```
+
+See [docs/cli-reference.md](docs/cli-reference.md).
+
 ## Try it
 
 ```bash
