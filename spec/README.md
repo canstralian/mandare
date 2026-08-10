@@ -18,6 +18,12 @@ domains are:
 | `skill/` | placeholder | Skill package format (`SKILL.md` + `skill.yaml` + tests) not yet formalized |
 | `state/` | placeholder | Structured runtime state contract not yet extracted from `runtime_state.json` |
 
+Beyond the six original domains, governed-integration contracts also live here:
+
+| Domain | Status | Contents |
+| --- | --- | --- |
+| `mcp/` | drafted | MCP server framework governance contract (`SPEC.md`): authority tiers, ordered decision procedure, destructive-action hard gate, evaluation scorecard — generalizes `src/rif_runtime/mcp/metasploit.py` |
+
 `contracts/rif_familiar/` is left in place unchanged for this slice — it is the
 device-facing (RIF Familiar / Field Observer) contract set and is the origin of the
 schemas seeded into `capability/`, `governance/`, and `evidence/` above. A later
