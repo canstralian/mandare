@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/runtime-replay-report/v1",
+  "title": "RIF Runtime Replay Report v1",
+  "description": "Result of a deterministic replay or verify pass. Normative text: spec/replay/SPEC.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "ok", "mode", "run_id", "events_applied"],
+  "properties": {
+    "schema_version": {
+      "const": "rif.runtime.replay-report/v1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["pure", "verify", "time_travel"]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[a-f0-9]{32}$"
+    },
+    "events_applied": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "snapshot": {
+      "$ref": "#/$defs/snapshot"
+    },
+    "divergence": {
+      "$ref": "#/$defs/divergence"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100
+    }
+  },
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at_sequence", "head_hash", "state_digest", "status", "posture"],
+      "properties": {
+        "at_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "head_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "absent",
+            "accepted",
+            "mode_bound",
+            "context_ready",
+            "authorized",
+            "denied",
+            "review_hold",
+            "granted",
+            "executing",
+            "succeeded",
+            "failed",
+            "aborted"
+          ]
+        },
+        "posture": {
+          "type": "string",
+          "enum": ["normal", "elevated", "restricted", "locked"]
+        },
+        "denial_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_decision": {
+          "type": ["string", "null"],
+          "enum": ["allow", "deny", "review", null]
+        },
+        "environment": {
+          "type": ["string", "null"]
+        },
+        "context_hash": {
+          "type": ["string", "null"],
+          "pattern": "^([a-f0-9]{64})?$"
+        },
+        "last_result_hash": {
+          "type": ["string", "null"],
+          "pattern": "^([a-f0-9]{64})?$"
+        }
+      }
+    },
+    "divergence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason_code", "sequence", "event_id"],
+      "properties": {
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "DECODE_ERROR",
+            "SCHEMA_INVALID",
+            "SEQUENCE_GAP",
+            "SEQUENCE_DUP",
+            "CAUSATION_INVALID",
+            "CHAIN_BREAK",
+            "HASH_MISMATCH",
+            "ID_MISMATCH",
+            "RESULT_HASH_MISMATCH",
+            "EVIDENCE_MISSING",
+            "STATE_DIVERGENCE",
+            "RUN_ID_MIXED",
+            "AT_BEFORE_ROOT",
+            "LEGACY_LOG"
+          ]
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected": {
+          "type": ["string", "null"]
+        },
+        "actual": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

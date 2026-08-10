@@ -73,14 +73,15 @@ rif status
 Read-only with respect to policy mutation; uses the same local `data/` paths as
 the API.
 
-## Planned (not implemented)
+## Planned (v1.0 demo CLI — not yet implemented)
 
-The following surfaces are aspirational and are **not** available in the
-current CLI:
+Authoritative design: [cli-v1-spec.md](cli-v1-spec.md).
 
-- `rif execute`
-- `rif evidence`
-- `rif telemetry`
-- `rif validate`
-- `rif policy`
-- Global flags such as `--config`, `--json`, `--verbose`, `--profile`, `--offline`
+Target commands: `rif run`, `rif replay` (run id), `rif verify`, `rif inspect`,
+`rif policy`, `rif evidence`, plus global `--json` / CI exit codes (`0–5`).
+
+Until that surface ships, the commands below remain **unimplemented** on the
+current binary (do not confuse with today’s `rif replay` file-path command):
+
+- `rif run` / `rif verify` / `rif inspect` / `rif policy` / `rif evidence`
+- Global flags such as `--json`, `--verbose`, `--profile`, `--offline`

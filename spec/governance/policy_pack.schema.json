@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/runtime-policy-pack/v1",
+  "title": "RIF Runtime Policy Pack v1",
+  "description": "Minimal governance-as-code policy pack. Normative text: spec/governance/GOVERNANCE_AS_CODE.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pack_id", "defaults", "rules"],
+  "properties": {
+    "schema_version": {
+      "const": "rif.runtime.policy/v1"
+    },
+    "pack_id": {
+      "type": "string",
+      "pattern": "^pack_[a-z0-9_]{3,64}$"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect", "reason_code"],
+      "properties": {
+        "effect": {
+          "type": "string",
+          "enum": ["allow", "deny", "review"]
+        },
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        }
+      }
+    },
+    "builtins_allowed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "posture_at_least",
+          "posture_is",
+          "mode_in",
+          "budget_remaining_gte",
+          "capability_declared",
+          "evidence_present",
+          "risk_lte",
+          "host_matches",
+          "action_is",
+          "action_prefix",
+          "intent_hash_eq"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effect", "reason_code", "when"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,63}$"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "effect": {
+          "type": "string",
+          "enum": ["allow", "deny", "review"]
+        },
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 0
+        },
+        "when": {
+          "$ref": "#/$defs/bool_expr"
+        }
+      }
+    },
+    "bool_expr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "all": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/bool_expr"
+          }
+        },
+        "any": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/bool_expr"
+          }
+        },
+        "not": {
+          "$ref": "#/$defs/bool_expr"
+        },
+        "posture_is": {
+          "type": "string",
+          "enum": ["normal", "elevated", "restricted", "locked"]
+        },
+        "posture_at_least": {
+          "type": "string",
+          "enum": ["normal", "elevated", "restricted", "locked"]
+        },
+        "mode_in": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 1
+        },
+        "budget_remaining_gte": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "capability_declared": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "risk_class": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        },
+        "evidence_present": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1
+        },
+        "risk_lte": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "host_matches": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "minItems": 1
+        },
+        "action_is": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "action_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "intent_hash_eq": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

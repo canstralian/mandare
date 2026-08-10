@@ -1,10 +1,12 @@
 # spec/replay
 
-Contract for replay: capturing a runtime execution and re-running it (deterministic
-or model-dependent) to verify behavior, diff against a prior run, or produce an
-audit timeline.
+Deterministic **replay engine** contract for RIF Runtime v1.0.
 
-**Placeholder** — capture/diff schemas not yet extracted. The **event unit of
-replay** is frozen in [`../events/SPEC.md`](../events/SPEC.md)
-(`rif.runtime.event/v1`). Next slice: define `replay_capture.schema.json` as an
-ordered sequence of those envelopes plus verify metadata (`replay.completed`).
+| File | Role |
+| --- | --- |
+| [`SPEC.md`](./SPEC.md) | State machine, algorithm, pseudocode, structures, complexity, failures, golden tests |
+| [`replay_report.schema.json`](./replay_report.schema.json) | JSON Schema for replay/verify reports |
+
+**Event unit:** [`../events/SPEC.md`](../events/SPEC.md) (`rif.runtime.event/v1`).
+
+**Modes:** `pure` (reconstruct, no side effects), `verify` (hash/evidence checks), `time_travel` (state at sequence N).
