@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -27,7 +26,8 @@ app = typer.Typer(
 
 
 def _die(message: str, code: int = 1) -> NoReturn:
-    print(f"[red]error:[/red] {message}", file=sys.stderr)
+    # Use typer.secho (not rich.print) so paths are not soft-wrapped mid-string.
+    typer.secho(f"error: {message}", fg=typer.colors.RED, err=True)
     raise typer.Exit(code)
 
 
@@ -126,9 +126,10 @@ def replay(
     except ReplayDecodeError as exc:
         _die(str(exc))
     if state.historical_decisions == 0:
-        print(
-            f"[yellow]note:[/yellow] decisions file is empty: {path}",
-            file=sys.stderr,
+        typer.secho(
+            f"note: decisions file is empty: {path}",
+            fg=typer.colors.YELLOW,
+            err=True,
         )
     print(state.__dict__)
 
@@ -173,9 +174,7 @@ def msf_check(
     try:
         governance_mode = GovernanceMode(mode)
     except ValueError:
-        _die(
-            f"unknown mode {mode!r}; expected one of: {_GOVERNANCE_MODES_HELP}"
-        )
+        _die(f"unknown mode {mode!r}; expected one of: {_GOVERNANCE_MODES_HELP}")
     r = RIFRuntime()
     intent = MetasploitIntent(
         actor=actor, capability=capability, target=target, scope_id=scope_id
@@ -204,9 +203,7 @@ def status() -> None:
         _die(str(exc))
     payload = {
         "environment": r.environment_name,
-        "posture": r.posture.value
-        if hasattr(r.posture, "value")
-        else r.posture,
+        "posture": r.posture.value,
         "persisted": r.persisted_summary(),
         "recovered": recovered,
     }

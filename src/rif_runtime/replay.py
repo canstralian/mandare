@@ -45,9 +45,7 @@ class ReplayEngine:
             try:
                 rows.append(json.loads(line))
             except json.JSONDecodeError as exc:
-                raise ReplayDecodeError(
-                    self.decisions_path, line_no, exc.msg
-                ) from exc
+                raise ReplayDecodeError(self.decisions_path, line_no, exc.msg) from exc
         return rows
 
     def replay_graph(self, rows: list[dict[str, Any]] | None = None) -> GovernanceGraph:
