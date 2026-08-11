@@ -15,11 +15,16 @@ checks *is* the answer to "which authority boundary prevented escalation":
                                    token whose intent hash still matches.
 
 Every decision produces a signed evidence event.
+
+Signing key stability: resolved via ``RIF_MSF_SIGNING_KEY``, legacy
+``RIF_MSF_BROKER_KEY``, HKDF from ``RIF_SECRET_KEY``, or a random fallback.
 """
 
 from __future__ import annotations
 
+import hashlib
 import hmac
+import logging
 import os
 import secrets
 from dataclasses import dataclass
@@ -38,6 +43,48 @@ from .capabilities import (
     contract_hash,
     is_severe,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _derive_signing_key() -> str:
+    """Resolve the Metasploit evidence/token signing key.
+
+    Priority:
+      1. ``RIF_MSF_SIGNING_KEY`` (explicit operator override).
+      2. Legacy ``RIF_MSF_BROKER_KEY`` (backward compatible).
+      3. HKDF(SHA-256) from ``RIF_SECRET_KEY`` (stable across restarts).
+      4. Secure random fallback (logs a warning; breaks cross-restart verify).
+    """
+    explicit = os.environ.get("RIF_MSF_SIGNING_KEY")
+    if explicit:
+        return explicit
+
+    legacy = os.environ.get("RIF_MSF_BROKER_KEY")
+    if legacy:
+        return legacy
+
+    app_secret = os.environ.get("RIF_SECRET_KEY")
+    if app_secret:
+        # HKDF-Extract then Expand (RFC 5869), single output block.
+        prk = hmac.new(
+            key=b"rif-msf-signing",  # salt (domain separation)
+            msg=app_secret.encode(),
+            digestmod=hashlib.sha256,
+        ).digest()
+        okm = hmac.new(
+            key=prk,
+            msg=b"msf-event-signing-v1" + b"\x01",
+            digestmod=hashlib.sha256,
+        ).digest()
+        return okm.hex()
+
+    logger.warning(
+        "Neither RIF_MSF_SIGNING_KEY, RIF_MSF_BROKER_KEY, nor RIF_SECRET_KEY "
+        "is set; generating an ephemeral signing key (will not survive restart)."
+    )
+    return secrets.token_hex(32)
+
 
 # Natural-language authority assertions and prompt-injection markers. None of
 # these confer authority; their presence in operator text, imported recon, or
@@ -208,9 +255,7 @@ def scan_for_injection(*texts: str | None) -> list[str]:
 
 class MetasploitGovernor:
     def __init__(self, signing_key: str | None = None) -> None:
-        self.signing_key = (
-            signing_key or os.getenv("RIF_MSF_BROKER_KEY") or secrets.token_hex(32)
-        )
+        self.signing_key = signing_key or _derive_signing_key()
 
     def mint_token(
         self,

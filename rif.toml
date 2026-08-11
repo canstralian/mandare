@@ -8,17 +8,21 @@
 # Env vars take precedence over file values.
 #
 # Env-var mapping:
-#   RIF_POSTURE          -> [runtime] posture
-#   RIF_ENVIRONMENT      -> [runtime] environment
-#   RIF_CLOUD_EGRESS     -> [runtime] cloud_egress
-#   RIF_SERVER_HOST      -> [server] host
-#   RIF_SERVER_PORT      -> [server] port
-#   RIF_SERVER_ROOT_PATH -> [server] root_path
-#   RIF_PROVIDER_MODE    -> [provider] mode
-#   RIF_PROVIDER_MODEL   -> [provider] model
-#   RIF_PROVIDER_ENDPOINT-> [provider] endpoint
-#   RIF_DATA_DIR         -> [paths] data_dir
-#   RIF_CONFIG_DIR       -> [paths] config_dir
+#   RIF_POSTURE                     -> [runtime] posture
+#   RIF_ENVIRONMENT                 -> [runtime] environment
+#   RIF_CLOUD_EGRESS                -> [runtime] cloud_egress
+#   RIF_SERVER_HOST                 -> [server] host
+#   RIF_SERVER_PORT                 -> [server] port
+#   RIF_SERVER_ROOT_PATH            -> [server] root_path
+#   RIF_PROVIDER_MODE               -> [provider] mode
+#   RIF_PROVIDER_MODEL              -> [provider] model
+#   RIF_PROVIDER_ENDPOINT           -> [provider] endpoint
+#   RIF_DATA_DIR                    -> [paths] data_dir
+#   RIF_CONFIG_DIR                  -> [paths] config_dir
+#   RIF_RATE_LIMIT_RPS              -> [security] rate_limit_rps
+#   RIF_RATE_LIMIT_BURST            -> [security] rate_limit_burst
+#   RIF_AUTH_LOCKOUT_ATTEMPTS       -> [security] auth_lockout_attempts
+#   RIF_AUTH_LOCKOUT_WINDOW_SECONDS -> [security] auth_lockout_window_seconds
 
 [runtime]
 # Governance posture: normal | elevated | restricted | locked
@@ -54,3 +58,20 @@ data_dir = "data"
 
 # Directory for supplementary config files (environments.yaml, policies)
 config_dir = "config"
+
+[security]
+# Per-IP token-bucket rate limiter (applied via RateLimitMiddleware).
+# Identity is request.client.host (direct peer). Behind a reverse proxy this
+# collapses to the proxy IP unless TLS terminates in-process; do not enable
+# naive X-Forwarded-For trust here — put edge rate limits in front if needed.
+# Sustained requests per second allowed per client IP.
+rate_limit_rps = 20
+
+# Peak burst capacity (max tokens in bucket).
+rate_limit_burst = 40
+
+# Brute-force auth lockout: number of failed attempts before the IP is locked.
+auth_lockout_attempts = 10
+
+# Sliding window (seconds) over which failed attempts are counted.
+auth_lockout_window_seconds = 60
