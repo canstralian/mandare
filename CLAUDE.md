@@ -12,7 +12,7 @@ database, no external services.
 
 Core execution circuit:
 
-```
+```text
 Agent request
   -> PolicyEngine.evaluate()      (src/rif_runtime/policy.py)
   -> PolicyDecision
@@ -29,7 +29,7 @@ regardless of other rules.
 
 ## Layout
 
-```
+```text
 src/rif_runtime/
   api.py                  FastAPI app, all HTTP routes (source of truth for the API surface)
   cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`
@@ -121,8 +121,10 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   decisions) or `JsonStore` (whole-file JSON with atomic temp-file replace,
   e.g. policies). Don't hand-roll file I/O elsewhere.
 - `RIFRuntime` is constructed fresh per process/test (`RIFRuntime()`), not a
-  singleton with DI — tests instantiate it directly and rely on real files
-  under `data/`.
+  singleton with DI — tests instantiate it directly. Tests that touch
+  persistent storage must supply isolated paths via `tmp_path` (following
+  `tests/test_policy_store.py`) rather than relying on shared files under
+  `data/`.
 - Enums (`Decision`, `Posture`, …) subclass `enum.StrEnum` so they serialize
   cleanly and compare equal to plain strings (tests assert
   `r.posture == "elevated"`). Note that unlike the older `str, Enum` form,
@@ -167,7 +169,7 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 
 ## API surface (from `src/rif_runtime/api.py`)
 
-```
+```text
 GET  /
 GET  /health
 GET  /v1/environments
