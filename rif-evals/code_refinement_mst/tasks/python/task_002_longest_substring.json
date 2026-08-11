@@ -1,0 +1,40 @@
+{
+  "task_id": "py_002_longest_substring",
+  "language": "python",
+  "prompt": "Write a function longest_unique_substring(s: str) -> int that returns the length of the longest substring of s that contains no repeating characters.",
+  "entrypoint": "longest_unique_substring",
+  "tests": [
+    "assert longest_unique_substring('abcabcbb') == 3",
+    "assert longest_unique_substring('bbbbb') == 1",
+    "assert longest_unique_substring('pwwkew') == 3",
+    "assert longest_unique_substring('') == 0",
+    "assert longest_unique_substring('abcdefg') == 7"
+  ],
+  "refinement_turns": [
+    {
+      "turn": 1,
+      "instruction": "Refactor the sliding-window logic into clearly named variables so the intent is immediately obvious to a reader.",
+      "change_type": "refactor"
+    },
+    {
+      "turn": 2,
+      "instruction": "Replace the set-based membership check with a dict that stores the last-seen index of each character, eliminating the need to shrink the window character-by-character.",
+      "change_type": "performance"
+    },
+    {
+      "turn": 3,
+      "instruction": "Add a PEP 257 docstring and full type annotations without changing any logic.",
+      "change_type": "style"
+    },
+    {
+      "turn": 4,
+      "instruction": "Ensure the function handles strings containing only whitespace and strings with Unicode characters (e.g., emoji or accented letters) correctly.",
+      "change_type": "edge_case"
+    },
+    {
+      "turn": 5,
+      "instruction": "Add an early-exit guard: if the string length is 0 or 1, return the length immediately without entering the main loop.",
+      "change_type": "logic_preserving"
+    }
+  ]
+}
