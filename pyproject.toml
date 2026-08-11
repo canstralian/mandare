@@ -49,6 +49,16 @@ supabase = [
 dev = [
     "pytest>=8.4",
     "mypy>=1.18",
+    # lint.yml installs only `-e ".[dev]"` and then runs `ruff check`, so ruff
+    # has to be declared here. ci.yml gets it from requirements-dev.txt and
+    # quality.yml pins it inline, which is why the omission only broke the
+    # newest workflow.
+    #
+    # Range covers both versions already in use — 0.12.x (requirements-dev.txt)
+    # and 0.15.22 (quality.yml) — so neither workflow hits a resolver conflict.
+    # <0.16 is deliberate: quality.yml records that 0.16.0 re-sorts imports and
+    # enables new lints, reddening main with no code change.
+    "ruff>=0.12,<0.16",
     # Required by tests/test_rif_familiar_contracts.py. Without these the
     # quality.yml `pip install -e ".[dev]"` path collects an ImportError even
     # though ci.yml (which installs requirements-dev.txt) passes.
