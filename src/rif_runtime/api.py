@@ -108,8 +108,9 @@ def reset_posture() -> dict[str, Any]:
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
-    return {"posture": runtime.posture}
+    # Use the locked setter so this write cannot race evaluate/record and
+    # stamp allow/normal while a concurrent lock is intended.
+    return {"posture": runtime.set_posture(posture).value}
 
 
 @app.get("/")

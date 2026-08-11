@@ -107,6 +107,18 @@ class RIFRuntime:
             )
         return decision
 
+    def set_posture(self, posture: Posture) -> Posture:
+        """Set live posture under the evaluate/record lock.
+
+        Direct ``runtime.posture = ...`` assignment races the locked evaluate
+        path and can stamp ``allow``/``normal`` while a concurrent lock is
+        intended. Prefer this method (and ``reset_posture``) for API writes.
+        """
+
+        with self._lock:
+            self.posture = Posture(posture)
+            return self.posture
+
     def reset_posture(self) -> Posture:
         """Return to ``normal`` and clear denial pressure so reset sticks."""
 
