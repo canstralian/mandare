@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -169,7 +169,7 @@ def test_broker_allows_the_one_approved_action(governor):
 def test_broker_denies_expired_token(governor):
     intent = _intent("module.execute")
     token = governor.mint_token(intent, approver="human:alice", ttl_seconds=600)
-    later = datetime.now(timezone.utc) + timedelta(minutes=30)
+    later = datetime.now(UTC) + timedelta(minutes=30)
     outcome = governor.evaluate(
         intent, mode=GovernanceMode.lab_broker, token=token, now=later
     )

@@ -12,7 +12,7 @@ database, no external services.
 
 Core execution circuit:
 
-```
+```text
 Agent request
   -> PolicyEngine.evaluate()      (src/rif_runtime/policy.py)
   -> PolicyDecision
@@ -29,7 +29,7 @@ regardless of other rules.
 
 ## Layout
 
-```
+```text
 src/rif_runtime/
   api.py                  FastAPI app, all HTTP routes (source of truth for the API surface)
   cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`
@@ -121,10 +121,15 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   decisions) or `JsonStore` (whole-file JSON with atomic temp-file replace,
   e.g. policies). Don't hand-roll file I/O elsewhere.
 - `RIFRuntime` is constructed fresh per process/test (`RIFRuntime()`), not a
-  singleton with DI — tests instantiate it directly and rely on real files
-  under `data/`.
-- Enums (`Decision`, `Posture`) are `str, Enum` so they serialize cleanly and
-  compare equal to plain strings (tests assert `r.posture == "elevated"`).
+  singleton with DI — tests instantiate it directly. Tests that touch
+  persistent storage must supply isolated paths via `tmp_path` (following
+  `tests/test_policy_store.py`) rather than relying on shared files under
+  `data/`.
+- Enums (`Decision`, `Posture`, …) subclass `enum.StrEnum` so they serialize
+  cleanly and compare equal to plain strings (tests assert
+  `r.posture == "elevated"`). Note that unlike the older `str, Enum` form,
+  `str(Posture.normal)` is `"normal"`, not `"Posture.normal"` — the audit log
+  in `posture_history.jsonl` records the bare value.
 - Environment profiles are config-driven (`config/environments.yaml`), not
   hardcoded; add new environments there rather than branching in code.
 
@@ -164,7 +169,7 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
 
 ## API surface (from `src/rif_runtime/api.py`)
 
-```
+```text
 GET  /
 GET  /\nGET  /health\nGET  /v1/environments\nPOST /v1/environment/{name}\nPOST /v1/policy/evaluate\nPOST /v1/posture/{posture}\nPOST /v1/posture/reset\nGET  /v1/graph/summary\nGET  /v1/telemetry/summary\nGET  /v1/persistence/summary\nGET  /v1/recovered-state\nGET  /v1/audit\nPOST /v1/mcp/invoke\nGET  /v1/mcp/metasploit/capabilities\nPOST /v1/mcp/metasploit/evaluate\nPOST /v1/mcp/metasploit/token\nGET  /v1/policies\nPUT  /v1/policies/{rule_id}\nDELETE /v1/policies/{rule_id}
 ```

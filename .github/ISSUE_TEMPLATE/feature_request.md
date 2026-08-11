@@ -1,8 +1,6 @@
 ---
-name: Feature request
-title: "[Feature]: "
-labels: enhancement
+name: Feature Request
+about: Suggest an improvement
 ---
-## Problem
-## Proposal
-## Acceptance Criteria
+
+...

@@ -1,11 +1,15 @@
+from typing import Any
+
 import networkx as nx
+
+from ..schemas import PolicyDecision
 
 
 class GovernanceGraph:
-    def __init__(self):
+    def __init__(self) -> None:
         self.graph = nx.MultiDiGraph()
 
-    def record_decision(self, decision):
+    def record_decision(self, decision: PolicyDecision) -> None:
         self.graph.add_node(decision.actor, type="actor")
         self.graph.add_node(decision.target, type="target")
         self.graph.add_edge(
@@ -22,7 +26,7 @@ class GovernanceGraph:
             timestamp=decision.timestamp.isoformat(),
         )
 
-    def summary(self):
+    def summary(self) -> dict[str, Any]:
         return {
             "nodes": self.graph.number_of_nodes(),
             "edges": self.graph.number_of_edges(),

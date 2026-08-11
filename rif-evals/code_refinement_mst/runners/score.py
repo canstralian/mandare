@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -11,7 +10,7 @@ class SessionScore:
     task_id: str
     turns_attempted: int
     turns_passed: int
-    first_regression_turn: Optional[int]
+    first_regression_turn: int | None
     mst_score: int
 
 

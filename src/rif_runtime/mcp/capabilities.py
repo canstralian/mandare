@@ -11,7 +11,7 @@ token is presented.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ..security import sha256_digest
@@ -19,7 +19,7 @@ from ..security import sha256_digest
 CONTRACT_VERSION = "msf-governance/v1"
 
 
-class CapabilityClass(str, Enum):
+class CapabilityClass(StrEnum):
     """How much authority a Metasploit MCP capability carries."""
 
     read_only = "read_only"

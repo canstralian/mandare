@@ -23,8 +23,8 @@ import hmac
 import os
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from enum import Enum
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -73,7 +73,7 @@ INJECTION_PATTERNS: tuple[str, ...] = (
 )
 
 
-class GovernanceMode(str, Enum):
+class GovernanceMode(StrEnum):
     """Which containment lane evaluates a Metasploit intent."""
 
     read_only_firewall = "read_only_firewall"
@@ -124,7 +124,7 @@ class CapabilityToken(BaseModel):
     scope_id: str
     intent_hash: str
     approver: str
-    issued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: datetime
     signature: str = ""
 
@@ -135,8 +135,8 @@ class CapabilityToken(BaseModel):
         # TypeError when compared against the timezone-aware ``now`` in the
         # broker, and would sign inconsistently across environments.
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     def signing_payload(self) -> dict[str, Any]:
         return {
@@ -184,7 +184,7 @@ def _string_params(value: Any) -> list[str]:
         for inner in value.values():
             collected.extend(_string_params(inner))
         return collected
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         collected = []
         for item in value:
             collected.extend(_string_params(item))
@@ -218,7 +218,7 @@ class MetasploitGovernor:
         approver: str,
         ttl_seconds: int = 600,
     ) -> CapabilityToken:
-        issued = datetime.now(timezone.utc)
+        issued = datetime.now(UTC)
         token = CapabilityToken(
             capability=intent.capability,
             target=intent.target,
@@ -241,7 +241,7 @@ class MetasploitGovernor:
         token: CapabilityToken | None = None,
         now: datetime | None = None,
     ) -> GovernanceOutcome:
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         simulated = mode == GovernanceMode.shadow
         capability_class = classify(intent.capability)
         severe = is_severe(intent.capability)

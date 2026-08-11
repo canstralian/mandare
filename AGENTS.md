@@ -9,13 +9,18 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
 
 - Dependencies are installed into a virtualenv at `.venv` (gitignored). Activate
   it before running anything: `source .venv/bin/activate`. The startup update
-  script keeps it in sync with `pip install -e .` + `requirements-dev.txt`.
-- That bootstrap is defined in `.cursor/environment.json` (repo-owned), so setup
-  uses `python3` explicitly and does not depend on the base image providing a
-  bare `python` alias.
-- `python3 -m venv` requires the `python3.12-venv` system package. It is already
-  present in the VM image; only reinstall it (`apt-get install -y python3.12-venv`)
-  if venv creation ever fails on a fresh machine.
+  script keeps it in sync with `pip install -e .` + `requirements.txt` +
+  `requirements-dev.txt` (`pyproject.toml` currently has empty `dependencies`).
+- That bootstrap is defined in `.cursor/environment.json` (repo-owned) and runs
+  `scripts/cloud-agent-install.sh` — the only supported install entrypoint.
+  Flow: reuse a structurally valid `.venv` (python + pip + activate) → stdlib
+  `venv` if `ensurepip` works → already-installed `virtualenv` → else
+  `/usr/bin/python3 -m pip install --user virtualenv` and create `.venv` →
+  install deps → acceptance gate (`import fastapi` / `rif_runtime`) and write
+  `.venv/.rif-bootstrap-ok`. Do not rely on `apt-get install python3.12-venv`:
+  many Cloud images omit `ensurepip`, and restricted egress blocks Ubuntu
+  archives. PyPI is allowlisted; system pip is present even when `ensurepip`
+  is not. Prefer linking docs to this script over copying shell snippets.
 - CI (`.github/workflows/ci.yml`) gates on three commands, run in this order:
   `ruff check src tests`, `mypy src/rif_runtime --ignore-missing-imports`,
   `pytest -q`. `quality.yml` also enforces `ruff format .` — run all four before
@@ -36,3 +41,16 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
   `data/decisions.jsonl` / `data/posture_history.jsonl` (gitignored) — expected
   and harmless. Posture accumulates across runs, so a fresh checkout may already
   show non-`normal` posture from prior runs.
+
+## Local Cursor CLI hardening (optional, single-user)
+
+For a trusted local machine + private repos, prefer the RIF-optimized Agent CLI
+baseline documented in `docs/cursor/README.md`:
+
+- Copy `docs/cursor/cli-config.json.example` → `~/.cursor/cli-config.json`
+- Project permissions / sandbox: `.cursor/cli.json`, `.cursor/sandbox.json`
+- Always-on rule: `.cursor/rules/rif-evidence-first.mdc`
+
+Summary: `approvalMode: allowlist`, sandbox workspace-write, restricted
+WebFetch domains, Shell on for build/test, WebSearch/GenerateImage off, Max
+Mode off. Prefer repository evidence over external network research.

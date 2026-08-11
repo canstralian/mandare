@@ -35,7 +35,8 @@ def test_version_matches_pyproject() -> None:
     except PackageNotFoundError:
         if os.environ.get("CI"):
             pytest.fail(
-                "rif-runtime not installed in CI — ci.yml must run `pip install -e .` before pytest"
+                "rif-runtime not installed in CI — ci.yml must run "
+                "`pip install -e .` before pytest"
             )
         pytest.skip("rif-runtime not installed — run `pip install -e .` first")
 
@@ -46,7 +47,7 @@ def test_version_matches_pyproject() -> None:
 
 
 def test_read_version_from_pyproject_path_resolution() -> None:
-    """_read_version_from_pyproject() resolves pyproject.toml via the real 3-parent path."""
+    """_read_version_from_pyproject() resolves pyproject.toml via the 3-parent path."""
     from rif_runtime._version import _read_version_from_pyproject
 
     pyproject = Path(__file__).parent.parent / "pyproject.toml"
@@ -63,7 +64,7 @@ def test_read_version_from_pyproject_path_resolution() -> None:
 def test_version_falls_back_to_pyproject(
     patch_metadata_unavailable: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """_read_version() reads pyproject.toml when importlib.metadata raises PackageNotFoundError."""
+    """_read_version() reads pyproject.toml when metadata raises PackageNotFound."""
     monkeypatch.setattr(
         "rif_runtime._version._read_version_from_pyproject", lambda: "9.8.7"
     )
@@ -77,7 +78,7 @@ def test_version_unknown_when_all_fallbacks_fail(
     patch_metadata_unavailable: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """_read_version() returns 'unknown' and emits a RuntimeWarning when all sources fail."""
+    """_read_version() returns 'unknown' and warns when all sources fail."""
     monkeypatch.setattr(
         "rif_runtime._version._read_version_from_pyproject", lambda: None
     )
