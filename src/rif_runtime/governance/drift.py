@@ -34,10 +34,12 @@ from rif_runtime.schemas import PolicyDecision, Posture
 # target.  The reason field is deliberately not scanned — see
 # _adversarial_score.  Keyword alternatives use \b so substrings inside longer
 # identifiers (e.g. "elasticsearch", "selectAll", "executor") are not flagged.
+# SQL keywords also require trailing whitespace so REST path segments like
+# /users/delete/123 or /v1/union/members are not scored as injection.
 _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
-    # SQL injection keywords
+    # SQL injection keywords (keyword + whitespace → statement shape, not path noun)
     re.compile(
-        r"\b(select|insert|update|delete|drop|union|exec|execute|truncate)\b",
+        r"\b(select|insert|update|delete|drop|union|exec|execute|truncate)\b\s+",
         re.IGNORECASE,
     ),
     # Timing / blind-injection helpers

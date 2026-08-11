@@ -79,6 +79,14 @@ def test_entropy_grows_with_diversity():
         "/binary/shipping",
         "cabin/shed",
         "powershellish",
+        # REST path nouns that share SQL keyword spellings — must not fire
+        # without trailing whitespace (statement shape).
+        "/users/delete/123",
+        "/user/update/profile",
+        "/api/drop/item",
+        "/v1/union/members",
+        "/items/insert",
+        "/jobs/truncate",
     ],
 )
 def test_adversarial_patterns_no_false_positive(safe: str):
@@ -138,6 +146,18 @@ def test_adversarial_score_empty():
 def test_adversarial_score_all_clean():
     events = [_decision(target="https://api.anthropic.com") for _ in range(5)]
     assert _adversarial_score(events) == 0.0
+
+
+def test_adversarial_score_rest_path_sql_nouns_no_false_positive():
+    # Path segments that spell like SQL keywords must not inflate the score.
+    events = [
+        _decision(target="https://api.example.com/users/delete/123"),
+        _decision(target="https://api.example.com/user/update/profile"),
+        _decision(target="https://api.example.com/api/drop/item"),
+        _decision(target="https://api.example.com/v1/union/members"),
+    ]
+    assert _adversarial_score(events) == 0.0
+    assert recommend_correction(DriftVector.from_events(events)) == Posture.normal
 
 
 def test_adversarial_score_sql_in_target():
