@@ -83,6 +83,10 @@ class EvidenceLedger:
         Migration policy (no rewrite): legacy rows contribute content hashes
         and count toward the sequence cursor so new v1 rows continue the
         chronological order without colliding sequence numbers.
+
+        Streams the file (constant memory). Corrupt or non-object lines are
+        skipped so a damaged tip cannot block ``RIFRuntime`` construction;
+        ``ReplayEngine.verify()`` reports those rows explicitly.
         """
 
         if not self.path.exists():
@@ -90,16 +94,25 @@ class EvidenceLedger:
 
         previous: str | None = None
         max_sequence = 0
+        # Non-blank row ordinal — same basis as verify_chain()'s enumerate(rows).
+        # Physical line numbers inflate the cursor when blank lines appear.
+        row_ordinal = 0
         with self.path.open(encoding="utf-8") as handle:
-            for index, line in enumerate(handle, start=1):
+            for line in handle:
                 if not line.strip():
                     continue
-                row = json.loads(line)
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                row_ordinal += 1
                 if isinstance(row.get("sequence"), int):
                     max_sequence = max(max_sequence, row["sequence"])
                 else:
-                    # Legacy row: treat file order as its implicit sequence.
-                    max_sequence = max(max_sequence, index)
+                    # Legacy row: treat non-blank file order as its sequence.
+                    max_sequence = max(max_sequence, row_ordinal)
                 previous = (
                     row["record_hash"]
                     if isinstance(row.get("record_hash"), str) and row["record_hash"]
@@ -116,15 +129,20 @@ class EvidenceLedger:
         return self._previous_hash
 
     def append_decision(self, decision: PolicyDecision) -> dict[str, Any]:
-        """Persist a decision with v1 envelope; return the written row."""
+        """Persist a decision with v1 envelope; return the written row.
 
-        self._sequence += 1
+        Sequence and tip hash advance only after a successful durable append so
+        a failed write cannot leave the in-memory cursor ahead of the file.
+        """
+
+        next_sequence = self._sequence + 1
         row = enrich_decision_row(
             decision,
-            sequence=self._sequence,
+            sequence=next_sequence,
             previous_hash=self._previous_hash,
         )
         self.store.append(row)
+        self._sequence = next_sequence
         self._previous_hash = row["record_hash"]
         return row
 
@@ -148,62 +166,91 @@ class EvidenceLedger:
         )
 
     def verify_chain(self) -> LedgerChainReport:
-        """Validate chronological hash links without mutating state."""
+        """Validate chronological hash links without mutating state.
 
-        rows = self.read_all()
+        Streams the ledger file (same blank-skipping, corrupt-skipping ordinal
+        basis as ``_bootstrap``). Corrupt lines are reported as errors rather
+        than aborting the walk, so a damaged tip remains diagnosable.
+        """
+
         errors: list[str] = []
         legacy = 0
         v1 = 0
         previous: str | None = None
         last_sequence: int | None = None
+        row_count = 0
+        scan_index = 0
 
-        for index, row in enumerate(rows, start=1):
-            version = row.get("schema_version")
-            if version == DECISION_SCHEMA_V1:
-                v1 += 1
-                expected_hash = content_hash(row)
-                actual_hash = row.get("record_hash")
-                if actual_hash != expected_hash:
-                    errors.append(
-                        f"row {index}: record_hash mismatch "
-                        f"(expected {expected_hash}, got {actual_hash!r})"
-                    )
+        if self.path.exists():
+            with self.path.open(encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    scan_index += 1
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        errors.append(f"row {scan_index}: JSONDecodeError: {exc}")
+                        continue
+                    if not isinstance(row, dict):
+                        kind = type(row).__name__
+                        errors.append(f"row {scan_index}: expected object, got {kind}")
+                        continue
 
-                prev = row.get("previous_hash")
-                if prev != previous:
-                    errors.append(
-                        f"row {index}: previous_hash mismatch "
-                        f"(expected {previous!r}, got {prev!r})"
-                    )
+                    row_count += 1
+                    version = row.get("schema_version")
+                    if version == DECISION_SCHEMA_V1:
+                        v1 += 1
+                        expected_hash = content_hash(row)
+                        actual_hash = row.get("record_hash")
+                        if actual_hash != expected_hash:
+                            errors.append(
+                                f"row {scan_index}: record_hash mismatch "
+                                f"(expected {expected_hash}, got {actual_hash!r})"
+                            )
 
-                seq = row.get("sequence")
-                if not isinstance(seq, int) or seq < 1:
-                    errors.append(f"row {index}: invalid sequence {seq!r}")
-                elif last_sequence is not None and seq <= last_sequence:
-                    errors.append(
-                        f"row {index}: sequence {seq} not greater than "
-                        f"prior sequence {last_sequence}"
-                    )
-                else:
-                    last_sequence = seq
+                        prev = row.get("previous_hash")
+                        if prev != previous:
+                            errors.append(
+                                f"row {scan_index}: previous_hash mismatch "
+                                f"(expected {previous!r}, got {prev!r})"
+                            )
 
-                previous = (
-                    actual_hash if isinstance(actual_hash, str) else expected_hash
-                )
-            elif version is None:
-                legacy += 1
-                # Legacy: no stored envelope; still advance the causal tip so a
-                # following v1 row can link across the migration boundary.
-                previous = content_hash(row)
-                last_sequence = (
-                    index if last_sequence is None else max(last_sequence, index)
-                )
-            else:
-                errors.append(f"row {index}: unknown schema_version {version!r}")
-                previous = content_hash(row)
+                        seq = row.get("sequence")
+                        if not isinstance(seq, int) or seq < 1:
+                            errors.append(f"row {scan_index}: invalid sequence {seq!r}")
+                        elif last_sequence is not None and seq <= last_sequence:
+                            errors.append(
+                                f"row {scan_index}: sequence {seq} not greater than "
+                                f"prior sequence {last_sequence}"
+                            )
+                        else:
+                            last_sequence = seq
+
+                        previous = (
+                            actual_hash
+                            if isinstance(actual_hash, str)
+                            else expected_hash
+                        )
+                    elif version is None:
+                        legacy += 1
+                        # Legacy: no stored envelope; still advance the causal
+                        # tip so a following v1 row can link across migration.
+                        # Use valid-row ordinal (row_count), matching _bootstrap.
+                        previous = content_hash(row)
+                        last_sequence = (
+                            row_count
+                            if last_sequence is None
+                            else max(last_sequence, row_count)
+                        )
+                    else:
+                        errors.append(
+                            f"row {scan_index}: unknown schema_version {version!r}"
+                        )
+                        previous = content_hash(row)
 
         return LedgerChainReport(
-            row_count=len(rows),
+            row_count=row_count,
             legacy_rows=legacy,
             v1_rows=v1,
             chain_ok=not errors,

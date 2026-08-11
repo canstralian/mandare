@@ -191,3 +191,74 @@ def test_example_evidence_record_shape():
     assert row["schema_version"] == "rif.evidence.decision/v1"
     assert row["timestamp"] == "2026-08-07T14:00:00Z"
     assert len(row["record_hash"]) == 64
+
+
+def test_bootstrap_skips_corrupt_lines_without_blocking_startup(tmp_path):
+    # Regression: eager _bootstrap used to raise JSONDecodeError on a corrupt
+    # tip and prevent RIFRuntime / EvidenceLedger construction entirely.
+    log = tmp_path / "decisions.jsonl"
+    legacy = _decision(target="https://legacy.example.com").model_dump(mode="json")
+    log.write_text(
+        json.dumps(legacy) + "\nnot-json\n",
+        encoding="utf-8",
+    )
+    ledger = EvidenceLedger(log)
+    assert ledger.sequence == 1
+    row = ledger.append_decision(_decision(target="https://new.example.com"))
+    assert row["sequence"] == 2
+    assert row["previous_hash"] == content_hash(legacy)
+    chain = ledger.verify_chain()
+    # Corrupt line is reported, but the causal tip still links legacy → v1.
+    assert chain.chain_ok is False
+    assert any("JSONDecodeError" in e for e in chain.errors)
+    assert chain.legacy_rows == 1
+    assert chain.v1_rows == 1
+    assert not any("previous_hash mismatch" in e for e in chain.errors)
+
+
+def test_bootstrap_legacy_sequence_uses_nonblank_ordinal(tmp_path):
+    # Physical line numbers inflate the cursor when blank lines appear; the
+    # implicit legacy sequence must match verify_chain's row ordinal basis.
+    log = tmp_path / "decisions.jsonl"
+    legacy = _decision(target="https://legacy.example.com").model_dump(mode="json")
+    log.write_text("\n" + json.dumps(legacy) + "\n", encoding="utf-8")
+
+    ledger = EvidenceLedger(log)
+    assert ledger.sequence == 1
+    row = ledger.append_decision(_decision(target="https://new.example.com"))
+    assert row["sequence"] == 2
+    chain = ledger.verify_chain()
+    assert chain.chain_ok is True
+    assert chain.legacy_rows == 1
+    assert chain.v1_rows == 1
+
+
+def test_append_does_not_advance_sequence_when_store_write_fails(tmp_path, monkeypatch):
+    ledger = EvidenceLedger(tmp_path / "decisions.jsonl")
+    ledger.append_decision(_decision(target="https://a.example.com"))
+    assert ledger.sequence == 1
+    tip = ledger.previous_hash
+
+    fail_next = {"value": True}
+    real_append = ledger.store.append
+
+    def maybe_fail(record: object) -> None:
+        if fail_next["value"]:
+            raise OSError("simulated append failure")
+        real_append(record)
+
+    monkeypatch.setattr(ledger.store, "append", maybe_fail)
+    try:
+        ledger.append_decision(_decision(target="https://b.example.com"))
+        raise AssertionError("expected OSError")
+    except OSError:
+        pass
+
+    assert ledger.sequence == 1
+    assert ledger.previous_hash == tip
+    # A subsequent successful append must continue from the durable tip.
+    fail_next["value"] = False
+    row = ledger.append_decision(_decision(target="https://c.example.com"))
+    assert row["sequence"] == 2
+    assert row["previous_hash"] == tip
+    assert ledger.verify_chain().chain_ok is True
