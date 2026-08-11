@@ -1,0 +1,45 @@
+# Development Dockerfile: includes debugging tools and hot reload support
+FROM golang:1.21-alpine
+
+# Install development and debugging tools
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    curl \
+    jq \
+    bash \
+    delve
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN adduser -D -u 1000 -s /bin/bash rif
+
+# Copy go.mod and go.sum
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build binary with debug info (needed for delve)
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -gcflags="all=-N -l" \
+    -o rif-runtime ./cmd/rif
+
+# Create evidence directory
+RUN mkdir -p /app/evidence && chown rif:rif /app/evidence
+
+# Change to non-root user
+USER rif
+
+# Expose debug port (2345 for delve)
+EXPOSE 2345 8000
+
+# Start with bash (override with command when running)
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c", "/app/rif-runtime --help"]

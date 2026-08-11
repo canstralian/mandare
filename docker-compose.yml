@@ -1,0 +1,234 @@
+version: '3.9'
+
+services:
+  # RIF Runtime service
+  rif-runtime:
+    # Build from Dockerfile (or use pre-built image)
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      # Build args (optional, for version control)
+      args:
+        - BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        - VCS_REF=$(git rev-parse --short HEAD)
+    
+    # Image name and tag
+    image: rif-runtime:v1.0.0
+    container_name: rif-runtime-server
+    
+    # Restart policy
+    # - unless-stopped: restart on failure, but allow manual stop
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          # CPU limit: 1 core
+          cpus: '1.0'
+          # Memory limit: 512 MB
+          memory: 512M
+        reservations:
+          # Guaranteed CPU: 0.5 cores
+          cpus: '0.5'
+          # Guaranteed memory: 256 MB
+          memory: 256M
+    
+    # Port mappings
+    # - 8000:8000 — evidence API (if implemented)
+    ports:
+      - "8000:8000"
+    
+    # Environment variables
+    environment:
+      # Log level
+      - LOG_LEVEL=info
+      # Evidence storage path (inside container)
+      - EVIDENCE_PATH=/app/evidence
+      # Policy path (inside container)
+      - POLICY_PATH=/etc/rif/policies
+      # Compliance rules path
+      - COMPLIANCE_PATH=/etc/rif/compliance
+    
+    # Load environment from .env file
+    env_file:
+      - .env
+    
+    # Volume mounts
+    volumes:
+      # Evidence storage (persistent)
+      - evidence-data:/app/evidence
+      
+      # Policy configuration (read-only)
+      - ./config/policies:/etc/rif/policies:ro
+      
+      # Compliance rules (read-only)
+      - ./config/compliance:/etc/rif/compliance:ro
+      
+      # logs (if the app writes logs to a file)
+      - ./logs:/app/logs
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        # Rotate logs: max 10 MB per file, keep 3 files
+        max-size: "10m"
+        max-file: "3"
+        # Add container labels to logs
+        labels: "app=rif-runtime"
+    
+    # Health check
+    healthcheck:
+      test: [
+        "CMD",
+        "/app/rif-runtime",
+        "version"
+      ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    # Security options
+    security_opt:
+      # Drop all capabilities, then add back only needed ones
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # NET_BIND_SERVICE: bind to ports < 1024 (if needed)
+      # Omit if not needed (least privilege)
+      - NET_BIND_SERVICE
+    
+    # Read-only root filesystem (security hardening)
+    # Note: requires writable /tmp and /app/evidence
+    read_only: false
+    # (Keep false for now; enable in v1.1 after testing)
+    
+    # Standard input/output (for debugging)
+    stdin_open: true
+    tty: true
+    
+    # Network (custom bridge for service discovery)
+    networks:
+      - rif-network
+    
+    # DNS servers (optional, use default if not needed)
+    # dns:
+    #   - 8.8.8.8
+    #   - 8.8.4.4
+    
+    # Depends on (none for this service, but shown for reference)
+    depends_on:
+      - evidence-db
+    
+    # Override entrypoint (for debugging)
+    # entrypoint: /bin/sh
+    # command: -c "tail -f /dev/null"
+
+  # Optional: PostgreSQL for evidence storage (v1.1+)
+  evidence-db:
+    image: postgres:15-alpine
+    container_name: rif-evidence-db
+    
+    restart: unless-stopped
+    
+    environment:
+      - POSTGRES_DB=rif_evidence
+      - POSTGRES_USER=rif
+      # Password from .env file (never hardcode)
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-dev-password}
+    
+    volumes:
+      # Database data (persistent)
+      - evidence-db-data:/var/lib/postgresql/data
+    
+    ports:
+      - "5432:5432"
+    
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "pg_isready -U rif"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    networks:
+      - rif-network
+    
+    # Security options
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+
+  # Optional: Redis for caching (v1.1+)
+  cache:
+    image: redis:7-alpine
+    container_name: rif-cache
+    
+    restart: unless-stopped
+    
+    command: redis-server --appendonly yes
+    
+    volumes:
+      - cache-data:/data
+    
+    ports:
+      - "6379:6379"
+    
+    healthcheck:
+      test: [
+        "CMD",
+        "redis-cli",
+        "ping"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    networks:
+      - rif-network
+    
+    cap_drop:
+      - ALL
+
+# Named volumes (persistent data)
+volumes:
+  evidence-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/evidence
+  
+  evidence-db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+  
+  cache-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/redis
+
+# Custom bridge network (service discovery by name)
+networks:
+  rif-network:
+    driver: bridge
+    driver_opts:
+      # Enable IPv6 (optional)
+      # com.docker.network.driver.mtu: "1500"
+      com.docker.driver.om.override_platform_network: "false"
+    ipam:
+      config:
+        # Subnet for services
+        - subnet: 172.25.0.0/16
