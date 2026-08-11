@@ -13,13 +13,13 @@ from .auth import ControlPlaneAuth, configure_lockout
 from .config import get_settings
 from .configuration.policies import PolicyRule
 from .integrations import supabase as sb
-from .middleware import RateLimitMiddleware, RequestIDMiddleware
 from .mcp.capabilities import capability_catalog
 from .mcp.metasploit import (
     CapabilityToken,
     GovernanceMode,
     MetasploitIntent,
 )
+from .middleware import RateLimitMiddleware, RequestIDMiddleware
 from .replay import ReplayEngine
 from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
