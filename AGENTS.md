@@ -42,3 +42,16 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
   `data/decisions.jsonl` / `data/posture_history.jsonl` (gitignored) — expected
   and harmless. Posture accumulates across runs, so a fresh checkout may already
   show non-`normal` posture from prior runs.
+
+## Local Cursor CLI hardening (optional, single-user)
+
+For a trusted local machine + private repos, prefer the RIF-optimized Agent CLI
+baseline documented in `docs/cursor/README.md`:
+
+- Copy `docs/cursor/cli-config.json.example` → `~/.cursor/cli-config.json`
+- Project permissions / sandbox: `.cursor/cli.json`, `.cursor/sandbox.json`
+- Always-on rule: `.cursor/rules/rif-evidence-first.mdc`
+
+Summary: `approvalMode: allowlist`, sandbox workspace-write, restricted
+WebFetch domains, Shell on for build/test, WebSearch/GenerateImage off, Max
+Mode off. Prefer repository evidence over external network research.

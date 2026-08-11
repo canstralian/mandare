@@ -43,6 +43,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+supabase = [
+    "supabase>=2.0,<3.0",
+]
 dev = [
     "pytest>=8.4",
     "mypy>=1.18",
