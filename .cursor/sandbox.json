@@ -1,0 +1,26 @@
+{
+  "type": "workspace_readwrite",
+  "networkPolicy": {
+    "default": "deny",
+    "allow": [
+      "github.com",
+      "*.github.com",
+      "raw.githubusercontent.com",
+      "*.githubusercontent.com",
+      "huggingface.co",
+      "*.huggingface.co",
+      "api.openai.com",
+      "developers.cloudflare.com",
+      "docs.anthropic.com",
+      "modelcontextprotocol.io",
+      "*.modelcontextprotocol.io",
+      "airtable.com",
+      "*.airtable.com",
+      "pypi.org",
+      "files.pythonhosted.org",
+      "pypi.python.org",
+      "pythonhosted.org"
+    ]
+  },
+  "enableSharedBuildCache": true
+}

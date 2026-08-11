@@ -64,12 +64,15 @@ class RIFRuntime:
 
     def set_posture(self, posture: Posture) -> Posture:
         """Set live posture without recording a transition event."""
-        self.posture = posture
-        return self.posture
+        with self._lock:
+            self.posture = posture
+            return self.posture
 
     def reset_posture(self) -> Posture:
         """Return live posture to ``normal`` without recording a transition."""
-        return self.set_posture(Posture.normal)
+        with self._lock:
+            self.posture = Posture.normal
+            return self.posture
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
         decision = self.policy.evaluate(
