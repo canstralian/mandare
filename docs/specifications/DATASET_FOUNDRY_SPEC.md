@@ -31,7 +31,7 @@ Registry Entry
 Loader (effect: READ)
       │
       ▼
-License Validation (effect: READ, non-blocking annotation)
+License Validation (non-governed: local config only)
       │
       ▼
 Normalization

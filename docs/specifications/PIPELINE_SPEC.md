@@ -191,4 +191,4 @@ configs/
     <id>.yaml               # quality scorer configuration
 ```
 
-Pipeline configuration is composable. A profile config may override specific fields of the default pipeline config. Merge is shallow: a profile key replaces the default key entirely.
+Pipeline configuration is composable. A profile config may override specific fields of the default pipeline config. Merge is key-level: a scalar or list key in the override replaces the same key in the default entirely. For nested dicts like `chunker_map`, only the specified keys are overridden; unspecified keys inherit from the default. See `docs/specifications/CONFIGURATION_ENGINE.md` for the full merge semantics.

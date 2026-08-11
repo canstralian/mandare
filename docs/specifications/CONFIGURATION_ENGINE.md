@@ -132,12 +132,12 @@ Configuration values may reference environment variables using `${VAR_NAME}` syn
 
 ```yaml
 # configs/exporters/hf_exporter.yaml
-hf_token: ${HF_TOKEN}
+hf_repo_id: ${HF_DEFAULT_REPO}    # non-secret: org/dataset target
 ```
 
 Environment variable references are resolved at load time. Missing required variables fail at startup.
 
-Secrets must never be committed to config files. Use environment variable references.
+Secrets must never be committed to config files, and must never appear as config fields even via env-var references. Credentials like `HF_TOKEN` are read directly from the process environment by the tool that needs them — they are never declared as config fields at all. See `docs/tools/hf_exporter.md` for the token contract.
 
 ## Adding a new configuration category
 

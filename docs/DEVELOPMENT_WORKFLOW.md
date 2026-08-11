@@ -4,7 +4,7 @@
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dataset]"
+pip install -e ".[dev]"
 pip install -r requirements-dev.txt
 ```
 
@@ -83,7 +83,7 @@ Every PR must:
 - Include or reference a specification for any new behavior
 - Include tests for new pipeline stages, chunkers, exporters, or quality models
 - Update `docs/` when the change affects contracts, API surface, or workflows
-- Not regress existing `ruf check`, `mypy`, or `pytest` results
+- Not regress existing `ruff check`, `mypy`, or `pytest` results
 
 ## Governance
 
