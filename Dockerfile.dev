@@ -1,45 +1,45 @@
-# Development Dockerfile: includes debugging tools and hot reload support
-FROM golang:1.21-alpine
+# syntax=docker/dockerfile:1
+#
+# Local/dev image — same runtime entrypoint as Dockerfile (no --reload).
+# Mount source with compose overrides if you need live code; do not use
+# `rif serve` (reload) as PID 1 in containers.
+# Previous Go/delve content was incorrect for this pure-Python package.
 
-# Install development and debugging tools
-RUN apk add --no-cache \
-    git \
-    ca-certificates \
-    tzdata \
-    curl \
-    jq \
-    bash \
-    delve
+ARG PYTHON_VERSION=3.12.3
+FROM python:${PYTHON_VERSION}-slim
 
-# Create app directory
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
 
-# Create non-root user
-RUN adduser -D -u 1000 -s /bin/bash rif
+RUN python -m venv /opt/venv \
+    && adduser \
+        --disabled-password \
+        --gecos "" \
+        --home "/nonexistent" \
+        --shell "/sbin/nologin" \
+        --no-create-home \
+        --uid 10001 \
+        appuser \
+    && mkdir -p /app/data /app/config \
+    && chown -R appuser:appuser /app
 
-# Copy go.mod and go.sum
-COPY go.mod go.sum ./
+COPY requirements.txt pyproject.toml README.md ./
+COPY src ./src
+COPY config/environments.yaml /app/config/environments.yaml
+COPY rif.toml /app/rif.toml
 
-# Download dependencies
-RUN go mod download
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install -U pip \
+    && /opt/venv/bin/pip install -r requirements.txt \
+    && /opt/venv/bin/pip install --no-deps . \
+    && chown -R appuser:appuser /opt/venv
 
-# Copy source code
-COPY . .
+USER appuser
 
-# Build binary with debug info (needed for delve)
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -gcflags="all=-N -l" \
-    -o rif-runtime ./cmd/rif
+EXPOSE 8000
 
-# Create evidence directory
-RUN mkdir -p /app/evidence && chown rif:rif /app/evidence
-
-# Change to non-root user
-USER rif
-
-# Expose debug port (2345 for delve)
-EXPOSE 2345 8000
-
-# Start with bash (override with command when running)
-ENTRYPOINT ["/bin/bash"]
-CMD ["-c", "/app/rif-runtime --help"]
+CMD ["python", "-m", "uvicorn", "rif_runtime.api:app", "--host", "0.0.0.0", "--port", "8000"]

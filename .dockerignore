@@ -37,9 +37,10 @@ coverage.xml
 vendor/
 go.sum.bak
 
-# Documentation
+# Documentation (keep README.md — required by pyproject.toml for pip install)
 docs/
 *.md
+!README.md
 examples/
 tutorials/
 

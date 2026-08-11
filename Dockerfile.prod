@@ -1,83 +1,62 @@
-# Build stage: compile the RIF Runtime binary
-FROM golang:1.21-alpine AS builder
+# syntax=docker/dockerfile:1
+#
+# Alias retained for older docs/Makefile/checklists that say `Dockerfile.prod`.
+# Canonical production image definition: ./Dockerfile (pure-Python FastAPI).
+# The previous Go multi-stage content did not match this repository.
 
-# Install build dependencies (minimal)
-RUN apk add --no-cache git ca-certificates tzdata
+ARG PYTHON_VERSION=3.12.3
 
-# Create app directory
+FROM python:${PYTHON_VERSION}-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /build
 
-# Copy go.mod and go.sum first (better layer caching)
-COPY go.mod go.sum ./
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Download dependencies (cached layer)
-RUN go mod download
+COPY requirements.txt pyproject.toml README.md ./
+COPY src ./src
 
-# Copy source code
-COPY . .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install -U pip \
+    && python -m pip install -r requirements.txt \
+    && python -m pip install --no-deps .
 
-# Build the binary
-# - CGO_ENABLED=0: static binary (no libc dependencies)
-# - GOOS=linux: Linux target
-# - GOARCH=amd64: x86_64 architecture (adjust for ARM64 as needed)
-# - -ldflags: strip debug info, set version at build time
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-w -s -X main.Version=$(git describe --tags --always || echo 'dev')" \
-    -o rif-runtime ./cmd/rif
+FROM python:${PYTHON_VERSION}-slim AS runtime
 
-# Verify binary was created and is executable
-RUN test -f rif-runtime && file rif-runtime
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    RIF_DATA_DIR=data \
+    RIF_CONFIG_DIR=config
 
----
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    appuser \
+    && mkdir -p /app/data /app/config \
+    && chown -R appuser:appuser /app
 
-# Runtime stage: minimal production image
-FROM alpine:3.19
-
-# Install runtime dependencies (minimal)
-# - ca-certificates: for HTTPS
-# - tzdata: timezone support (if time functions used)
-RUN apk add --no-cache ca-certificates tzdata
-
-# Create non-root user (security best practice)
-# - UID 1000: standard unprivileged user
-# - -D: no password
-# - -s /sbin/nologin: no shell access
-RUN adduser -D -u 1000 -s /sbin/nologin rif
-
-# Set working directory
 WORKDIR /app
 
-# Copy binary from builder stage
-COPY --from=builder --chown=rif:rif /build/rif-runtime /app/rif-runtime
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appuser config/environments.yaml /app/config/environments.yaml
+COPY --chown=appuser:appuser rif.toml /app/rif.toml
 
-# Create evidence directory (for filesystem storage)
-# - /app/evidence: evidence log directory
-# - chown rif:rif: owned by non-root user
-RUN mkdir -p /app/evidence && chown rif:rif /app/evidence
+USER appuser
 
-# Switch to non-root user
-USER rif
-
-# Health check (curl evidence API or check process)
-# - interval: check every 30 seconds
-# - timeout: fail if check takes >5 seconds
-# - retries: fail after 3 consecutive failures
-# - start-period: give container 10 seconds to start
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-    CMD /app/rif-runtime version || exit 1
-
-# Metadata labels
-LABEL org.opencontainers.image.title="RIF Runtime v1.0"
-LABEL org.opencontainers.image.description="Evidence-first governance runtime kernel"
-LABEL org.opencontainers.image.version="1.0.0"
-LABEL org.opencontainers.image.source="https://github.com/canstralian/rif-runtime"
-LABEL org.opencontainers.image.licenses="TBD"
-
-# Expose port for evidence API (if applicable)
 EXPOSE 8000
 
-# Default entrypoint: run the binary
-ENTRYPOINT ["/app/rif-runtime"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
 
-# Default command: show help (override with `docker run rif-runtime run --help`)
-CMD ["--help"]
+CMD ["python", "-m", "uvicorn", "rif_runtime.api:app", "--host", "0.0.0.0", "--port", "8000"]

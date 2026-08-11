@@ -1,25 +1,47 @@
 # syntax=docker/dockerfile:1
-
-# Comments are provided throughout this file to help you get started.
-# If you need more help, visit the Dockerfile reference guide at
-# https://docs.docker.com/go/dockerfile-reference/
-
-# Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
+#
+# RIF Runtime — governance MVP image (pure-Python FastAPI).
+# Prefer: python -m uvicorn rif_runtime.api:app (no --reload) for PID/lifecycle.
+# Do not claim OS sandboxing; see SECURITY.md.
 
 ARG PYTHON_VERSION=3.12.3
-FROM python:${PYTHON_VERSION}-slim as base
 
-# Prevents Python from writing pyc files.
-ENV PYTHONDONTWRITEBYTECODE=1
+# ---------------------------------------------------------------------------
+# Builder: install deps + package into an isolated venv (layer-cache friendly)
+# ---------------------------------------------------------------------------
+FROM python:${PYTHON_VERSION}-slim AS builder
 
-# Keeps Python from buffering stdout and stderr to avoid situations where
-# the application crashes without emitting any logs due to buffering.
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
 
-WORKDIR /app
+WORKDIR /build
 
-# Create a non-privileged user that the app will run under.
-# See https://docs.docker.com/go/dockerfile-user-best-practices/
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Dependency layer first (cache hits when only app code changes).
+COPY requirements.txt pyproject.toml README.md ./
+COPY src ./src
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install -U pip \
+    && python -m pip install -r requirements.txt \
+    && python -m pip install --no-deps .
+
+# ---------------------------------------------------------------------------
+# Runtime: non-root, minimal surface, signal-friendly uvicorn PID 1
+# ---------------------------------------------------------------------------
+FROM python:${PYTHON_VERSION}-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    # Working directory is /app so relative data/ and config/ resolve as in CLI.
+    RIF_DATA_DIR=data \
+    RIF_CONFIG_DIR=config
+
 ARG UID=10001
 RUN adduser \
     --disabled-password \
@@ -28,27 +50,26 @@ RUN adduser \
     --shell "/sbin/nologin" \
     --no-create-home \
     --uid "${UID}" \
-    appuser
+    appuser \
+    && mkdir -p /app/data /app/config \
+    && chown -R appuser:appuser /app
 
-# Download dependencies as a separate step to take advantage of Docker's caching.
-# Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
-# Leverage a bind mount to requirements.txt to avoid having to copy them into
-# into this layer.
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=bind,source=requirements.txt,target=requirements.txt \
-    python -m pip install -r requirements.txt
+WORKDIR /app
 
-# Copy the source code into the container before installing the package.
-COPY . .
+COPY --from=builder /opt/venv /opt/venv
 
-# Install the project so imports resolve correctly when the app starts.
-RUN python -m pip install -e .
+# Environment profiles (required at startup). Seed policies are created by
+# PolicyStore defaults if data/policies.json is absent on the volume.
+COPY --chown=appuser:appuser config/environments.yaml /app/config/environments.yaml
+COPY --chown=appuser:appuser rif.toml /app/rif.toml
 
-# Switch to the non-privileged user to run the application.
 USER appuser
 
-# Expose the port that the application listens on.
 EXPOSE 8000
 
-# Run the application.
-CMD uvicorn 'src.rif_runtime.api:app' --host=0.0.0.0 --port=8000
+# No curl in slim — use stdlib. /health is unauthenticated by design.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
+
+# uvicorn as PID 1 forwards SIGTERM for clean shutdown (avoid rif serve --reload).
+CMD ["python", "-m", "uvicorn", "rif_runtime.api:app", "--host", "0.0.0.0", "--port", "8000"]

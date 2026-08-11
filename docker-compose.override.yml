@@ -1,56 +1,14 @@
-# docker-compose.override.yml — Local development overrides
-# Automatically loaded by Docker Compose; never committed
-# Use for: debugging, verbose logging, mount source code
+# Optional local overrides (auto-merged with compose.yaml when present).
+# Keep this file free of extra services — a previous Go/Postgres override broke
+# `docker compose up` against the Python MVP.
+#
+# Example local-only tweaks (uncomment as needed):
+#
+# services:
+#   server:
+#     environment:
+#       RIF_CORS_ORIGINS: http://localhost:3000
+#     ports:
+#       - "8000:8000"
 
-version: '3.9'
-
-services:
-  rif-runtime:
-    # Build from dev Dockerfile (includes delve, curl, jq, etc.)
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    
-    # Verbose logging in development
-    environment:
-      - LOG_LEVEL=debug
-      - DEBUG=true
-    
-    # Mount source code for hot reload (bind mount)
-    volumes:
-      # Go source code
-      - ./cmd:/app/cmd:cached
-      - ./rif:/app/rif:cached
-      - ./go.mod:/app/go.mod:cached
-      - ./go.sum:/app/go.sum:cached
-      
-      # Allow container to write back (logs, debug files)
-      - ./logs:/app/logs
-    
-    # Run bash instead of the binary (for manual testing)
-    entrypoint: /bin/bash
-    command: -c "tail -f /dev/null"
-    
-    # Remove resource limits in development
-    deploy:
-      resources:
-        limits: {}
-        reservations: {}
-    
-    # Expose debug port (delve)
-    ports:
-      - "2345:2345"
-
-  evidence-db:
-    # Verbose logging for database
-    environment:
-      - POSTGRES_INITDB_ARGS=-c log_statement=all
-    
-    # Remove resource limits in development
-    deploy:
-      resources:
-        limits: {}
-        reservations: {}
-
-  cache:
-    # No changes needed for development
+services: {}
