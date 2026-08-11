@@ -35,6 +35,7 @@ jobs:
       # jq is pre-installed on GitHub-hosted ubuntu runners
       # runs on bandit success (0) or findings (1), but not on cancellation or pip/setup failures
       - name: Validate SARIF is well-formed and non-empty
+        id: validate_sarif
         if: success() || failure()
         run: |
           test -f bandit.sarif || { echo "::error::bandit.sarif not found — did bandit run?"; exit 1; }
@@ -43,8 +44,9 @@ jobs:
           jq empty bandit.sarif || { echo "::error::bandit.sarif is not valid JSON"; exit 1; }
           jq -e '.runs | length > 0' bandit.sarif > /dev/null || { echo "::error::bandit.sarif missing required .runs[]"; exit 1; }
 
-      # upload will fail until Code scanning is enabled in repo settings (see #36)
+      # Gate on validate outcome so malformed SARIF is never uploaded; still run when
+      # bandit exited 1 (findings) as long as validation succeeded.
       - uses: github/codeql-action/upload-sarif@v4
-        if: success() || failure()
+        if: (success() || failure()) && steps.validate_sarif.outcome == 'success'
         with:
           sarif_file: bandit.sarif
