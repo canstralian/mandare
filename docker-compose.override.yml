@@ -1,0 +1,14 @@
+# Optional local overrides (auto-merged with compose.yaml when present).
+# Keep this file free of extra services — a previous Go/Postgres override broke
+# `docker compose up` against the Python MVP.
+#
+# Example local-only tweaks (uncomment as needed):
+#
+# services:
+#   server:
+#     environment:
+#       RIF_CORS_ORIGINS: http://localhost:3000
+#     ports:
+#       - "8000:8000"
+
+services: {}

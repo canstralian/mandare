@@ -80,13 +80,16 @@ Run the API:
 
 ```bash
 rif serve              # uvicorn with --reload, http://127.0.0.1:8000
+rif serve --no-reload  # single process (prefer for scripted/agent runs)
 ```
 
-CLI usage:
+CLI usage (`rif --help` for full help):
 
 ```bash
 rif check <actor> <action> <target>     # evaluate one request, print the decision
 rif replay [decisions_path]             # rebuild graph/posture from a decisions.jsonl
+rif status                              # local environment/posture/persistence summary
+rif msf-check <capability> <target>     # Metasploit intent under a governance mode
 ```
 
 Test, lint, type-check (this is exactly what `.github/workflows/ci.yml` runs, in order):

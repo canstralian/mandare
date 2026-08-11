@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/runtime-event/v1",
+  "title": "RIF Runtime Event Envelope v1",
+  "description": "Canonical append-only event envelope for RIF Runtime v1.0. Normative text: spec/events/SPEC.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "type",
+    "run_id",
+    "sequence",
+    "causation_id",
+    "correlation_id",
+    "recorded_at",
+    "actor",
+    "evidence_refs",
+    "integrity",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rif.runtime.event/v1"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt_[a-f0-9]{64}$",
+      "description": "Deterministic id: evt_ + sha256 hex of canonical preimage (SPEC §5)."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "intent.received",
+        "mode.selected",
+        "memory.retrieved",
+        "context.built",
+        "governance.evaluated",
+        "budget.debited",
+        "capability.requested",
+        "capability.granted",
+        "capability.denied",
+        "execution.started",
+        "execution.completed",
+        "execution.failed",
+        "evidence.recorded",
+        "replay.completed"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[a-f0-9]{32}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "causation_id": {
+      "type": "string",
+      "pattern": "^evt_[a-f0-9]{64}$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Observational UTC timestamp; not used for causal ordering."
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "capability": {
+      "$ref": "#/$defs/capability"
+    },
+    "budget": {
+      "$ref": "#/$defs/budget"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/evidence_ref"
+      }
+    },
+    "result_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "integrity": {
+      "$ref": "#/$defs/integrity"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Type-specific fields. Writers MUST validate against the payload schema for `type` (SPEC.md examples are normative shapes)."
+    }
+  },
+  "$defs": {
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["agent", "human", "operator", "runtime", "system"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests_remaining": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_remaining": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_remaining_usd": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]{1,6})?$"
+        }
+      }
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "content_sha256",
+            "event_id",
+            "observation_event_id",
+            "uri"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous_event_sha256", "event_sha256"],
+      "properties": {
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "event_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

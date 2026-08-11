@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+#
+# Local/dev image — same runtime entrypoint as Dockerfile (no --reload).
+# Mount source with compose overrides if you need live code; do not use
+# `rif serve` (reload) as PID 1 in containers.
+# Previous Go/delve content was incorrect for this pure-Python package.
+
+ARG PYTHON_VERSION=3.12.3
+FROM python:${PYTHON_VERSION}-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+RUN python -m venv /opt/venv \
+    && adduser \
+        --disabled-password \
+        --gecos "" \
+        --home "/nonexistent" \
+        --shell "/sbin/nologin" \
+        --no-create-home \
+        --uid 10001 \
+        appuser \
+    && mkdir -p /app/data /app/config \
+    && chown -R appuser:appuser /app
+
+COPY requirements.txt pyproject.toml README.md ./
+COPY src ./src
+COPY config/environments.yaml /app/config/environments.yaml
+COPY rif.toml /app/rif.toml
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install -U pip \
+    && /opt/venv/bin/pip install -r requirements.txt \
+    && /opt/venv/bin/pip install --no-deps . \
+    && chown -R appuser:appuser /opt/venv
+
+USER appuser
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "rif_runtime.api:app", "--host", "0.0.0.0", "--port", "8000"]

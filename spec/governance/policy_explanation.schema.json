@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/runtime-policy-explanation/v1",
+  "title": "RIF Runtime Policy Explanation v1",
+  "description": "Explainable governance decision output. Normative text: spec/governance/GOVERNANCE_AS_CODE.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "explanation_id",
+    "pack_id",
+    "pack_hash",
+    "input_digest",
+    "decision",
+    "reason_code",
+    "reason_summary",
+    "precedence",
+    "candidates",
+    "discarded",
+    "input_snapshot",
+    "posture_before",
+    "posture_after",
+    "replay_consistent"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rif.runtime.policy-explanation/v1"
+    },
+    "explanation_id": {
+      "type": "string",
+      "pattern": "^ex_[a-f0-9]{64}$"
+    },
+    "pack_id": {
+      "type": "string",
+      "pattern": "^pack_[a-z0-9_]{3,64}$"
+    },
+    "pack_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["allow", "deny", "review"]
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+    },
+    "reason_summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "matched_rule_id": {
+      "type": ["string", "null"]
+    },
+    "matched_rule_priority": {
+      "type": ["integer", "null"]
+    },
+    "precedence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "priority", "specificity", "effect"],
+        "properties": {
+          "id": { "type": "string" },
+          "priority": { "type": "integer" },
+          "specificity": { "type": "integer" },
+          "effect": {
+            "type": "string",
+            "enum": ["allow", "deny", "review"]
+          }
+        }
+      }
+    },
+    "discarded": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "cause"],
+        "properties": {
+          "id": { "type": "string" },
+          "cause": { "type": "string" }
+        }
+      }
+    },
+    "input_snapshot": {
+      "type": "object"
+    },
+    "posture_before": {
+      "type": "string",
+      "enum": ["normal", "elevated", "restricted", "locked"]
+    },
+    "posture_after": {
+      "type": "string",
+      "enum": ["normal", "elevated", "restricted", "locked"]
+    },
+    "replay_consistent": {
+      "type": "boolean",
+      "const": true
+    }
+  }
+}

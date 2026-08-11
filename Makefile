@@ -83,19 +83,23 @@ security:
 	bandit -r src/ -ll
 	pip-audit --desc || true
 
-# Docker targets
+# Docker targets (governance MVP image — see README.Docker.md)
 docker-build:
-	docker build -t rif-runtime-server:latest .
+	docker build -t rif-runtime:local .
 
 docker-run: docker-build
-	docker run -p 8000:8000 \
-		-e RIF_LOG_LEVEL=INFO \
+	@test -n "$$RIF_CONTROL_PLANE_API_KEYS" || (echo "Set RIF_CONTROL_PLANE_API_KEYS first" && exit 1)
+	mkdir -p data
+	docker run --rm -p 8000:8000 \
+		--read-only --tmpfs /tmp \
+		--cap-drop ALL --security-opt no-new-privileges:true \
+		-e RIF_CONTROL_PLANE_API_KEYS \
 		-v $(PWD)/data:/app/data \
-		-v $(PWD)/config:/app/config \
-		rif-runtime-server:latest
+		-v $(PWD)/config:/app/config:ro \
+		rif-runtime:local
 
 docker-up:
-	docker compose up --build
+	docker compose up --build -d --wait
 
 docker-down:
 	docker compose down
@@ -104,7 +108,7 @@ docker-logs:
 	docker compose logs -f server
 
 docker-prod-up:
-	docker compose -f docker-compose.prod.yml up -d
+	docker compose -f docker-compose.prod.yml up -d --build --wait
 
 docker-prod-down:
 	docker compose -f docker-compose.prod.yml down

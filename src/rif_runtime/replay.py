@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .graph.memory import GovernanceGraph
 from .schemas import Decision, PolicyDecision, Posture
+
+
+class ReplayDecodeError(ValueError):
+    """Raised when a decisions.jsonl line is not valid JSON."""
+
+    def __init__(self, path: Path, line_no: int, message: str) -> None:
+        self.path = path
+        self.line_no = line_no
+        super().__init__(f"invalid JSONL at {path}:{line_no}: {message}")
 
 
 @dataclass
@@ -22,15 +32,20 @@ class ReplayEngine:
         self.decisions_path = Path(decisions_path)
 
     def _rows(self) -> list[dict[str, Any]]:
-        import json
-
         if not self.decisions_path.exists():
             return []
 
         rows: list[dict[str, Any]] = []
-        for line in self.decisions_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+        for line_no, line in enumerate(
+            self.decisions_path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if not line.strip():
+                continue
+            try:
                 rows.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                raise ReplayDecodeError(self.decisions_path, line_no, exc.msg) from exc
         return rows
 
     def replay_graph(self, rows: list[dict[str, Any]] | None = None) -> GovernanceGraph:

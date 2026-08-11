@@ -1,0 +1,56 @@
+# Deterministic hashing / replay smoke matrix.
+# Full strategy (golden fixtures, cross-platform hash compare, flaky detection)
+# is documented in docs/TEST_STRATEGY_DETERMINISM.md; this workflow only runs
+# what is implemented today so CI stays green while the rest lands.
+
+name: Deterministic Replay Test Matrix
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 2 * * *"
+
+env:
+  PYTHONHASHSEED: 0
+  PYTHONDONTWRITEBYTECODE: 1
+
+jobs:
+  determinism:
+    name: Determinism - ${{ matrix.os }} (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements-dev.txt
+
+      - name: Run determinism unit tests
+        run: pytest tests/test_determinism_golden.py -v --tb=short
+        env:
+          RIF_TEST_PLATFORM: ${{ matrix.os }}
+          RIF_TEST_PYTHON_VERSION: ${{ matrix.python-version }}

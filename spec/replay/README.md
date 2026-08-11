@@ -1,13 +1,12 @@
 # spec/replay
 
-Contract for replay: capturing a runtime execution and re-running it (deterministic
-or model-dependent) to verify behavior, diff against a prior run, or produce an
-audit timeline.
+Deterministic **replay engine** contract for RIF Runtime v1.0.
 
-**Placeholder** — no schema yet. Current replay logic lives in
-`src/rif_runtime/replay.py` without a standalone contract; extracting one is the
-next concrete step for this directory, per ADR-0008.
+| File | Role |
+| --- | --- |
+| [`SPEC.md`](./SPEC.md) | State machine, algorithm, pseudocode, structures, complexity, failures, golden tests |
+| [`replay_report.schema.json`](./replay_report.schema.json) | JSON Schema for replay/verify reports |
 
-## Next slice
-Define a `replay_capture.schema.json` describing the minimal shape a capture must
-have (inputs, environment, timestamps, and evidence references) to be replayable.
+**Event unit:** [`../events/SPEC.md`](../events/SPEC.md) (`rif.runtime.event/v1`).
+
+**Modes:** `pure` (reconstruct, no side effects), `verify` (hash/evidence checks), `time_travel` (state at sequence N).
