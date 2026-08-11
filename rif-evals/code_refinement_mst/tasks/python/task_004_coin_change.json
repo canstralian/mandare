@@ -1,0 +1,40 @@
+{
+  "task_id": "py_004_coin_change",
+  "language": "python",
+  "prompt": "Write a function coin_change(coins: list[int], amount: int) -> int that returns the fewest number of coins needed to make up amount using the denominations in coins. If the amount cannot be made up by any combination of the coins, return -1.",
+  "entrypoint": "coin_change",
+  "tests": [
+    "assert coin_change([1, 5, 11], 15) == 3",
+    "assert coin_change([2], 3) == -1",
+    "assert coin_change([1], 0) == 0",
+    "assert coin_change([1, 2, 5], 11) == 3",
+    "assert coin_change([186, 419, 83, 408], 6249) == 20"
+  ],
+  "refinement_turns": [
+    {
+      "turn": 1,
+      "instruction": "Refactor the bottom-up DP table so the sentinel value and the final result check are extracted into named constants or variables with explanatory names.",
+      "change_type": "refactor"
+    },
+    {
+      "turn": 2,
+      "instruction": "Add a fast-path guard at the top: if amount is 0 return 0 immediately; if coins is empty or all coins are larger than amount return -1 without building the DP table.",
+      "change_type": "performance"
+    },
+    {
+      "turn": 3,
+      "instruction": "Add a PEP 257 docstring with Args, Returns, and Raises sections, plus full type annotations on the function signature.",
+      "change_type": "style"
+    },
+    {
+      "turn": 4,
+      "instruction": "Raise a ValueError with a descriptive message when any coin denomination is less than or equal to zero, since that would cause infinite loops or nonsensical results.",
+      "change_type": "additive"
+    },
+    {
+      "turn": 5,
+      "instruction": "Deduplicate and sort the coins list at the start so that identical denominations do not cause redundant inner-loop iterations, preserving identical outputs.",
+      "change_type": "logic_preserving"
+    }
+  ]
+}

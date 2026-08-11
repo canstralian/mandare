@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RIFCodeRefinementSession",
+  "description": "Full causal trace of one task run: governance-gated turns plus the resulting RIFCodeRefinementResult, as written under sessions/generated/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "model",
+    "actor",
+    "environment",
+    "started_at",
+    "completed_at",
+    "posture_start",
+    "posture_end",
+    "events",
+    "result"
+  ],
+  "properties": {
+    "task_id": { "type": "string" },
+    "model": { "type": "string" },
+    "actor": { "type": "string" },
+    "environment": { "type": "string" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "posture_start": { "type": "string" },
+    "posture_end": { "type": "string" },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/turnEvent" }
+    },
+    "result": {
+      "$ref": "./result.schema.json"
+    }
+  },
+  "$defs": {
+    "turnEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_type",
+        "task_id",
+        "turn",
+        "change_type",
+        "state_hash_before",
+        "state_hash_after",
+        "tests_passed",
+        "policy_decision",
+        "verification_status",
+        "regression_detected"
+      ],
+      "properties": {
+        "event_type": { "const": "code_refinement_turn" },
+        "task_id": { "type": "string" },
+        "turn": { "type": "integer", "minimum": 1 },
+        "change_type": {
+          "enum": [
+            "style",
+            "refactor",
+            "performance",
+            "logic_preserving",
+            "additive",
+            "edge_case",
+            "semantic"
+          ]
+        },
+        "state_hash_before": { "type": "string" },
+        "state_hash_after": { "type": "string" },
+        "tests_passed": { "type": ["boolean", "null"] },
+        "policy_decision": { "enum": ["allow", "deny", "review"] },
+        "verification_status": {
+          "enum": ["passed", "failed", "error", "blocked"]
+        },
+        "regression_detected": { "type": "boolean" }
+      }
+    }
+  }
+}

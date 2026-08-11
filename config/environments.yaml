@@ -18,3 +18,15 @@ environments:
     allow_package_manager_network_access: false
     allowed_hosts: []
     metadata: {project: rif, environment: ci, governance: enabled, security: deny-default, stage: ci}
+  RIF_Metasploit_ReadOnly:
+    networking_type: limited
+    allow_mcp_server_network_access: true
+    allow_package_manager_network_access: false
+    allowed_hosts: [127.0.0.1, localhost]
+    metadata: {project: rif, environment: metasploit-readonly, mode: read-only-firewall, governance: enabled, security: knowledge-not-authority, egress: sealed, stage: lab}
+  RIF_Metasploit_Lab:
+    networking_type: limited
+    allow_mcp_server_network_access: true
+    allow_package_manager_network_access: false
+    allowed_hosts: [127.0.0.1, localhost]
+    metadata: {project: rif, environment: metasploit-lab, mode: lab-broker, governance: enabled, security: dual-authorised, egress: sealed, stage: lab}

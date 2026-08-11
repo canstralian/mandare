@@ -1,104 +1,278 @@
-from fastapi import FastAPI, HTTPException
+import os
+from dataclasses import asdict
+from typing import Annotated, Any
+from uuid import uuid4
+
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import ValidationError
+
+from .agents.auditor import AuditorAgent
+from .auth import ControlPlaneAuth
+from .configuration.policies import PolicyRule
+from .integrations import supabase as sb
+from .mcp.capabilities import capability_catalog
+from .mcp.metasploit import (
+    CapabilityToken,
+    GovernanceMode,
+    MetasploitIntent,
+)
+from .replay import ReplayEngine
+from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
-from .schemas import PolicyRequest, Posture
-from rif_runtime.agents.auditor import AuditorAgent
-from rif_runtime.configuration.policies import PolicyRule, PolicyStore
+from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
+from .startup import register_config_startup
 
-runtime=RIFRuntime()
-app=FastAPI(title='RIF Runtime', version='0.1.0')
+runtime = RIFRuntime()
+app = FastAPI(
+    title="RIF Runtime",
+    version="0.3.0",
+    description="Governed execution substrate for intelligent systems.",
+)
 
-@app.get('/health')
-def health():
-    return {'status':'ok','environment':runtime.environment_name,'posture':runtime.posture}
+# CORS — configure allowed origins via RIF_CORS_ORIGINS (comma-separated).
+# Default permits only localhost dev; set to your Vercel URL in production.
+_cors_origins = [
+    o.strip()
+    for o in os.environ.get("RIF_CORS_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get('/v1/environments')
-def environments():
-    return {'current':runtime.environment_name,'environments':runtime.config.environments}
+register_config_startup(app)
 
-@app.post('/v1/environment/{name}')
-def set_environment(name:str):
-    try:
-        runtime.set_environment(name)
-        return {'current':runtime.environment_name}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+_bearer = HTTPBearer(auto_error=False)
+_BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
 
-@app.post('/v1/policy/evaluate')
-def evaluate(req:PolicyRequest):
-    return runtime.evaluate(req)
 
-@app.post('/v1/posture/{posture}')
-def posture(posture:Posture):
-    runtime.posture=posture
-    return {'posture':runtime.posture}
+def _require_identity(credentials: _BearerCredentials) -> str:
+    """Verify a Supabase Bearer JWT and return the user UUID string."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return sb.verify_jwt(credentials.credentials)
 
-@app.get("/")
-def root():
+
+IdentityId = Annotated[str, Depends(_require_identity)]
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
     return {
-        "name": "RIF Runtime",
-        "status": "online",
-        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate"]
+        "status": "ok",
+        "environment": runtime.environment_name,
+        "posture": runtime.posture,
     }
 
 
-@app.get("/v1/graph/summary")
-def graph_summary():
-    return runtime.graph_summary()
-
-@app.get("/v1/telemetry/summary")
-def telemetry_summary():
-    return runtime.telemetry_summary()
-
+@app.get("/v1/environments")
+def environments() -> dict[str, Any]:
+    return {
+        "current": runtime.environment_name,
+        "environments": runtime.config.environments,
+    }
 
 
-@app.get("/v1/audit")
-def audit():
-    return AuditorAgent().audit(runtime)
+@app.post("/v1/environment/{name}", dependencies=[ControlPlaneAuth])
+def set_environment(name: str) -> dict[str, Any]:
+    try:
+        runtime.set_environment(name)
+        return {"current": runtime.environment_name}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
-@app.post("/v1/mcp/invoke")
-def mcp_invoke(payload: dict):
-    from rif_runtime.schemas import PolicyRequest
-    req = PolicyRequest(
-        actor=payload.get("actor","agent:mcp"),
-        action="mcp.invoke",
-        target=payload.get("target","unknown"),
-        reason=payload.get("reason")
-    )
+
+@app.post("/v1/policy/evaluate", dependencies=[ControlPlaneAuth])
+def evaluate(req: PolicyRequest) -> PolicyDecision:
     return runtime.evaluate(req)
 
 
-@app.get("/v1/persistence/summary")
-def persistence_summary():
-    return runtime.persisted_summary()
-
-
-@app.post("/v1/posture/reset")
-def reset_posture():
-    from rif_runtime.schemas import Posture
+@app.post("/v1/posture/reset", dependencies=[ControlPlaneAuth])
+def reset_posture() -> dict[str, Any]:
+    # Must be registered before /v1/posture/{posture}, otherwise "reset" is
+    # captured as a Posture path param and FastAPI returns 422.
     runtime.posture = Posture.normal
     return {"posture": runtime.posture.value}
 
 
+@app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
+def posture(posture: Posture) -> dict[str, Any]:
+    runtime.posture = posture
+    return {"posture": runtime.posture}
+
+
+@app.get("/")
+def root() -> dict[str, Any]:
+    return {
+        "name": "RIF Runtime",
+        "status": "online",
+        "routes": ["/health", "/docs", "/v1/environments", "/v1/policy/evaluate"],
+    }
+
+
+@app.get("/v1/graph/summary")
+def graph_summary() -> dict[str, Any]:
+    return runtime.graph_summary()
+
+
+@app.get("/v1/telemetry/summary")
+def telemetry_summary() -> dict[str, Any]:
+    return runtime.telemetry_summary()
+
+
+@app.get("/v1/audit")
+def audit() -> dict[str, Any]:
+    return AuditorAgent().audit(runtime)
+
+
+@app.post("/v1/mcp/invoke")
+def mcp_invoke(payload: dict[str, Any]) -> PolicyDecision:
+    from rif_runtime.schemas import PolicyRequest
+
+    req = PolicyRequest(
+        actor=payload.get("actor", "agent:mcp"),
+        action="mcp.invoke",
+        target=payload.get("target", "unknown"),
+        reason=payload.get("reason"),
+    )
+    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
+    # write to the decision log. The authenticated /v1/policy/evaluate is the
+    # recording path. See runtime.evaluate(record=...).
+    return runtime.evaluate(req, record=False)
+
+
+@app.get("/v1/mcp/metasploit/capabilities")
+def metasploit_capabilities() -> dict[str, Any]:
+    return capability_catalog()
+
+
+@app.post("/v1/mcp/metasploit/evaluate")
+def metasploit_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        intent = MetasploitIntent.model_validate(payload.get("intent", payload))
+        mode = GovernanceMode(
+            payload.get("mode", GovernanceMode.read_only_firewall.value)
+        )
+        token = (
+            CapabilityToken.model_validate(payload["token"])
+            if payload.get("token")
+            else None
+        )
+    except (ValidationError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    # Unauthenticated simulation route: dry-run so it cannot mutate posture or
+    # write to the stores. Minting a capability token (the actual authorization)
+    # goes through the guarded /v1/mcp/metasploit/token.
+    outcome = runtime.evaluate_metasploit(intent, mode=mode, token=token, record=False)
+    return {
+        "decision": outcome.decision,
+        "evidence": outcome.evidence,
+        "simulated": outcome.simulated,
+        "severe": outcome.severe,
+        "posture": runtime.posture,
+    }
+
+
+@app.post("/v1/mcp/metasploit/token", dependencies=[ControlPlaneAuth])
+def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
+    if "intent" not in payload:
+        raise HTTPException(status_code=422, detail="missing 'intent' in payload")
+    try:
+        intent = MetasploitIntent.model_validate(payload["intent"])
+        # TypeError, not just ValueError: int(None) and int({}) raise TypeError,
+        # so a null or object ttl_seconds would otherwise escape as a 500 while
+        # a non-numeric string correctly returned 422.
+        ttl_seconds = int(payload.get("ttl_seconds", 600))
+    except (ValidationError, TypeError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return runtime.metasploit.mint_token(
+        intent,
+        approver=payload.get("approver", "human:operator"),
+        ttl_seconds=ttl_seconds,
+    )
+
+
+@app.get("/v1/persistence/summary")
+def persistence_summary() -> dict[str, Any]:
+    return runtime.persisted_summary()
+
+
 @app.get("/v1/recovered-state")
-def recovered_state():
-    return runtime.recovered_summary()
-
-
-policy_store = PolicyStore()
+def recovered_state() -> dict[str, Any]:
+    # Rebuilt from the persisted decision log, not from live runtime state, so
+    # the response is meaningful after a restart.
+    return asdict(ReplayEngine().recover())
 
 
 @app.get("/v1/policies")
-def list_policies():
-    return {"rules": [rule.model_dump() for rule in policy_store.list()]}
+def list_policies() -> dict[str, Any]:
+    return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 
-@app.put("/v1/policies/{rule_id}")
-def upsert_policy(rule_id: str, rule: PolicyRule):
+@app.put("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
+def upsert_policy(rule_id: str, rule: PolicyRule) -> PolicyRule:
     if rule.id != rule_id:
         rule = rule.model_copy(update={"id": rule_id})
-    return policy_store.upsert(rule)
+    return runtime.policy_store.upsert(rule)
 
 
-@app.delete("/v1/policies/{rule_id}")
-def delete_policy(rule_id: str):
-    return {"deleted": policy_store.delete(rule_id)}
+@app.delete("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
+def delete_policy(rule_id: str) -> dict[str, Any]:
+    return {"deleted": runtime.policy_store.delete(rule_id)}
+
+
+@app.post("/v1/runs")
+def create_run(req: RunRequest, identity_id: IdentityId) -> RunRecord:
+    """Create a governed execution run authenticated via Supabase JWT.
+
+    Flow: verify identity → evaluate policy → record evidence → return run.
+    The endpoint is deny-safe: a policy denial still writes evidence before
+    returning 403 so the decision is always auditable.
+    """
+    run_id = str(uuid4())
+
+    policy_req = PolicyRequest(
+        actor=f"user:{identity_id}",
+        action="run.create",
+        target=req.prompt[:200],
+        reason="vercel-frontend-run",
+        context=req.context,
+    )
+    decision = runtime.evaluate(policy_req)
+
+    run_status = (
+        RunStatus.policy_approved
+        if decision.decision == Decision.allow
+        else RunStatus.denied
+    )
+    record = RunRecord(
+        run_id=run_id,
+        identity_id=identity_id,
+        status=run_status,
+        prompt=req.prompt,
+        context=req.context,
+        policy_decision=decision.decision.value,
+        matched_rule=decision.matched_rule,
+    )
+
+    sb.write_run(run_id, identity_id, run_status.value, req.prompt)
+    sb.write_evidence(run_id, "policy_decision", decision.model_dump(mode="json"))
+
+    if decision.decision != Decision.allow:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"policy denied: {decision.reason}",
+            headers={"X-RIF-Run-Id": run_id},
+        )
+
+    return record

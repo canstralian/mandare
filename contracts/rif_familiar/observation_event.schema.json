@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rif://contracts/rif-familiar/observation-event/v0.1",
+  "title": "RIF Familiar Observation Event v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "emitted_at",
+    "device_id",
+    "manifest_sha256",
+    "sequence",
+    "collection_mode",
+    "wireless_summary",
+    "device_health",
+    "privacy",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "rif-familiar.observation-event/v0.1"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^obs_[A-Za-z0-9_-]{12,96}$"
+    },
+    "emitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^rif-familiar-[a-z0-9-]{1,48}$"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "collection_mode": {
+      "const": "passive_aggregate"
+    },
+    "wireless_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wifi_network_count", "wifi_channels", "ble_device_count"],
+      "properties": {
+        "wifi_network_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128
+        },
+        "wifi_channels": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 196
+          },
+          "uniqueItems": true,
+          "maxItems": 64
+        },
+        "ble_device_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        }
+      }
+    },
+    "device_health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["battery_percent", "uptime_seconds", "storage_queue_depth"],
+      "properties": {
+        "battery_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "temperature_c": {
+          "type": "number",
+          "minimum": -20,
+          "maximum": 100
+        },
+        "uptime_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "storage_queue_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "raw_identifier_retention",
+        "prohibited_fields"
+      ],
+      "properties": {
+        "classification": {
+          "const": "aggregate_redacted"
+        },
+        "raw_identifier_retention": {
+          "const": false
+        },
+        "prohibited_fields": {
+          "const": [
+            "ssid",
+            "bssid",
+            "mac_address",
+            "device_name",
+            "manufacturer_data",
+            "packet_payload"
+          ]
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous_event_sha256", "payload_sha256"],
+      "properties": {
+        "previous_event_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "payload_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

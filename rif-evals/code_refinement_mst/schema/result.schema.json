@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RIFCodeRefinementResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "model",
+    "turns_attempted",
+    "turns_passed",
+    "first_regression_turn",
+    "mst_score",
+    "events"
+  ],
+  "properties": {
+    "task_id": { "type": "string" },
+    "model": { "type": "string" },
+    "turns_attempted": { "type": "integer" },
+    "turns_passed": { "type": "integer" },
+    "first_regression_turn": {
+      "type": ["integer", "null"]
+    },
+    "mst_score": { "type": "number" },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  }
+}

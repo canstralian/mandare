@@ -1,0 +1,36 @@
+name: runtime-architect
+
+kind: cursor-agent
+
+description: Reviews subsystem boundaries and architectural evolution.
+
+owns:
+  - src/rif_runtime
+
+responsibilities:
+  - architecture review
+  - dependency analysis
+  - ADR generation
+
+inputs:
+  - python
+  - documentation
+
+outputs:
+  - review
+  - recommendations
+
+depends_on:
+  - run-rif-runtime
+
+blocks:
+  - provider-engineer
+
+quality_gates:
+  - architecture review
+  - dependency validation
+
+invariants:
+  - No circular dependencies.
+  - One responsibility per subsystem.
+  - Explicit contracts.

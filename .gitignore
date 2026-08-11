@@ -1,4 +1,5 @@
 .venv/
+.venv*/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -12,3 +13,7 @@ data/*.jsonl
 
 data/*.jsonl
 data/*.tmp
+
+rif-evals/code_refinement_mst/sessions/generated/*.json
+rif-evals/code_refinement_mst/reports/*.json
+rif-evals/code_refinement_mst/reports/*.md
