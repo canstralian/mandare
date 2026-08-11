@@ -30,8 +30,9 @@ from urllib.parse import unquote, urlparse
 
 from rif_runtime.schemas import PolicyDecision, Posture
 
-# Word-boundary-anchored patterns for detecting adversarial payload in targets
-# and reasons.  All keyword alternatives use \b so substrings inside longer
+# Word-boundary-anchored patterns for detecting adversarial payload in the
+# target.  The reason field is deliberately not scanned — see
+# _adversarial_score.  Keyword alternatives use \b so substrings inside longer
 # identifiers (e.g. "elasticsearch", "selectAll", "executor") are not flagged.
 _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
     # SQL injection keywords
@@ -44,8 +45,11 @@ _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
     # Path traversal — two or more ../ or ..\ sequences anywhere in the string
     # (consecutive *or* separated by a path segment, e.g. ../segment/../)
     re.compile(r"(\.\.[\\/]).*(\.\.[\\/])"),
-    # Shell interpreter references
-    re.compile(r"\b(cmd\.exe|powershell|/bin/(sh|bash|zsh))\b", re.IGNORECASE),
+    # Shell interpreter references.  The \b is applied per-alternative rather
+    # than around the whole group: a leading \b before "/bin/..." can only hold
+    # when the "/" follows a word character, so grouping them together matched
+    # ".../run/bin/zsh" while missing "; /bin/sh" — exactly backwards.
+    re.compile(r"\b(?:cmd\.exe|powershell)\b|/bin/(?:sh|bash|zsh)\b", re.IGNORECASE),
     # Shell chaining: semicolon/pipe require whitespace after to avoid false-positives
     # on legitimate query separators like ?a=1;b=2.  Backtick substitution fires
     # without a space because value`cmd` syntax has no delimiter.

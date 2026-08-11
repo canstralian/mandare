@@ -73,6 +73,12 @@ def test_entropy_grows_with_diversity():
         "elasticsearch",
         "executor.run()",  # 'exec' is a prefix; 'u' immediately follows
         "selectAll(items)",  # camelCase prefix — no boundary after 'select'
+        # Interpreter-adjacent strings that must stay clean now that the
+        # /bin/... alternative is no longer gated behind a leading \b.
+        "/bin/shell",  # 'sh' has no trailing boundary
+        "/binary/shipping",
+        "cabin/shed",
+        "powershellish",
     ],
 )
 def test_adversarial_patterns_no_false_positive(safe: str):
@@ -87,6 +93,14 @@ def test_adversarial_patterns_no_false_positive(safe: str):
         "SELECT * FROM users",
         "1; DROP TABLE students",
         "cmd.exe /c whoami",
+        # Unix interpreters: the leading "/" is not a word character, so a \b
+        # in front of the whole interpreter group silently disabled all three.
+        # Only cmd.exe and powershell were ever detected.
+        "; /bin/sh",
+        "?cmd=/bin/bash",
+        "/bin/zsh -c id",
+        "/usr/bin/bash",
+        "powershell -enc SQBFAFgA",
         "../../etc/passwd",
         "../segment/../etc/passwd",  # non-consecutive traversal
         "<script>alert(1)</script>",
