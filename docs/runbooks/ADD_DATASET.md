@@ -103,11 +103,11 @@ rif-dataset ingest --dataset your-dataset-id --limit 100
 ```
 
 `--limit 100` loads only the first 100 records. Review the output:
-- Check that records are well-formed
-- Check that `content_type` classification looks correct
-- Check that license annotation is `compatible`
+- Check that records are well-formed (non-empty `id`, `source_id`, and `text` or `messages`)
+- Check that `source_id` matches `your-dataset-id`
+- Check that the record count is plausible (not suspiciously low)
 
-If content type classification is wrong, adjust `content_types` in the registry entry.
+`content_type` classification and license annotation are applied by downstream pipeline stages (Classification and License Validation), not by ingestion. Verify those in steps 6–7.
 
 ### 6. Run license validation
 
