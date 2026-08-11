@@ -6,12 +6,14 @@ Manifests declare all observable behaviors to enable governance and replay.
 """
 
 from enum import Enum
-from typing import Any, Optional, Dict, List, Literal
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field, validator
 
 
 class AccessLevel(str, Enum):
     """Access level for resource operations."""
+
     NONE = "none"
     READ = "read"
     WRITE = "write"
@@ -21,6 +23,7 @@ class AccessLevel(str, Enum):
 
 class NetworkProtocol(str, Enum):
     """Supported network protocols."""
+
     HTTP = "http"
     HTTPS = "https"
     SSH = "ssh"
@@ -31,6 +34,7 @@ class NetworkProtocol(str, Enum):
 
 class SideEffectType(str, Enum):
     """Types of side effects a capability can have."""
+
     NETWORK_EGRESS = "network_egress"
     FILESYSTEM_WRITE = "filesystem_write"
     FILESYSTEM_DELETE = "filesystem_delete"
@@ -43,6 +47,7 @@ class SideEffectType(str, Enum):
 
 class Replayability(str, Enum):
     """How repeatable a capability is."""
+
     DETERMINISTIC = "deterministic"  # Same input → same output, safe to replay
     IDEMPOTENT = "idempotent"  # Safe to replay (e.g., mkdir -p)
     NON_IDEMPOTENT = "non_idempotent"  # Replay may have different effects
@@ -52,164 +57,153 @@ class Replayability(str, Enum):
 
 class EvidenceRequirement(BaseModel):
     """Evidence that must be captured for auditability."""
+
     name: str = Field(
         ...,
-        description="Evidence artifact name (e.g., 'http_request', 'file_written', 'process_output')"
+        description=(
+            "Evidence artifact name (e.g., 'http_request', "
+            "'file_written', 'process_output')"
+        ),
     )
     format: Literal["json", "text", "binary", "structured"] = Field(
         default="json",
-        description="Format of evidence artifact"
+        description="Format of evidence artifact",
     )
     sensitive: bool = Field(
         default=False,
-        description="Whether evidence may contain credentials/PII (redact before logging)"
+        description=(
+            "Whether evidence may contain credentials/PII (redact before logging)"
+        ),
     )
     immutable: bool = Field(
         default=True,
-        description="Whether evidence must be cryptographically signed for audit trail"
+        description=(
+            "Whether evidence must be cryptographically signed for audit trail"
+        ),
     )
 
 
 class NetworkAccessSpec(BaseModel):
     """Declares network access patterns."""
+
     enabled: bool = Field(
-        default=False,
-        description="Whether capability requires network access"
+        default=False, description="Whether capability requires network access"
     )
-    protocols: List[NetworkProtocol] = Field(
+    protocols: list[NetworkProtocol] = Field(
         default_factory=list,
-        description="Allowed protocols (HTTP, HTTPS, SSH, DNS, WebSocket, gRPC)"
+        description="Allowed protocols (HTTP, HTTPS, SSH, DNS, WebSocket, gRPC)",
     )
-    allowed_domains: List[str] = Field(
+    allowed_domains: list[str] = Field(
         default_factory=list,
-        description="Whitelist of allowed domains/IPs (CIDR notation supported)"
+        description="Whitelist of allowed domains/IPs (CIDR notation supported)",
     )
-    blocked_domains: List[str] = Field(
+    blocked_domains: list[str] = Field(
         default_factory=list,
-        description="Blacklist of blocked domains/IPs (e.g., metadata services)"
+        description="Blacklist of blocked domains/IPs (e.g., metadata services)",
     )
     require_tls: bool = Field(
-        default=True,
-        description="Whether TLS verification is required"
+        default=True, description="Whether TLS verification is required"
     )
     dns_only: bool = Field(
         default=False,
-        description="Whether capability only performs DNS lookups (no HTTP/SSH)"
+        description="Whether capability only performs DNS lookups (no HTTP/SSH)",
     )
-    timeout_seconds: int = Field(
-        default=30,
-        description="Network operation timeout"
-    )
+    timeout_seconds: int = Field(default=30, description="Network operation timeout")
 
 
 class FilesystemAccessSpec(BaseModel):
     """Declares filesystem access patterns."""
+
     enabled: bool = Field(
-        default=False,
-        description="Whether capability accesses filesystem"
+        default=False, description="Whether capability accesses filesystem"
     )
     access_level: AccessLevel = Field(
         default=AccessLevel.NONE,
-        description="Access level (read, write, execute, admin)"
+        description="Access level (read, write, execute, admin)",
     )
-    allowed_paths: List[str] = Field(
+    allowed_paths: list[str] = Field(
         default_factory=list,
-        description="Whitelist of allowed paths (glob patterns supported)"
+        description="Whitelist of allowed paths (glob patterns supported)",
     )
-    blocked_paths: List[str] = Field(
+    blocked_paths: list[str] = Field(
         default_factory=list,
-        description="Blacklist of blocked paths (e.g., /etc, /sys)"
+        description="Blacklist of blocked paths (e.g., /etc, /sys)",
     )
-    allowed_extensions: List[str] = Field(
-        default_factory=list,
-        description="Allowed file extensions (.py, .json, etc.)"
+    allowed_extensions: list[str] = Field(
+        default_factory=list, description="Allowed file extensions (.py, .json, etc.)"
     )
     max_file_size_mb: int = Field(
-        default=100,
-        description="Maximum file size for operations"
+        default=100, description="Maximum file size for operations"
     )
     max_total_size_mb: int = Field(
-        default=1000,
-        description="Maximum total data written in one execution"
+        default=1000, description="Maximum total data written in one execution"
     )
 
 
 class ExternalServiceSpec(BaseModel):
     """Declares external service integrations."""
+
     name: str = Field(
-        ...,
-        description="Service name (e.g., 'github', 'aws_s3', 'slack')"
+        ..., description="Service name (e.g., 'github', 'aws_s3', 'slack')"
     )
-    endpoint: str = Field(
-        ...,
-        description="Service endpoint URL or identifier"
-    )
+    endpoint: str = Field(..., description="Service endpoint URL or identifier")
     auth_required: bool = Field(
-        default=True,
-        description="Whether authentication is required"
+        default=True, description="Whether authentication is required"
     )
-    credentials_type: Optional[str] = Field(
+    credentials_type: str | None = Field(
         default=None,
-        description="Type of credentials (api_key, oauth_token, username_password, etc.)"
+        description=(
+            "Type of credentials (api_key, oauth_token, username_password, etc.)"
+        ),
     )
-    rate_limit: Optional[int] = Field(
-        default=None,
-        description="Calls per minute limit (if known)"
+    rate_limit: int | None = Field(
+        default=None, description="Calls per minute limit (if known)"
     )
     mutation_allowed: bool = Field(
-        default=False,
-        description="Whether capability can mutate state (not just read)"
+        default=False, description="Whether capability can mutate state (not just read)"
     )
 
 
 class CostEstimate(BaseModel):
     """Cost implications of running the capability."""
+
     api_calls: int = Field(
-        default=1,
-        description="Estimated number of external API calls"
+        default=1, description="Estimated number of external API calls"
     )
     data_transfer_mb: float = Field(
-        default=0.0,
-        description="Estimated data transfer in MB"
+        default=0.0, description="Estimated data transfer in MB"
     )
     compute_seconds: float = Field(
-        default=1.0,
-        description="Estimated compute time in seconds"
+        default=1.0, description="Estimated compute time in seconds"
     )
     storage_mb: float = Field(
-        default=0.0,
-        description="Estimated persistent storage in MB"
+        default=0.0, description="Estimated persistent storage in MB"
     )
-    estimated_cost_usd: Optional[float] = Field(
-        default=None,
-        description="Estimated cost in USD (if applicable)"
+    estimated_cost_usd: float | None = Field(
+        default=None, description="Estimated cost in USD (if applicable)"
     )
 
 
 class CapabilityManifest(BaseModel):
     """
     Complete capability manifest for RIF Runtime.
-    
+
     Declares all observable behaviors, side effects, access patterns, and evidence.
     Used for policy evaluation, execution sandboxing, and audit trail.
     """
-    
+
     # Identity
     name: str = Field(
         ...,
         min_length=1,
         max_length=255,
-        description="Capability name (e.g., 'shell_command', 'github_push')"
+        description="Capability name (e.g., 'shell_command', 'github_push')",
     )
-    version: str = Field(
-        default="1.0.0",
-        description="Semantic version of capability"
-    )
+    version: str = Field(default="1.0.0", description="Semantic version of capability")
     description: str = Field(
-        ...,
-        description="Human-readable description of what the capability does"
+        ..., description="Human-readable description of what the capability does"
     )
-    
+
     # Categorization
     category: Literal[
         "network",
@@ -218,110 +212,99 @@ class CapabilityManifest(BaseModel):
         "credential",
         "system",
         "external_service",
-        "data_processing"
-    ] = Field(
-        ...,
-        description="Primary category of capability"
-    )
-    
+        "data_processing",
+    ] = Field(..., description="Primary category of capability")
+
     # Side Effects
-    side_effects: List[SideEffectType] = Field(
-        default_factory=list,
-        description="List of all observable side effects"
+    side_effects: list[SideEffectType] = Field(
+        default_factory=list, description="List of all observable side effects"
     )
     mutates_state: bool = Field(
         default=False,
-        description="Whether capability mutates external state (not idempotent)"
+        description="Whether capability mutates external state (not idempotent)",
     )
-    
+
     # Access Patterns
     network_access: NetworkAccessSpec = Field(
         default_factory=NetworkAccessSpec,
-        description="Network access patterns and restrictions"
+        description="Network access patterns and restrictions",
     )
     filesystem_access: FilesystemAccessSpec = Field(
         default_factory=FilesystemAccessSpec,
-        description="Filesystem access patterns and restrictions"
+        description="Filesystem access patterns and restrictions",
     )
-    external_services: List[ExternalServiceSpec] = Field(
+    external_services: list[ExternalServiceSpec] = Field(
         default_factory=list,
-        description="External services this capability integrates with"
+        description="External services this capability integrates with",
     )
-    
+
     # Execution Constraints
     timeout_seconds: int = Field(
-        default=30,
-        ge=1,
-        le=3600,
-        description="Maximum execution time"
+        default=30, ge=1, le=3600, description="Maximum execution time"
     )
     max_retries: int = Field(
-        default=3,
-        ge=0,
-        description="Maximum retry attempts on failure"
+        default=3, ge=0, description="Maximum retry attempts on failure"
     )
-    
+
     # Auditability
-    evidence_requirements: List[EvidenceRequirement] = Field(
+    evidence_requirements: list[EvidenceRequirement] = Field(
         default_factory=list,
-        description="Evidence artifacts that must be captured for audit"
+        description="Evidence artifacts that must be captured for audit",
     )
     replayability: Replayability = Field(
         default=Replayability.DETERMINISTIC,
-        description="How safely this capability can be replayed"
+        description="How safely this capability can be replayed",
     )
-    
+
     # Cost & Performance
     cost_estimate: CostEstimate = Field(
-        default_factory=CostEstimate,
-        description="Cost and performance implications"
+        default_factory=CostEstimate, description="Cost and performance implications"
     )
-    
+
     # Input Parameters
-    parameters: Dict[str, Any] = Field(
+    parameters: dict[str, Any] = Field(
         default_factory=dict,
-        description="Input parameter schema (JSON Schema compatible)"
+        description="Input parameter schema (JSON Schema compatible)",
     )
-    required_parameters: List[str] = Field(
-        default_factory=list,
-        description="Required parameter names"
+    required_parameters: list[str] = Field(
+        default_factory=list, description="Required parameter names"
     )
-    
+
     # Governance
     requires_approval: bool = Field(
         default=False,
-        description="Whether policy must explicitly approve before execution"
+        description="Whether policy must explicitly approve before execution",
     )
-    approval_reason: Optional[str] = Field(
-        default=None,
-        description="Why approval is required (e.g., 'data deletion')"
+    approval_reason: str | None = Field(
+        default=None, description="Why approval is required (e.g., 'data deletion')"
     )
-    
+
     # Metadata
     author: str = Field(
-        default="rif-team",
-        description="Author/maintainer of this capability"
+        default="rif-team", description="Author/maintainer of this capability"
     )
-    tags: List[str] = Field(
-        default_factory=list,
-        description="Tags for categorization and discovery"
+    tags: list[str] = Field(
+        default_factory=list, description="Tags for categorization and discovery"
     )
-    
+
     # Validation
     @validator("version")
-    def validate_version(cls, v):
+    def validate_version(cls, v: str) -> str:
         """Ensure semantic versioning."""
         import re
+
         if not re.match(r"^\d+\.\d+\.\d+", v):
             raise ValueError("Version must follow semantic versioning (e.g., 1.0.0)")
         return v
-    
+
     @validator("side_effects", pre=True, always=True)
-    def validate_side_effects(cls, v, values):
+    def validate_side_effects(
+        cls, v: list[SideEffectType], values: dict[str, Any]
+    ) -> list[SideEffectType]:
         """Validate side effects are appropriate for category."""
         if not v:
             return v
-        
+
         category = values.get("category")
         allowed_for_category = {
             "network": [SideEffectType.NETWORK_EGRESS],
@@ -338,7 +321,7 @@ class CapabilityManifest(BaseModel):
             "external_service": [SideEffectType.EXTERNAL_SERVICE_MUTATION],
             "data_processing": [],
         }
-        
+
         if category in allowed_for_category:
             expected = set(allowed_for_category[category])
             actual = set(v)
@@ -346,11 +329,13 @@ class CapabilityManifest(BaseModel):
                 raise ValueError(
                     f"Side effects {actual} not appropriate for category {category}"
                 )
-        
+
         return v
-    
+
     @validator("network_access")
-    def validate_network_access(cls, v, values):
+    def validate_network_access(
+        cls, v: NetworkAccessSpec, values: dict[str, Any]
+    ) -> NetworkAccessSpec:
         """Ensure network access is declared if side effects indicate it."""
         side_effects = values.get("side_effects", [])
         if SideEffectType.NETWORK_EGRESS in side_effects and not v.enabled:
@@ -358,9 +343,11 @@ class CapabilityManifest(BaseModel):
                 "network_access.enabled must be True if NETWORK_EGRESS in side_effects"
             )
         return v
-    
+
     @validator("filesystem_access")
-    def validate_filesystem_access(cls, v, values):
+    def validate_filesystem_access(
+        cls, v: FilesystemAccessSpec, values: dict[str, Any]
+    ) -> FilesystemAccessSpec:
         """Ensure filesystem access is declared if side effects indicate it."""
         side_effects = values.get("side_effects", [])
         fs_effects = {
@@ -369,12 +356,15 @@ class CapabilityManifest(BaseModel):
         }
         if (fs_effects & set(side_effects)) and not v.enabled:
             raise ValueError(
-                "filesystem_access.enabled must be True if filesystem side effects present"
+                "filesystem_access.enabled must be True if filesystem "
+                "side effects present"
             )
         return v
-    
+
     @validator("replayability")
-    def validate_replayability(cls, v, values):
+    def validate_replayability(
+        cls, v: Replayability, values: dict[str, Any]
+    ) -> Replayability:
         """Validate replayability vs mutates_state."""
         mutates = values.get("mutates_state", False)
         if mutates and v == Replayability.DETERMINISTIC:

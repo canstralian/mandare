@@ -10,18 +10,17 @@ Real-world examples showing how to declare:
 """
 
 from rif_runtime.schemas.capability import (
-    CapabilityManifest,
-    SideEffectType,
-    Replayability,
-    EvidenceRequirement,
-    NetworkAccessSpec,
-    FilesystemAccessSpec,
-    ExternalServiceSpec,
-    CostEstimate,
-    NetworkProtocol,
     AccessLevel,
+    CapabilityManifest,
+    CostEstimate,
+    EvidenceRequirement,
+    ExternalServiceSpec,
+    FilesystemAccessSpec,
+    NetworkAccessSpec,
+    NetworkProtocol,
+    Replayability,
+    SideEffectType,
 )
-
 
 # ============================================================================
 # Example 1: Shell Command Execution
@@ -32,24 +31,21 @@ SHELL_COMMAND_MANIFEST = CapabilityManifest(
     version="1.0.0",
     description="Execute arbitrary shell commands in a sandboxed environment",
     category="process",
-    
     side_effects=[
         SideEffectType.PROCESS_EXECUTION,
         SideEffectType.ENVIRONMENT_MUTATION,
         SideEffectType.FILESYSTEM_WRITE,  # May write to temp
     ],
     mutates_state=True,  # Commands can have side effects
-    
     network_access=NetworkAccessSpec(
         enabled=False,  # Base shell doesn't need network; can be added via pipes
         timeout_seconds=60,
     ),
-    
     filesystem_access=FilesystemAccessSpec(
         enabled=True,
         access_level=AccessLevel.EXECUTE,
         allowed_paths=[
-            "/tmp/**",
+            "/tmp/**",  # nosec B108
             "/home/user/workspace/**",
         ],
         blocked_paths=[
@@ -61,12 +57,9 @@ SHELL_COMMAND_MANIFEST = CapabilityManifest(
         max_file_size_mb=500,
         max_total_size_mb=2000,
     ),
-    
     external_services=[],
-    
     timeout_seconds=60,
     max_retries=1,
-    
     evidence_requirements=[
         EvidenceRequirement(
             name="command_invoked",
@@ -99,9 +92,8 @@ SHELL_COMMAND_MANIFEST = CapabilityManifest(
             immutable=True,
         ),
     ],
-    
-    replayability=Replayability.NON_DETERMINISTIC,  # Commands often have non-deterministic output
-    
+    replayability=Replayability.NON_DETERMINISTIC,
+    # Commands often have non-deterministic output
     cost_estimate=CostEstimate(
         api_calls=0,
         data_transfer_mb=0.0,
@@ -109,7 +101,6 @@ SHELL_COMMAND_MANIFEST = CapabilityManifest(
         storage_mb=0.0,
         estimated_cost_usd=None,
     ),
-    
     parameters={
         "command": {
             "type": "string",
@@ -131,10 +122,10 @@ SHELL_COMMAND_MANIFEST = CapabilityManifest(
         },
     },
     required_parameters=["command"],
-    
     requires_approval=True,
-    approval_reason="Arbitrary code execution is high-risk; must be explicitly approved",
-    
+    approval_reason=(
+        "Arbitrary code execution is high-risk; must be explicitly approved"
+    ),
     author="rif-team",
     tags=["execution", "shell", "dangerous", "high-risk"],
 )
@@ -149,12 +140,10 @@ WEB_SEARCH_MANIFEST = CapabilityManifest(
     version="1.0.0",
     description="Search the web using Google/Bing and return results",
     category="network",
-    
     side_effects=[
         SideEffectType.NETWORK_EGRESS,
     ],
     mutates_state=False,  # No persistent side effects
-    
     network_access=NetworkAccessSpec(
         enabled=True,
         protocols=[NetworkProtocol.HTTPS],
@@ -170,11 +159,9 @@ WEB_SEARCH_MANIFEST = CapabilityManifest(
         require_tls=True,
         timeout_seconds=15,
     ),
-    
     filesystem_access=FilesystemAccessSpec(
         enabled=False,
     ),
-    
     external_services=[
         ExternalServiceSpec(
             name="google",
@@ -185,10 +172,8 @@ WEB_SEARCH_MANIFEST = CapabilityManifest(
             mutation_allowed=False,
         ),
     ],
-    
     timeout_seconds=20,
     max_retries=2,
-    
     evidence_requirements=[
         EvidenceRequirement(
             name="search_query",
@@ -215,9 +200,7 @@ WEB_SEARCH_MANIFEST = CapabilityManifest(
             immutable=True,
         ),
     ],
-    
     replayability=Replayability.NON_DETERMINISTIC,  # Search results may vary
-    
     cost_estimate=CostEstimate(
         api_calls=1,
         data_transfer_mb=0.5,
@@ -225,7 +208,6 @@ WEB_SEARCH_MANIFEST = CapabilityManifest(
         storage_mb=0.0,
         estimated_cost_usd=0.0,  # Free tier
     ),
-    
     parameters={
         "query": {
             "type": "string",
@@ -247,9 +229,7 @@ WEB_SEARCH_MANIFEST = CapabilityManifest(
         },
     },
     required_parameters=["query"],
-    
     requires_approval=False,
-    
     author="rif-team",
     tags=["search", "network", "read-only", "safe"],
 )
@@ -264,22 +244,19 @@ FILE_WRITE_MANIFEST = CapabilityManifest(
     version="1.0.0",
     description="Write or append content to a file",
     category="filesystem",
-    
     side_effects=[
         SideEffectType.FILESYSTEM_WRITE,
     ],
     mutates_state=True,
-    
     network_access=NetworkAccessSpec(
         enabled=False,
     ),
-    
     filesystem_access=FilesystemAccessSpec(
         enabled=True,
         access_level=AccessLevel.WRITE,
         allowed_paths=[
             "/home/user/workspace/**",
-            "/tmp/**",
+            "/tmp/**",  # nosec B108
             "/app/data/**",
         ],
         blocked_paths=[
@@ -292,12 +269,9 @@ FILE_WRITE_MANIFEST = CapabilityManifest(
         max_file_size_mb=100,
         max_total_size_mb=500,
     ),
-    
     external_services=[],
-    
     timeout_seconds=10,
     max_retries=1,
-    
     evidence_requirements=[
         EvidenceRequirement(
             name="file_path",
@@ -336,9 +310,7 @@ FILE_WRITE_MANIFEST = CapabilityManifest(
             immutable=True,
         ),
     ],
-    
     replayability=Replayability.IDEMPOTENT,  # Can be replayed safely if mode is 'write'
-    
     cost_estimate=CostEstimate(
         api_calls=0,
         data_transfer_mb=0.0,
@@ -346,7 +318,6 @@ FILE_WRITE_MANIFEST = CapabilityManifest(
         storage_mb=0.05,
         estimated_cost_usd=None,
     ),
-    
     parameters={
         "path": {
             "type": "string",
@@ -370,10 +341,10 @@ FILE_WRITE_MANIFEST = CapabilityManifest(
         },
     },
     required_parameters=["path", "content"],
-    
     requires_approval=True,
-    approval_reason="File writes must be explicitly approved to prevent accidental data loss",
-    
+    approval_reason=(
+        "File writes must be explicitly approved to prevent accidental data loss"
+    ),
     author="rif-team",
     tags=["filesystem", "write", "mutation", "requires-approval"],
 )
@@ -388,14 +359,12 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
     version="1.0.0",
     description="Push commits to a Git repository",
     category="external_service",
-    
     side_effects=[
         SideEffectType.EXTERNAL_SERVICE_MUTATION,
         SideEffectType.NETWORK_EGRESS,
         SideEffectType.CREDENTIAL_EXPOSURE,
     ],
     mutates_state=True,
-    
     network_access=NetworkAccessSpec(
         enabled=True,
         protocols=[NetworkProtocol.SSH, NetworkProtocol.HTTPS],
@@ -407,7 +376,6 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
         require_tls=True,
         timeout_seconds=60,
     ),
-    
     filesystem_access=FilesystemAccessSpec(
         enabled=True,
         access_level=AccessLevel.READ,
@@ -420,7 +388,6 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
         ],
         max_file_size_mb=500,
     ),
-    
     external_services=[
         ExternalServiceSpec(
             name="github",
@@ -431,10 +398,8 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
             mutation_allowed=True,
         ),
     ],
-    
     timeout_seconds=60,
     max_retries=2,
-    
     evidence_requirements=[
         EvidenceRequirement(
             name="repository_url",
@@ -467,9 +432,8 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
             immutable=True,
         ),
     ],
-    
-    replayability=Replayability.NON_IDEMPOTENT,  # Can't safely replay (creates duplicate commits)
-    
+    replayability=Replayability.NON_IDEMPOTENT,
+    # Can't safely replay (creates duplicate commits)
     cost_estimate=CostEstimate(
         api_calls=1,
         data_transfer_mb=10.0,
@@ -477,7 +441,6 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
         storage_mb=0.0,
         estimated_cost_usd=None,
     ),
-    
     parameters={
         "repo_path": {
             "type": "string",
@@ -501,10 +464,8 @@ GIT_PUSH_MANIFEST = CapabilityManifest(
         },
     },
     required_parameters=["repo_path"],
-    
     requires_approval=True,
     approval_reason="Git push mutates repository and must be explicitly approved",
-    
     author="rif-team",
     tags=["git", "network", "mutation", "credential-sensitive", "requires-approval"],
 )
@@ -519,12 +480,10 @@ HTTP_API_CALL_MANIFEST = CapabilityManifest(
     version="1.0.0",
     description="Make HTTP/HTTPS requests to APIs",
     category="network",
-    
     side_effects=[
         SideEffectType.NETWORK_EGRESS,
     ],
     mutates_state=False,  # Base HTTP is read-only (depends on endpoint)
-    
     network_access=NetworkAccessSpec(
         enabled=True,
         protocols=[NetworkProtocol.HTTP, NetworkProtocol.HTTPS],
@@ -537,11 +496,9 @@ HTTP_API_CALL_MANIFEST = CapabilityManifest(
         require_tls=True,
         timeout_seconds=30,
     ),
-    
     filesystem_access=FilesystemAccessSpec(
         enabled=False,
     ),
-    
     external_services=[
         ExternalServiceSpec(
             name="arbitrary_api",
@@ -552,10 +509,8 @@ HTTP_API_CALL_MANIFEST = CapabilityManifest(
             mutation_allowed=True,  # Depends on method
         ),
     ],
-    
     timeout_seconds=30,
     max_retries=2,
-    
     evidence_requirements=[
         EvidenceRequirement(
             name="http_method",
@@ -600,9 +555,7 @@ HTTP_API_CALL_MANIFEST = CapabilityManifest(
             immutable=True,
         ),
     ],
-    
     replayability=Replayability.NON_DETERMINISTIC,  # API responses vary
-    
     cost_estimate=CostEstimate(
         api_calls=1,
         data_transfer_mb=1.0,
@@ -610,7 +563,6 @@ HTTP_API_CALL_MANIFEST = CapabilityManifest(
         storage_mb=0.0,
         estimated_cost_usd=None,
     ),
-    
     parameters={
         "url": {
             "type": "string",
@@ -647,9 +599,7 @@ HTTP_API_CALL_MANIFEST = CapabilityManifest(
         },
     },
     required_parameters=["url"],
-    
     requires_approval=False,  # Depends on URL; policy should gate
-    
     author="rif-team",
     tags=["network", "api", "http", "read-heavy"],
 )
@@ -671,9 +621,9 @@ EXAMPLES = {
 if __name__ == "__main__":
     """Print all examples as JSON for reference."""
     import json
-    
+
     for name, manifest in EXAMPLES.items():
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"CAPABILITY: {name.upper()}")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         print(json.dumps(manifest.model_dump(), indent=2, default=str))
