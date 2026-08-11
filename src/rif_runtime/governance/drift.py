@@ -115,6 +115,11 @@ class DriftVector:
 
     @classmethod
     def from_events(cls, events: Sequence[PolicyDecision]) -> DriftVector:
+        """Summarise a window of decisions into the four drift dimensions.
+
+        An empty window yields an all-zero vector rather than raising: no
+        traffic is not evidence of drift, and callers poll this on a timer.
+        """
         if not events:
             return cls(0.0, 0.0, 0.0, 0.0)
         denial_rate = sum(1 for e in events if e.decision == "deny") / len(events)
