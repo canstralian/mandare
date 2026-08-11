@@ -48,6 +48,7 @@ supabase = [
 ]
 dev = [
     "pytest>=8.4",
+    "pytest-cov>=6.2,<8.0",
     "mypy>=1.18",
     "ruff>=0.12",
     "bandit>=1.8,<2.0",
