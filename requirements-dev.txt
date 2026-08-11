@@ -18,3 +18,5 @@ rfc3339-validator>=0.1.4,<0.2
 
 # Security
 bandit>=1.8,<2.0
+# Pinned in .github/workflows/bandit.yml; listed here so Dependabot can track bumps
+bandit-sarif-formatter==1.1.1

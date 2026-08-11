@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
   security-events: write
-  actions: read
+  actions: read  # required by upload-sarif to read workflow run metadata
 
 jobs:
   bandit:
@@ -25,12 +25,28 @@ jobs:
           python-version: "3.13"
           cache: pip
 
-      - run: python -m pip install --upgrade pip bandit[toml] bandit-sarif-formatter
+      # [toml] extra enables pyproject.toml-based bandit config if added later
+      # bandit-sarif-formatter pinned for SARIF schema compatibility; bandit floats to pick up security fixes
+      # bump bandit-sarif-formatter pin when upgrading bandit to verify SARIF schema compatibility
+      - run: python -m pip install --upgrade pip "bandit[toml]" "bandit-sarif-formatter==1.1.1"
 
       - run: bandit -r src -f sarif -o bandit.sarif
 
+      # jq is pre-installed on GitHub-hosted ubuntu runners
+      # runs on bandit success (0) or findings (1), but not on cancellation or pip/setup failures
+      - name: Validate SARIF is well-formed and non-empty
+        id: validate_sarif
+        if: success() || failure()
+        run: |
+          test -f bandit.sarif || { echo "::error::bandit.sarif not found — did bandit run?"; exit 1; }
+          test -s bandit.sarif || { echo "::error::bandit.sarif is empty"; exit 1; }
+          # jq empty validates JSON syntax; does not check SARIF schema beyond basic structure
+          jq empty bandit.sarif || { echo "::error::bandit.sarif is not valid JSON"; exit 1; }
+          jq -e '.runs | length > 0' bandit.sarif > /dev/null || { echo "::error::bandit.sarif missing required .runs[]"; exit 1; }
+
+      # Gate on validate outcome so malformed SARIF is never uploaded; still run when
+      # bandit exited 1 (findings) as long as validation succeeded.
       - uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        continue-on-error: true
+        if: (success() || failure()) && steps.validate_sarif.outcome == 'success'
         with:
           sarif_file: bandit.sarif
