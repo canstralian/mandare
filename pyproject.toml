@@ -59,6 +59,16 @@ dev = [
     # <0.16 is deliberate: quality.yml records that 0.16.0 re-sorts imports and
     # enables new lints, reddening main with no code change.
     "ruff>=0.12,<0.16",
+    # Also required by lint.yml, which installs nothing but this extra:
+    #   bandit  — the `bandit ... || true` step tolerates a failure, but the
+    #             following `cat bandit-report.json` does not, so a missing
+    #             bandit fails the job on the *next* line.
+    #   pytest-cov — the test-quality job runs `pytest --cov` and `coverage
+    #             json` against an 80% floor; neither is guarded.
+    # pip-audit is deliberately absent: its step is `|| true`, so a missing
+    # binary is harmless there.
+    "bandit[toml]>=1.7,<2.0",
+    "pytest-cov>=5.0,<8.0",
     # Required by tests/test_rif_familiar_contracts.py. Without these the
     # quality.yml `pip install -e ".[dev]"` path collects an ImportError even
     # though ci.yml (which installs requirements-dev.txt) passes.
