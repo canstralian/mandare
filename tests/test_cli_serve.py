@@ -33,7 +33,10 @@ def captured_uvicorn(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[st
     def _fake_run(_app: str, **kwargs: Any) -> None:
         calls.update(kwargs)
 
-    monkeypatch.setattr(cli.uvicorn, "run", _fake_run)
+    # Targeted by dotted path rather than `cli.uvicorn`: uvicorn is imported by
+    # cli, not re-exported from it, so the attribute access trips mypy strict's
+    # no_implicit_reexport under the `mypy src/ tests/` run in lint.yml.
+    monkeypatch.setattr("rif_runtime.cli.uvicorn.run", _fake_run)
     monkeypatch.chdir(tmp_path)
     return calls
 
