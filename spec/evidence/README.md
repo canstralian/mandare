@@ -8,13 +8,14 @@ action to be independently verifiable later.
 privacy-redacted, chained passive observation event, and is the seed contract for
 this directory.
 
-# Runtime implementation:
-# - Hash-chain primitives: `src/rif_runtime/audit.py`
-# - Decision evidence ledger (ADR-0002 canonical replay source):
-#   `src/rif_runtime/evidence/` — additive v1 envelope on `decisions.jsonl`
-#   (`schema_version`, `sequence`, `previous_hash`, `record_hash`) with
-#   legacy-row readability, `EvidenceLedger.verify_chain()`, and stable JSON
-#   export (`rif evidence-export`, `GET /v1/evidence/export`).
+## Runtime implementation
+
+- Hash-chain primitives: `src/rif_runtime/audit.py`
+- Decision evidence ledger (ADR-0002 canonical replay source):
+  `src/rif_runtime/evidence/` — additive v1 envelope on `decisions.jsonl`
+  (`schema_version`, `sequence`, `previous_hash`, `record_hash`) with
+  legacy-row readability, `EvidenceLedger.verify_chain()`, and stable JSON
+  export (`rif evidence-export`, `GET /v1/evidence/export`).
 
 ## Decision ledger v1 field justifications (replay)
 

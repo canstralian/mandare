@@ -85,23 +85,26 @@ class EvidenceLedger:
         chronological order without colliding sequence numbers.
         """
 
-        rows = self.store.read_all()
-        if not rows:
+        if not self.path.exists():
             return 0, None
 
         previous: str | None = None
         max_sequence = 0
-        for index, row in enumerate(rows, start=1):
-            if isinstance(row.get("sequence"), int):
-                max_sequence = max(max_sequence, row["sequence"])
-            else:
-                # Legacy row: treat file order as its implicit sequence.
-                max_sequence = max(max_sequence, index)
-            previous = (
-                row["record_hash"]
-                if isinstance(row.get("record_hash"), str) and row["record_hash"]
-                else content_hash(row)
-            )
+        with self.path.open(encoding="utf-8") as handle:
+            for index, line in enumerate(handle, start=1):
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if isinstance(row.get("sequence"), int):
+                    max_sequence = max(max_sequence, row["sequence"])
+                else:
+                    # Legacy row: treat file order as its implicit sequence.
+                    max_sequence = max(max_sequence, index)
+                previous = (
+                    row["record_hash"]
+                    if isinstance(row.get("record_hash"), str) and row["record_hash"]
+                    else content_hash(row)
+                )
         return max_sequence, previous
 
     @property
