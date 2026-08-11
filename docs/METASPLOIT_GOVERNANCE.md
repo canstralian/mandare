@@ -88,8 +88,11 @@ quickly. Verification denies with a specific boundary on each escalation route:
 
 ## Evidence
 
-Each decision emits a signed `EvidenceEvent` (HMAC over the canonical event),
-appended to `data/metasploit_evidence.jsonl`:
+Each recorded governance decision emits a signed `EvidenceEvent` (HMAC over
+the canonical event), appended to `data/metasploit_evidence.jsonl`. Dry-run
+evaluations (`record=False`) — including `/v1/mcp/invoke` and
+`/v1/mcp/metasploit/evaluate` — compute and return an `EvidenceEvent` but do
+not write it to the store:
 
 ```json
 {
