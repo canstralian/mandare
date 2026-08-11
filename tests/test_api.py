@@ -105,6 +105,73 @@ def test_posture_reset(monkeypatch):
     assert health.json()["posture"] == "normal"
 
 
+def test_posture_set_uses_locked_runtime_setter(monkeypatch):
+    # Regression: unlocked ``runtime.posture = ...`` raced evaluate/record and
+    # could stamp allow/normal while a concurrent lock was intended.
+    from rif_runtime import api
+
+    monkeypatch.setenv(ENV_VAR, "test-key")
+    headers = {"X-API-Key": "test-key"}
+
+    calls: list[str] = []
+    original = api.runtime.set_posture
+
+    def tracking_set(posture):
+        calls.append(str(posture))
+        return original(posture)
+
+    monkeypatch.setattr(api.runtime, "set_posture", tracking_set)
+    locked = client.post("/v1/posture/locked", headers=headers)
+    assert locked.status_code == 200
+    assert locked.json()["posture"] == "locked"
+    assert calls == ["locked"]
+    assert api.runtime.posture == "locked"
+    # Leave shared module runtime in a clean posture for later tests.
+    api.runtime.reset_posture()
+
+
+def test_posture_reset_clears_telemetry_so_escalation_does_not_snap_back(
+    monkeypatch,
+):
+    # Regression: reset only flipped the posture flag; residual denials in the
+    # 60m telemetry window made the next observe re-escalate immediately.
+    from rif_runtime import api
+    from rif_runtime.schemas import PolicyRequest
+
+    monkeypatch.setenv(ENV_VAR, "test-key")
+    headers = {"X-API-Key": "test-key"}
+
+    # Isolate from prior tests that share api.runtime (ratchet never de-escalates).
+    api.runtime.reset_posture()
+
+    # Drive three denials through the shared runtime (records into telemetry).
+    for i in range(3):
+        api.runtime.evaluate(
+            PolicyRequest(
+                actor="agent:reset-test",
+                action="http.request",
+                target=f"https://reset-evil-{i}.example.com",
+            )
+        )
+    assert api.runtime.posture == "elevated"
+    assert api.runtime.reflexive.telemetry.denial_count(60) >= 3
+
+    reset = client.post("/v1/posture/reset", headers=headers)
+    assert reset.status_code == 200
+    assert reset.json()["posture"] == "normal"
+    assert api.runtime.reflexive.telemetry.denial_count(60) == 0
+
+    # One more denial must not instantly re-elevate (needs 3 again).
+    api.runtime.evaluate(
+        PolicyRequest(
+            actor="agent:reset-test",
+            action="http.request",
+            target="https://reset-evil-after.example.com",
+        )
+    )
+    assert api.runtime.posture == "normal"
+
+
 def test_metasploit_token_bad_ttl_returns_422_not_500(monkeypatch):
     # int(None) and int({}) raise TypeError rather than ValueError, so these
     # payloads used to escape the handler's except clause as a 500 while a

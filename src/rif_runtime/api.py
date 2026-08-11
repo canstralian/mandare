@@ -101,14 +101,16 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
+    # Clear the telemetry window as well: otherwise residual denials in the
+    # 60m rolling window re-escalate on the next observe.
+    return {"posture": runtime.reset_posture().value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
-    return {"posture": runtime.posture}
+    # Use the locked setter so this write cannot race evaluate/record and
+    # stamp allow/normal while a concurrent lock is intended.
+    return {"posture": runtime.set_posture(posture).value}
 
 
 @app.get("/")
@@ -212,6 +214,21 @@ def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
     # the response is meaningful after a restart.
     return asdict(ReplayEngine().recover())
+
+
+@app.get("/v1/evidence/export")
+def evidence_export() -> dict[str, Any]:
+    """Stable JSON export of the decision evidence ledger (append order)."""
+
+    import json
+
+    ledger = runtime.evidence_ledger
+    chain = ledger.verify_chain()
+    return {
+        "schema_version": "rif.evidence.export/v1",
+        "records": json.loads(ledger.export_stable_json(indent=None)),
+        "chain": chain.as_dict(),
+    }
 
 
 @app.get("/v1/policies")

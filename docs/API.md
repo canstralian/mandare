@@ -10,5 +10,7 @@ POST /v1/mcp/metasploit/evaluate
 POST /v1/mcp/metasploit/token
 GET /v1/telemetry/summary
 GET /v1/persistence/summary
+GET /v1/recovered-state
+GET /v1/evidence/export
 GET /v1/audit
-POST /v1/runtime/reset-posture
+POST /v1/posture/reset

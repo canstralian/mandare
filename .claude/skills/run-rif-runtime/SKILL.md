@@ -57,8 +57,13 @@ Expected output (last two lines show the allow/deny pair):
 {"current":"RIF_Runtime","environments":{...}}
 {"agent":"agent:auditor",...}
 {"decision":"allow",...,"matched_rule":"policy.allow_known_model_hosts",...}
-{"decision":"deny",...,"posture":"elevated","matched_rule":"network.host.denied",...}
+{"decision":"deny",...,"posture":"normal","matched_rule":"network.host.denied",...}
 ```
+
+Note: the deny decision stamps the *live* posture at evaluation time (still
+`normal` after a single denial). Runtime posture escalates to `elevated` only
+after three denials in the rolling window — check `/health` after repeated
+denies if you need to observe escalation.
 
 Stop the server:
 
