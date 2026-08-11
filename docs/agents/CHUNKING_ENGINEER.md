@@ -23,7 +23,7 @@ Own the chunking stage: segmentation algorithms, content type coverage, and chun
 Before merging a chunker implementation:
 
 - [ ] Specification added to `docs/specifications/CHUNKING_SPEC.md`
-- [ ] Chunk IDs are `sha256(f"{record.id}:{chunk_index}").hexdigest()[:16]` (deterministic)
+- [ ] Chunk IDs are `sha256(f"{record.id}:{chunk_index}".encode("utf-8")).hexdigest()[:16]` (deterministic)
 - [ ] Chunker is pure (no I/O)
 - [ ] Empty input returns an empty list, not an error
 - [ ] Chunks below `min_chunk_tokens` are merged or annotated (not silently dropped)
@@ -39,7 +39,7 @@ Before merging a chunker implementation:
 
 The chunking output must be deterministic:
 
-```
+```text
 chunk(record_a) == chunk(record_a)   # same input, same output
 ```
 

@@ -134,7 +134,11 @@ Review the output:
 Manually inspect the first few records:
 
 ```bash
-head -5 /tmp/test-export/data.jsonl | python3 -m json.tool
+# The JSONL exporter names the output file <build_id>.jsonl by default.
+# Capture the build ID from the export output, or set output_filename: data.jsonl
+# in the profile to use a predictable name.
+BUILD_ID=$(rif-dataset build --config my-sft-v1 --dataset test-dataset --dry-run | grep build_id | awk '{print $2}')
+head -5 /tmp/test-export/${BUILD_ID}.jsonl | python3 -m json.tool
 ```
 
 Confirm the field names and values are correct for the downstream consumer.

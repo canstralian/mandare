@@ -50,7 +50,7 @@ min_chunk_tokens: 32
 
 A trace record is a sequence of messages that includes at least one tool call:
 
-```
+```text
 system → user → assistant (with tool_calls) → tool (result) → assistant → ...
 ```
 

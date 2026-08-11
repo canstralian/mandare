@@ -8,7 +8,7 @@ The pipeline does not branch on dataset identity, content type, or profile name 
 
 ## Configuration hierarchy
 
-```
+```text
 configs/
   pipeline/
     default.yaml            # base pipeline configuration

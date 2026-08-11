@@ -119,7 +119,7 @@ Plugins that perform I/O must:
 1. Accept a `BuildContext` parameter.
 2. Call `context.governance.evaluate(request)` before every I/O operation.
 3. Raise `GovernanceDenied` if the decision is `deny`.
-4. Record the governance decision in their output metadata or stage report.
+4. The governance decision is recorded automatically by `context.governance.evaluate(...)` in the audit trail. Recording the decision in plugin metadata or stage report is optional and supplemental — it does not replace or duplicate the authoritative audit record.
 
 Plugins that do not perform I/O have no governance requirements.
 

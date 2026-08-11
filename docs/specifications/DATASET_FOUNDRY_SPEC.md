@@ -24,7 +24,7 @@ The pipeline does not:
 
 ## Pipeline contract
 
-```
+```text
 Registry Entry
       │
       ▼

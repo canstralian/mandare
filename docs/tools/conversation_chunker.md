@@ -35,7 +35,7 @@ type: builtin
 # assistant_turn: each assistant message starts a new chunk
 exchange_boundary: user_turn
 
-# Maximum number of turns (user + assistant pairs) per chunk
+# Maximum number of user+assistant message pairs per chunk
 max_turns_per_chunk: 4
 
 # If true, the system message is prepended to every chunk
@@ -75,7 +75,7 @@ This format is compatible with OpenAI's chat completion format and with the `con
 
 ```python
 {
-    "turn_count": 2,               # number of turns in this chunk (excluding system)
+    "turn_count": 2,               # number of individual messages in this chunk (excluding system)
     "has_system_prompt": true,
     "message_roles": ["user", "assistant"],
     "chunk_type": "exchange",      # always "exchange" for this chunker

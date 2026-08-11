@@ -18,7 +18,9 @@ Segment Python source code into semantically meaningful chunks at AST node bound
 
 ## Output
 
-`list[DatasetChunk]` — one chunk per top-level AST definition.
+`list[DatasetChunk]` — one chunk per top-level AST definition, plus:
+- An import-block chunk when `include_imports=false` (imports not prepended to definitions)
+- Additional method chunks when `extract_methods=true` (one chunk per method, alongside the class chunk)
 
 ## Effect
 
@@ -64,7 +66,7 @@ The AST chunker parses the input with Python's `ast` module. It identifies top-l
 ## Chunk IDs
 
 ```python
-chunk_id = sha256(f"{record.id}:{chunk_index}").hexdigest()[:16]
+chunk_id = sha256(f"{record.id}:{chunk_index}".encode("utf-8")).hexdigest()[:16]
 ```
 
 `chunk_index` is the zero-based position of the chunk within the record's output list.

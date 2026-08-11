@@ -82,7 +82,7 @@ For datasets > 1M rows, use `row_group_size: 10000` for a balance of memory and 
 
 ## Output filename
 
-```
+```text
 <output_path>/<build_id>.parquet
 ```
 

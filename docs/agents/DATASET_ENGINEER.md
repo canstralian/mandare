@@ -50,7 +50,7 @@ Before marking a stage implementation complete:
 
 Owns implementation in:
 
-```
+```text
 src/rif_runtime/dataset/
   pipeline.py
   context.py

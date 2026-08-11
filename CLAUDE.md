@@ -226,13 +226,14 @@ policy engine.
 7. **License first.** No dataset enters the registry without a classified license config.
    No record with `license_status=incompatible` appears in any export artifact.
 
-8. **No publication without human review.** Publishing to HuggingFace Hub requires License
-   Governor and Quality Reviewer sign-off. The `hf_exporter` enforces a PUBLISH governance
-   evaluation; the policy must be explicitly configured to allow it.
+8. **No publication without human review.** When implemented, publishing to HuggingFace Hub
+   will require License Governor and Quality Reviewer sign-off. The `hf_exporter` will enforce
+   a PUBLISH governance evaluation; the policy must be explicitly configured to allow it.
+   (Dataset Foundry is currently specification-only; no implementation exists yet.)
 
 Key documentation:
 
-```
+```text
 docs/INDEX.md                              Navigation index for all docs
 docs/PROJECT_MANIFEST.md                   What the Dataset Foundry is
 docs/DEVELOPMENT_WORKFLOW.md               How to contribute

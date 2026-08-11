@@ -35,7 +35,7 @@ Pipeline behavior is defined in YAML configuration files. The pipeline executor 
 
 ### 3. Configuration directory under `configs/`
 
-```
+```text
 configs/
   pipeline/   datasets/   chunkers/   licenses/
   profiles/   quality/    exporters/  plugins/
@@ -61,7 +61,7 @@ The `DatasetManifest` records every source, configuration, stage output, and pol
 
 ### 8. Module layout
 
-```
+```text
 src/rif_runtime/
   dataset/
     registry.py     pipeline.py     context.py     governance.py     lineage.py
@@ -75,7 +75,7 @@ The `dataset/` subpackage depends on `rif_runtime.policy` (one-way). It does not
 
 A `rif-dataset` CLI (separate Typer app or subcommand) exposes:
 
-```
+```text
 rif-dataset build
 rif-dataset validate-config
 rif-dataset validate-registry

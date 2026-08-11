@@ -18,7 +18,7 @@ Configuration selects which implementation runs at each stage. The graph topolog
 
 ## Stage graph
 
-```
+```text
 DatasetRegistryEntry
         │
         ▼
@@ -171,7 +171,7 @@ Parallel stage execution (fan-out across multiple datasets) is a pipeline orches
 
 ## Configuration file layout
 
-```
+```text
 configs/
   pipeline/
     default.yaml            # default pipeline configuration

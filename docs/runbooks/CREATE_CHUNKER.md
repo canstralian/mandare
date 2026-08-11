@@ -8,7 +8,7 @@ Use when the built-in chunkers (AST, Markdown, Conversation, Trace, SlidingWindo
 
 - A clear definition of what a "chunk" means for the target content type
 - An understanding of the quality and size constraints for the downstream training objective
-- A chunker ID (lowercase alphanumeric with hyphens, ending in `_chunker`)
+- A chunker ID (lowercase alphanumeric with hyphens or underscores, ending in `_chunker` — e.g., `sql_chunker`)
 
 ## Steps
 

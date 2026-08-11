@@ -12,7 +12,7 @@ No registry entry → no ingestion. The pipeline does not accept arbitrary sourc
 
 ## Registry layout
 
-```
+```text
 configs/datasets/
   <id>.yaml         # one file per dataset
 ```

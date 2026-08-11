@@ -65,7 +65,7 @@ Plugin scorers that require network access (perplexity, reward) are governed:
 - Verify the endpoint is in the allowed hosts list for the runtime environment
 - Confirm the `PUBLISH` or `READ` policy is configured for the endpoint
 
-If the scoring endpoint is not in the policy, the scorer will be governance-denied and fall back to the heuristic scorer.
+If the scoring endpoint is not in the policy, the scorer will be governance-denied: the stage raises `GovernanceDenied`, the build halts, and the denial is recorded in the audit trail. There is no automatic fallback. To use the heuristic scorer instead, configure the pipeline with `quality_scorer_id: heuristic_scorer`.
 
 ---
 

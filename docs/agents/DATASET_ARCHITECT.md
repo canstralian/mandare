@@ -31,7 +31,7 @@ Optimize for explicit contracts, configuration-driven behavior, immutable artifa
 
 ## Architecture spine
 
-```
+```text
 Registry Entry
       │
       ▼
