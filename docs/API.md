@@ -11,4 +11,5 @@ POST /v1/mcp/metasploit/token
 GET /v1/telemetry/summary
 GET /v1/persistence/summary
 GET /v1/audit
-POST /v1/runtime/reset-posture
+GET /v1/drift/recommend
+POST /v1/posture/reset
