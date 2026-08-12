@@ -101,13 +101,13 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
+    runtime.set_posture(Posture.normal)
     return {"posture": runtime.posture.value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
+    runtime.set_posture(posture)
     return {"posture": runtime.posture}
 
 

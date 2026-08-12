@@ -2,6 +2,7 @@ from run_session import ScriptedAgent, run_session
 from sandbox_exec import run_in_sandbox
 from score import score_session
 
+from rif_runtime.config import reset_settings
 from rif_runtime.runtime import RIFRuntime
 
 
@@ -64,30 +65,37 @@ def test_run_session_clean_solution_has_no_regression():
     assert all(not event["regression_detected"] for event in result["events"])
 
 
-def test_run_session_detects_first_regression_and_escalates_posture():
-    agent = ScriptedAgent(
-        name="static-regresses",
-        states=[CORRECT_V1, CORRECT_V2, BROKEN_V1, BROKEN_V1, BROKEN_V1],
-    )
-    runtime = RIFRuntime()
-    session = run_session(ADD_ONE_TASK, agent, runtime=runtime)
+def test_run_session_detects_first_regression_and_escalates_posture(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    reset_settings()
+    try:
+        agent = ScriptedAgent(
+            name="static-regresses",
+            states=[CORRECT_V1, CORRECT_V2, BROKEN_V1, BROKEN_V1, BROKEN_V1],
+        )
+        runtime = RIFRuntime()
+        session = run_session(ADD_ONE_TASK, agent, runtime=runtime)
 
-    result = session["result"]
-    assert result["turns_attempted"] == 4
-    assert result["first_regression_turn"] == 2
-    assert result["mst_score"] == 1
+        result = session["result"]
+        assert result["turns_attempted"] == 4
+        assert result["first_regression_turn"] == 2
+        assert result["mst_score"] == 1
 
-    events = result["events"]
-    assert events[0]["tests_passed"] is True
-    assert events[1]["tests_passed"] is False
-    assert events[1]["regression_detected"] is True
-    # the regression is only the *first* one; later failing turns aren't
-    # re-flagged as new regressions
-    assert events[2]["regression_detected"] is False
-    assert events[3]["regression_detected"] is False
+        events = result["events"]
+        assert events[0]["tests_passed"] is True
+        assert events[1]["tests_passed"] is False
+        assert events[1]["regression_detected"] is True
+        # the regression is only the *first* one; later failing turns aren't
+        # re-flagged as new regressions
+        assert events[2]["regression_detected"] is False
+        assert events[3]["regression_detected"] is False
 
-    # three verification failures (turns 2-4) escalate posture, exactly
-    # like any other run of denials would
-    assert session["posture_start"] == "normal"
-    assert session["posture_end"] == "elevated"
-    assert runtime.posture == "elevated"
+        # three verification failures (turns 2-4) escalate posture, exactly
+        # like any other run of denials would
+        assert session["posture_start"] == "normal"
+        assert session["posture_end"] == "elevated"
+        assert runtime.posture == "elevated"
+    finally:
+        reset_settings()

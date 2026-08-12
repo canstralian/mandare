@@ -1,7 +1,8 @@
 import threading
+from pathlib import Path
 from typing import Any
 
-from .config import load_config
+from .config import get_settings, load_config
 from .configuration.policies import PolicyStore
 from .governance.posture import escalate_posture
 from .governance.reflexive import ReflexiveLoop
@@ -21,17 +22,31 @@ from .storage.jsonl import JsonlStore
 class RIFRuntime:
     def __init__(self) -> None:
         self.config = load_config()
-        self.environment_name = self.config.default_environment
+        data_dir = Path(get_settings().paths.data_dir)
+        _settings_env = get_settings().runtime.environment
+        self.environment_name = (
+            _settings_env
+            if _settings_env in self.config.environments
+            else self.config.default_environment
+        )
         self.posture = Posture.normal
         self.policy = PolicyEngine()
-        self.policy_store = PolicyStore()
+        self.policy_store = PolicyStore(str(data_dir / "policies.json"))
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
-        self.decisions_store = JsonlStore("data/decisions.jsonl")
-        self.posture_store = JsonlStore("data/posture_history.jsonl")
+        self.decisions_store = JsonlStore(data_dir / "decisions.jsonl")
+        self.posture_store = JsonlStore(data_dir / "posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
-        self.evidence_store = JsonlStore("data/metasploit_evidence.jsonl")
-        self._lock = threading.Lock()
+        self.evidence_store = JsonlStore(data_dir / "metasploit_evidence.jsonl")
+        self._lock = threading.RLock()
+        # Restore last known posture from persisted history so a restart
+        # honours a previously locked (or escalated) runtime.
+        _transitions = self.posture_store.read_all()
+        if _transitions:
+            try:
+                self.posture = Posture(_transitions[-1]["new_posture"])
+            except (ValueError, KeyError):
+                pass
 
     @property
     def profile(self) -> EnvironmentProfile:
@@ -42,21 +57,40 @@ class RIFRuntime:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
 
+    def set_posture(self, posture: Posture) -> Posture:
+        """Set live posture and append posture_history when it changes.
+
+        Control-plane mutations (reset / set) must persist so a restart
+        restores the same posture that operators just applied.
+        """
+        with self._lock:
+            old_posture = self.posture
+            if old_posture != posture:
+                self.posture = posture
+                self.posture_store.append(
+                    {
+                        "old_posture": str(old_posture),
+                        "new_posture": str(self.posture),
+                    },
+                )
+            return self.posture
+
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
-        decision = self.policy.evaluate(
-            req,
-            self.environment_name,
-            self.profile,
-            self.posture,
-            self.policy_store.list(),
-        )
-        # record=False is a side-effect-free dry run: return the computed
-        # decision without mutating posture or appending to the JSONL stores.
-        # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
-        # they cannot drive posture escalation or flood the audit log.
-        if not record:
-            return decision
-        return self.record_decision(decision)
+        with self._lock:
+            decision = self.policy.evaluate(
+                req,
+                self.environment_name,
+                self.profile,
+                self.posture,
+                self.policy_store.list(),
+            )
+            # record=False is a side-effect-free dry run: return the computed
+            # decision without mutating posture or appending to the JSONL stores.
+            # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
+            # they cannot drive posture escalation or flood the audit log.
+            if not record:
+                return decision
+            return self.record_decision(decision)
 
     def record_decision(self, decision: PolicyDecision) -> PolicyDecision:
         """Feed an already-computed decision through the governance circuit.
@@ -67,17 +101,18 @@ class RIFRuntime:
         `PolicyEngine.evaluate()` itself but should still drive posture
         escalation and land in the audit trail.
         """
-        self.governance_graph.record_decision(decision)
-        old_posture = self.posture
-        self.posture = self.reflexive.observe(decision, self.posture)
+        with self._lock:
+            self.governance_graph.record_decision(decision)
+            old_posture = self.posture
+            self.posture = self.reflexive.observe(decision, self.posture)
 
-        self.decisions_store.append(decision.model_dump())
+            self.decisions_store.append(decision.model_dump())
 
-        if old_posture != self.posture:
-            self.posture_store.append(
-                {"old_posture": str(old_posture), "new_posture": str(self.posture)}
-            )
-        return decision
+            if old_posture != self.posture:
+                self.posture_store.append(
+                    {"old_posture": str(old_posture), "new_posture": str(self.posture)},
+                )
+            return decision
 
     def evaluate_metasploit(
         self,

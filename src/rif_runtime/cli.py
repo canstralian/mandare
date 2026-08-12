@@ -30,7 +30,8 @@ if __name__ == "__main__":
 
 
 @app.command()
-def replay(decisions_path: str = "data/decisions.jsonl") -> None:
+def replay(decisions_path: str | None = None) -> None:
+    # None → ReplayEngine resolves via get_settings().paths.data_dir (RIF_DATA_DIR).
     state = ReplayEngine(decisions_path).recover()
     print(state.__dict__)
 
