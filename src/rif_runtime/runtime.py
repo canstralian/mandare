@@ -57,6 +57,24 @@ class RIFRuntime:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
 
+    def set_posture(self, posture: Posture) -> Posture:
+        """Set live posture and append posture_history when it changes.
+
+        Control-plane mutations (reset / set) must persist so a restart
+        restores the same posture that operators just applied.
+        """
+        with self._lock:
+            old_posture = self.posture
+            if old_posture != posture:
+                self.posture = posture
+                self.posture_store.append(
+                    {
+                        "old_posture": str(old_posture),
+                        "new_posture": str(self.posture),
+                    },
+                )
+            return self.posture
+
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
         with self._lock:
             decision = self.policy.evaluate(
