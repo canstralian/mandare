@@ -27,10 +27,16 @@ COPY . .
 RUN python -m pip install -e .
 
 # Persistent JSONL ledger lives here; mount a volume at this path in production.
+# NOTE: Fly volume mounts replace this directory at runtime (often root-owned),
+# so ownership is re-applied in scripts/docker-entrypoint.sh before dropping
+# privileges — build-time chown alone is not sufficient.
 RUN mkdir -p /app/data && chown appuser /app/data
 
-USER appuser
+COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 8000
 
+# Stay root for ENTRYPOINT so volume chown works; entrypoint drops to appuser.
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["uvicorn", "rif_runtime.api:app", "--host", "0.0.0.0", "--port", "8000"]
