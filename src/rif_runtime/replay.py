@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .config import get_settings
 from .graph.memory import GovernanceGraph
 from .schemas import Decision, PolicyDecision, Posture
 
@@ -17,9 +18,18 @@ class RecoveredState:
     last_posture: str
 
 
+def _default_decisions_path() -> Path:
+    """Resolve decisions.jsonl from settings so RIF_DATA_DIR is honoured."""
+    return Path(get_settings().paths.data_dir) / "decisions.jsonl"
+
+
 class ReplayEngine:
-    def __init__(self, decisions_path: str = "data/decisions.jsonl"):
-        self.decisions_path = Path(decisions_path)
+    def __init__(self, decisions_path: str | Path | None = None):
+        self.decisions_path = (
+            Path(decisions_path)
+            if decisions_path is not None
+            else _default_decisions_path()
+        )
 
     def _rows(self) -> list[dict[str, Any]]:
         import json
