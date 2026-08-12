@@ -37,10 +37,13 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
   single decision: `rif check "agent:test" "http.request" "https://blocked.example.com"`.
   Action names matter: only real network actions (`http.request`, `api.call`,
   `mcp.invoke`, `package.install`) are checked against `allowed_hosts`.
-- Running any real `RIFRuntime()` (server, CLI, or most tests) appends to
-  `data/decisions.jsonl` / `data/posture_history.jsonl` (gitignored) — expected
-  and harmless. Posture accumulates across runs, so a fresh checkout may already
-  show non-`normal` posture from prior runs.
+- Running any real `RIFRuntime()` (server or CLI) appends to
+  `decisions.jsonl` / `posture_history.jsonl` under the configured data
+  directory (`RIF_DATA_DIR`, default `data/`, gitignored) — expected and
+  harmless. Posture is restored from those logs at startup, so a run that
+  escalated to `locked` leaves the next `rif check` locked too; clear it with
+  `POST /v1/posture/reset` or by pointing `RIF_DATA_DIR` elsewhere. The test
+  suite isolates itself into a temp directory (`tests/conftest.py`).
 
 ## Local Cursor CLI hardening (optional, single-user)
 

@@ -159,11 +159,21 @@ BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
   metadata before committing. The version consistency test
   (`tests/test_version.py`) will catch any drift when the package is
   installed (as CI always does via `pip install -e .` before `pytest`).
-- Tests that instantiate `RIFRuntime()` write real records into
-  `data/decisions.jsonl` and `data/posture_history.jsonl` (gitignored) as a
-  side effect — there's no fixture isolating this. `tests/test_policy_store.py`
-  is the one place that uses `tmp_path` correctly; follow that pattern for new
-  tests that touch persistent storage where isolation matters.
+- **All persistent state lives under one configured directory.**
+  `RIFRuntime(data_dir=...)` (defaulting to `RIF_DATA_DIR` / `[paths] data_dir`)
+  owns `policies.json`, `decisions.jsonl`, `posture_history.jsonl` and
+  `metasploit_evidence.jsonl`; `ReplayEngine()` and `rif replay` default to the
+  same directory. Don't reintroduce a literal `data/…` path in code.
+- **Posture is restored at startup**, not reset to `normal`:
+  `RIFRuntime.__init__` reads the last transition from `posture_history.jsonl`
+  (falling back to replaying `decisions.jsonl`), so a `locked` runtime stays
+  locked across a restart. Operator posture changes must therefore go through
+  `RIFRuntime.set_posture()`, which records the transition — a bare
+  `runtime.posture = …` assignment is not durable.
+- `tests/conftest.py` points `RIF_DATA_DIR` at a per-session temp directory, so
+  tests that instantiate `RIFRuntime()` no longer touch the repo's `data/`.
+  Pass `RIFRuntime(data_dir=tmp_path)` when a test needs its own isolated
+  state (see `tests/test_runtime_restore.py`).
 - `data/policies.json` is checked into git (it's the seed/default state);
   `data/*.jsonl` files are gitignored. Don't flip that.
 

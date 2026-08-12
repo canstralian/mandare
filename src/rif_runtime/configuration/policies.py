@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
+from ..config import get_settings
 from ..schemas import Decision
 from .store import JsonStore
 
@@ -36,7 +39,11 @@ DEFAULT_POLICIES = {
 
 
 class PolicyStore:
-    def __init__(self, path: str = "data/policies.json"):
+    def __init__(self, path: str | Path | None = None):
+        # RIFRuntime passes its configured data_dir; standalone callers fall
+        # back to the same configured directory rather than a literal "data/".
+        if path is None:
+            path = Path(get_settings().paths.data_dir) / "policies.json"
         self.store = JsonStore(path, DEFAULT_POLICIES)
 
     def list(self) -> list[PolicyRule]:

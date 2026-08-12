@@ -26,8 +26,16 @@ from rif_runtime.config import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_singleton() -> Generator[None, None, None]:
-    """Ensure the module-level singleton is cleared between tests."""
+def _reset_singleton(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Clear the settings singleton and ambient RIF_* overrides per test.
+
+    These are loader contract tests, so they must see declared defaults. The
+    suite-wide RIF_DATA_DIR set in conftest.py (state isolation for RIFRuntime)
+    would otherwise leak in as an override; tests that exercise overrides set
+    their own env vars in the test body, after this fixture has run.
+    """
+    for env_key in ("RIF_DATA_DIR", "RIF_CONFIG_DIR"):
+        monkeypatch.delenv(env_key, raising=False)
     reset_settings()
     yield
     reset_settings()

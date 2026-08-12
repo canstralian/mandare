@@ -30,8 +30,13 @@ if __name__ == "__main__":
 
 
 @app.command()
-def replay(decisions_path: str = "data/decisions.jsonl") -> None:
-    state = ReplayEngine(decisions_path).recover()
+def replay(decisions_path: str = "") -> None:
+    """Rebuild graph and posture state from a decisions log.
+
+    Defaults to decisions.jsonl under the configured data directory
+    (RIF_DATA_DIR, or [paths] data_dir in rif.toml).
+    """
+    state = ReplayEngine(decisions_path or None).recover()
     print(state.__dict__)
 
 
