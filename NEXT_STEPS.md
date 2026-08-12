@@ -59,9 +59,9 @@ Ensure CI/CD passes locally before pushing.
 ### 5. Implement Core Capabilities
 Choose 2-3 highest-value capabilities to build out:
 
-```python
+```text
 # Example: HTTP Capability (if not implemented)
-src / rif_runtime / capabilities / http_capability.py
+src/rif_runtime/capabilities/http_capability.py
 
 # Template from ARCHITECTURE.md:
 # - Parse HTTP intent
