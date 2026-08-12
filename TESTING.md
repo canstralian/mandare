@@ -44,29 +44,31 @@ import pytest
 from rif_runtime.policy import PolicyEngine
 from rif_runtime.schemas import PolicyDecision
 
+
 @pytest.fixture
 def policy_engine():
     return PolicyEngine(policy_file="tests/fixtures/policies.yaml")
 
+
 def test_policy_allow_trusted_actor(policy_engine):
     """Trusted actors should be allowed by default."""
     result = policy_engine.evaluate(
-        actor="agent:trusted",
-        action="http.request",
-        target="https://api.anthropic.com"
+        actor="agent:trusted", action="http.request", target="https://api.anthropic.com"
     )
     assert result.decision == "allow"
     assert result.rationale == "actor in trusted_actors"
+
 
 def test_policy_deny_unknown_target(policy_engine):
     """Requests to unknown targets should require explicit approval."""
     result = policy_engine.evaluate(
         actor="agent:trusted",
         action="http.request",
-        target="https://unknown-api.example.com"
+        target="https://unknown-api.example.com",
     )
     assert result.decision == "deny"
     assert "unknown target" in result.rationale.lower()
+
 
 def test_policy_evaluation_with_context(policy_engine):
     """Policy should consider execution context."""
@@ -74,7 +76,7 @@ def test_policy_evaluation_with_context(policy_engine):
         actor="agent:untrusted",
         action="file.write",
         target="/etc/passwd",
-        context={"sandbox_level": "strict"}
+        context={"sandbox_level": "strict"},
     )
     assert result.decision == "deny"
 ```
@@ -87,9 +89,11 @@ import pytest
 from rif_runtime.execution.compiler import IntentCompiler
 from rif_runtime.schemas import CommandObject
 
+
 @pytest.fixture
 def compiler():
     return IntentCompiler()
+
 
 def test_simple_intent_parsing(compiler):
     """Parse simple HTTP intent."""
@@ -97,6 +101,7 @@ def test_simple_intent_parsing(compiler):
     assert cmd.action == "http.request"
     assert cmd.method == "POST"
     assert cmd.target == "https://api.example.com/resource"
+
 
 def test_intent_validation(compiler):
     """Invalid intent should raise ValidationError."""
@@ -115,46 +120,43 @@ Test component interaction and data flow through multiple layers.
 import pytest
 from rif_runtime.runtime import RIFRuntime
 
+
 @pytest.fixture
 def runtime(tmp_path):
-    return RIFRuntime(
-        config_dir="tests/fixtures",
-        data_dir=str(tmp_path)
-    )
+    return RIFRuntime(config_dir="tests/fixtures", data_dir=str(tmp_path))
+
 
 def test_full_policy_evaluation_pipeline(runtime):
     """End-to-end policy evaluation should record evidence."""
     result = runtime.evaluate_intent(
-        intent="POST https://api.example.com/data",
-        actor="agent:test"
+        intent="POST https://api.example.com/data", actor="agent:test"
     )
-    
+
     # Check decision was made
     assert result.decision_id is not None
     assert result.decision in ["allow", "deny"]
-    
+
     # Check evidence was recorded
     decision = runtime.storage.get_decision(result.decision_id)
     assert decision is not None
     assert decision["actor"] == "agent:test"
     assert decision["timestamp"] is not None
 
+
 def test_policy_reload_reflects_changes(runtime):
     """Runtime should reflect policy changes on reload."""
     # Initial evaluation
     result1 = runtime.evaluate_intent(
-        intent="POST https://api.example.com/data",
-        actor="agent:new"
+        intent="POST https://api.example.com/data", actor="agent:new"
     )
     assert result1.decision == "deny"  # Not in initial policy
-    
+
     # Reload with updated policy
     runtime.reload_policies("tests/fixtures/policies.updated.yaml")
-    
+
     # Should now allow
     result2 = runtime.evaluate_intent(
-        intent="POST https://api.example.com/data",
-        actor="agent:new"
+        intent="POST https://api.example.com/data", actor="agent:new"
     )
     assert result2.decision == "allow"
 ```
@@ -172,43 +174,42 @@ import json
 import zipfile
 from rif_runtime.runtime import RIFRuntime
 
+
 @pytest.fixture
 def runtime_e2e(tmp_path):
     return RIFRuntime(
-        config_dir="tests/fixtures",
-        data_dir=str(tmp_path),
-        mode="e2e_test"
+        config_dir="tests/fixtures", data_dir=str(tmp_path), mode="e2e_test"
     )
+
 
 def test_full_http_execution_workflow(runtime_e2e, tmp_path, requests_mock):
     """Complete workflow: intent → policy → execution → evidence."""
-    
+
     # Mock external HTTP endpoint
     requests_mock.post(
-        "https://api.example.com/resource",
-        json={"id": "123", "status": "created"}
+        "https://api.example.com/resource", json={"id": "123", "status": "created"}
     )
-    
+
     # Execute intent
     result = runtime_e2e.execute_intent(
         intent='POST https://api.example.com/resource {"name": "test"}',
-        actor="agent:e2e_test"
+        actor="agent:e2e_test",
     )
-    
+
     assert result.success is True
     assert result.execution_id is not None
-    
+
     # Verify evidence was recorded
     decision = runtime_e2e.storage.get_decision(result.decision_id)
     assert decision["result"] == "allow"
-    
+
     posture = runtime_e2e.storage.get_posture(result.posture_id)
     assert posture["runtime_version"] is not None
-    
+
     # Export evidence bundle
     bundle_path = tmp_path / "evidence.zip"
     runtime_e2e.export_evidence(result.execution_id, str(bundle_path))
-    
+
     # Verify bundle contents
     with zipfile.ZipFile(bundle_path) as zf:
         files = zf.namelist()
@@ -224,32 +225,34 @@ def test_full_http_execution_workflow(runtime_e2e, tmp_path, requests_mock):
 import pytest
 from rif_runtime.replay import ReplayEngine
 
+
 @pytest.fixture
 def replay_engine(runtime_e2e):
     return ReplayEngine(runtime=runtime_e2e)
 
+
 def test_replay_execution_determinism(runtime_e2e, replay_engine, requests_mock):
     """Replaying execution should produce identical results."""
-    
+
     # Mock endpoint with consistent responses
     requests_mock.post(
         "https://api.example.com/resource",
-        json={"result": "success", "timestamp": "fixed"}
+        json={"result": "success", "timestamp": "fixed"},
     )
-    
+
     # Original execution
     exec1 = runtime_e2e.execute_intent(
         intent='POST https://api.example.com/resource {"data": "test"}',
-        actor="agent:replay_test"
+        actor="agent:replay_test",
     )
-    
+
     # Replay execution
     exec2 = replay_engine.replay(exec1.execution_id)
-    
+
     # Compare outcomes
     result1 = runtime_e2e.storage.get_execution(exec1.execution_id)
     result2 = runtime_e2e.storage.get_execution(exec2.execution_id)
-    
+
     assert result1["http_status"] == result2["http_status"]
     assert result1["response_body"] == result2["response_body"]
 ```
@@ -264,31 +267,33 @@ import tempfile
 from pathlib import Path
 from rif_runtime.runtime import RIFRuntime
 
+
 @pytest.fixture
 def tmp_config_dir(tmp_path):
     """Create temporary config directory with test fixtures."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    
+
     # Copy fixture files
     import shutil
+
     for file in Path("tests/fixtures").glob("*.yaml"):
         shutil.copy(file, config_dir / file.name)
-    
+
     return config_dir
+
 
 @pytest.fixture
 def runtime(tmp_path, tmp_config_dir):
     """Configured runtime for testing."""
-    return RIFRuntime(
-        config_dir=str(tmp_config_dir),
-        data_dir=str(tmp_path)
-    )
+    return RIFRuntime(config_dir=str(tmp_config_dir), data_dir=str(tmp_path))
+
 
 @pytest.fixture
 def sample_decisions():
     """Load sample decisions for testing."""
     import json
+
     with open("tests/fixtures/sample_decisions.jsonl") as f:
         return [json.loads(line) for line in f]
 ```
@@ -355,16 +360,16 @@ Benchmark critical paths:
 # tests/performance/test_policy_throughput.py
 import pytest
 
+
 @pytest.mark.performance
 def test_policy_evaluation_throughput(benchmark, policy_engine):
     """Policy evaluation should complete < 50ms."""
+
     def evaluate():
         return policy_engine.evaluate(
-            actor="agent:test",
-            action="http.request",
-            target="https://api.example.com"
+            actor="agent:test", action="http.request", target="https://api.example.com"
         )
-    
+
     result = benchmark(evaluate)
     assert result.decision in ["allow", "deny"]
 ```
@@ -386,12 +391,13 @@ def test_intent_injection_prevention(compiler):
     with pytest.raises(ValueError):
         compiler.compile(malicious)
 
+
 def test_policy_bypass_prevention(policy_engine):
     """Policy evaluation should resist bypass attempts."""
     result = policy_engine.evaluate(
         actor="agent:test",
         action="http.request",
-        target="https://api.example.com/../../../etc/passwd"
+        target="https://api.example.com/../../../etc/passwd",
     )
     assert result.decision == "deny"
 ```

@@ -61,7 +61,7 @@ Choose 2-3 highest-value capabilities to build out:
 
 ```python
 # Example: HTTP Capability (if not implemented)
-src/rif_runtime/capabilities/http_capability.py
+src / rif_runtime / capabilities / http_capability.py
 
 # Template from ARCHITECTURE.md:
 # - Parse HTTP intent

@@ -147,11 +147,9 @@ Verification:
 def verify_decision(decision: Dict, runtime_secret: str) -> bool:
     """Verify decision integrity."""
     stored_sig = decision.pop("_signature")
-    canonical = json.dumps(decision, sort_keys=True, separators=(',', ':'))
+    canonical = json.dumps(decision, sort_keys=True, separators=(",", ":"))
     expected_sig = hmac.new(
-        runtime_secret.encode(),
-        canonical.encode(),
-        hashlib.sha256
+        runtime_secret.encode(), canonical.encode(), hashlib.sha256
     ).hexdigest()
     return stored_sig == expected_sig
 ```
@@ -216,7 +214,7 @@ capabilities:
 # All outbound HTTPS must verify certificates
 http_client = httpx.Client(
     verify=True,  # Enforce certificate verification
-    cert_reqs="required"
+    cert_reqs="required",
 )
 ```
 

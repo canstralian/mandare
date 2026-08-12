@@ -53,21 +53,22 @@ Follow these practices:
 from typing import Dict, Any
 from rif_runtime.capabilities.base import Capability
 
+
 class EmailCapability(Capability):
     """Send emails with policy evaluation."""
-    
+
     def __init__(self):
         super().__init__(name="email", timeout_seconds=30)
-    
+
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute email capability.
-        
+
         Args:
             params: {to, subject, body, reply_to}
-        
+
         Returns:
             {message_id, status, timestamp}
-        
+
         Raises:
             ValueError: Invalid email parameters
         """
@@ -82,20 +83,21 @@ class EmailCapability(Capability):
 import pytest
 from rif_runtime.capabilities.email_capability import EmailCapability
 
+
 @pytest.fixture
 def email_cap():
     return EmailCapability()
 
+
 @pytest.mark.asyncio
 async def test_send_email_success(email_cap):
     """Test successful email sending."""
-    result = await email_cap.execute({
-        "to": "test@example.com",
-        "subject": "Test",
-        "body": "Hello"
-    })
+    result = await email_cap.execute(
+        {"to": "test@example.com", "subject": "Test", "body": "Hello"}
+    )
     assert result["status"] == "sent"
     assert "message_id" in result
+
 
 @pytest.mark.asyncio
 async def test_invalid_email_address(email_cap):

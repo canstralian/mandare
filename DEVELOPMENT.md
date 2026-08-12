@@ -252,15 +252,15 @@ Use pytest with fixtures:
 import pytest
 from rif_runtime.policy import PolicyEngine
 
+
 @pytest.fixture
 def policy_engine():
     return PolicyEngine(policy_file="tests/fixtures/policies.yaml")
 
+
 def test_policy_evaluation(policy_engine):
     result = policy_engine.evaluate(
-        actor="test:agent",
-        action="http.request",
-        target="https://api.example.com"
+        actor="test:agent", action="http.request", target="https://api.example.com"
     )
     assert result.decision == "allow"
 ```
@@ -302,7 +302,7 @@ profiler.enable()
 
 profiler.disable()
 stats = pstats.Stats(profiler)
-stats.sort_stats('cumulative').print_stats(10)
+stats.sort_stats("cumulative").print_stats(10)
 ```
 
 ### Memory Profiling
