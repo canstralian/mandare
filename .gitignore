@@ -9,8 +9,6 @@ build/
 *.egg-info/
 .env
 data/*.jsonl
-
-data/*.jsonl
 data/*.tmp
 
 rif-evals/code_refinement_mst/sessions/generated/*.json
