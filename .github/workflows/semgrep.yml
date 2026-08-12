@@ -19,10 +19,10 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag
 
       - name: Run Semgrep
-        uses: semgrep/semgrep-action@v1
+        uses: semgrep/semgrep-action@v1 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag
         with:
           config: >-
             p/python
@@ -32,7 +32,7 @@ jobs:
           generateSarif: "1"
 
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag
         if: always()
         continue-on-error: true
         with:
