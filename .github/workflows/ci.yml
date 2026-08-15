@@ -1,17 +1,234 @@
 name: CI
-on: [push, pull_request]
+
+# Gating lane for `rif-runtime`. Every job here feeds a single aggregated check
+# named "release gate" — that is the only context that belongs in branch
+# protection. Adding individual jobs to protection as well would couple the
+# required-check list to this file's job names; the gate exists so the list
+# stays one entry long while the lane behind it evolves.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Superseded PR runs are cancelled; pushes to main always run to completion so
+  # the protected branch keeps a complete check history.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # pyproject requires-python is >=3.12; 3.12 is the gating baseline and the
+  # `test` matrix additionally covers 3.13 (both are in the trove classifiers).
+  BASELINE_PYTHON: "3.12"
+
 jobs:
-  test:
+  lint:
+    name: lint (ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: '3.12'
-      # pip install -e . must precede pytest: test_version.py asserts that
-      # importlib.metadata.version("rif-runtime") matches pyproject.toml.
-      - run: pip install -e .
-      - run: pip install -r requirements-dev.txt
+          python-version: ${{ env.BASELINE_PYTHON }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # requirements-dev.txt is the pinned source of truth for tooling versions
+      # (ruff>=0.12,<0.13). Installing ruff unpinned here would drift away from
+      # what contributors run locally per CLAUDE.md.
+      - run: pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - run: ruff check src tests
+      - run: ruff format --check .
+
+  typecheck:
+    name: typecheck (src)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.BASELINE_PYTHON }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - run: pip install --disable-pip-version-check -e .
+      - run: pip install --disable-pip-version-check -r requirements-dev.txt
+
+      # Scoped to the package only. `tests/` carries known annotation debt and is
+      # measured by the advisory `typecheck-tests` job below instead — putting it
+      # in the gating lane today would land the required check red on day one.
+      - run: mypy src/rif_runtime --ignore-missing-imports
+
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # `pip install -e .` must precede pytest: tests/test_version.py asserts
+      # importlib.metadata.version("rif-runtime") matches pyproject.toml, which
+      # only holds once the package metadata is installed.
+      - run: pip install --disable-pip-version-check -e .
+      - run: pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - run: pytest -q
+
+  clean-clone:
+    name: clean clone
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Deliberately no `cache: pip` and no cache-dependency-path. A warm pip
+      # cache can satisfy a dependency that is missing or unpinned in
+      # pyproject.toml / requirements-dev.txt, which is exactly the failure this
+      # job exists to catch. "A clean clone reproduces local results" is the
+      # v0.2.0 exit criterion itself, not a proxy for it — so this lane resolves
+      # every dependency from the index on every run and accepts the minutes.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.BASELINE_PYTHON }}
+
+      - name: Install from a cold index
+        run: |
+          pip install --disable-pip-version-check --no-cache-dir -e .
+          pip install --disable-pip-version-check --no-cache-dir -r requirements-dev.txt
+
+      - name: Record resolved dependency set
+        run: |
+          pip freeze | tee resolved-requirements.txt
+          {
+            echo '### Resolved dependencies (cold install)'
+            echo '```'
+            cat resolved-requirements.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The same three commands CLAUDE.md documents as the local workflow, in the
+      # same order, against a tree that has never seen a cached wheel.
       - run: ruff check src tests
       - run: mypy src/rif_runtime --ignore-missing-imports
       - run: pytest -q
+
+      # Console-script smoke: proves the `rif` entry point resolves from
+      # installed metadata rather than only from a source checkout. Ordered after
+      # pytest because the suite is what populates data/decisions.jsonl.
+      - run: rif replay
+
+  typecheck-tests:
+    name: typecheck (tests, advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # ADVISORY ONLY — intentionally absent from the `release gate` needs list.
+    # It ratchets instead of blocking: the job is green while the error count
+    # holds at or below the recorded baseline and red only on regression. Drive
+    # BASELINE_ERRORS to 0, then move this job into the gate's needs list and
+    # delete the ratchet.
+    env:
+      BASELINE_ERRORS: "147"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.BASELINE_PYTHON }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - run: pip install --disable-pip-version-check -e .
+      - run: pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Measure annotation debt in tests/
+        run: |
+          set -o pipefail
+          # --no-pretty defeats the pyproject `pretty = true` line wrapping so the
+          # "Found N errors" summary line stays greppable.
+          mypy tests --ignore-missing-imports --no-pretty > mypy-tests.log 2>&1 || true
+          tail -n 40 mypy-tests.log
+
+          count=$(grep -oE '^Found [0-9]+ error' mypy-tests.log | grep -oE '[0-9]+' || true)
+          [ -n "$count" ] || count=0
+
+          {
+            echo "### mypy tests/ — advisory"
+            echo ""
+            echo "| metric | value |"
+            echo "| --- | --- |"
+            echo "| errors | ${count} |"
+            echo "| baseline | ${BASELINE_ERRORS} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$count" -gt "$BASELINE_ERRORS" ]; then
+            echo "::error::mypy tests/ regressed: ${count} errors vs baseline ${BASELINE_ERRORS}"
+            exit 1
+          fi
+          if [ "$count" -lt "$BASELINE_ERRORS" ]; then
+            echo "::notice::mypy tests/ improved to ${count} errors — lower BASELINE_ERRORS in ci.yml to lock the gain in"
+          fi
+          if [ "$count" -eq 0 ]; then
+            echo "::notice::tests/ is clean — promote this job into the release gate needs list"
+          fi
+
+  gate:
+    # The one context to require in branch protection:
+    #   required_status_checks[contexts][]=release gate
+    name: release gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint, typecheck, test, clean-clone]
+    # `always()` is what makes the gate fail closed. Without it the gate is itself
+    # skipped when an upstream job fails or is cancelled, and GitHub scores a
+    # skipped required check as a pass — the gate would silently disappear at
+    # exactly the moment it is supposed to bite.
+    if: always()
+    steps:
+      - name: Verify every gating job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          # Kept in lockstep with `needs` above. If the two disagree the gate
+          # fails, so deleting a job from `needs` cannot quietly shrink the gate's
+          # coverage — the omission has to be made explicit here too.
+          EXPECTED: "lint typecheck test clean-clone"
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+
+          actual=$(echo "$NEEDS" | jq -r 'keys_unsorted[]' | sort | tr '\n' ' ')
+          expected=$(echo "$EXPECTED" | tr ' ' '\n' | sort | tr '\n' ' ')
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::gate coverage drift — needs=[${actual}] expected=[${expected}]"
+            exit 1
+          fi
+
+          # Anything that is not literally "success" fails the gate: failure,
+          # cancelled, and skipped alike. Skipped is the important one — it is
+          # how a job silently drops out of the lane.
+          bad=$(echo "$NEEDS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')
+          if [ -n "$bad" ]; then
+            echo "::error::release gate failed closed: ${bad//$'\n'/ }"
+            exit 1
+          fi
+
+          echo "release gate: all $(echo "$EXPECTED" | wc -w) gating jobs succeeded"
