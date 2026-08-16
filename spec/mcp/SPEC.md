@@ -277,3 +277,13 @@ on any single deduction.
 - **OD-5 (carried).** Providers layer (§8) overlaps DIE subsystems 0.1–0.2.
   Ruling applied: reference DIE as normative, keep §8 distinct but non-
   duplicating. Revisit only on genuine divergence.
+- **OD-6.** Registration-time pinning (§8) versus run-time capability
+  observation. MCP `2026-07-28` removes protocol-level sessions and makes tool
+  catalogs cacheable (`ttlMs`, `cacheScope`) with no stability guarantee, so a
+  manifest fixed at registration is not the same artifact as the catalog observed
+  when a decision is made. Whether the registration manifest *is* the first
+  snapshot, or is a separate T2 admission artifact that snapshots reference, is
+  open — tracked as OD-C4 in
+  `docs/spec-review-capability-snapshot-authority.md`, which holds the normative
+  treatment of capability-snapshot binding. Proposed there: keep them separate,
+  since conflating them would make re-observation imply re-admission.
