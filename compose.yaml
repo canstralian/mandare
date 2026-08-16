@@ -8,6 +8,7 @@ services:
       - "8000:8000"
     restart: unless-stopped
   dev:
+    profiles: [dev]
     build:
       context: .
       dockerfile: Dockerfile.dev
