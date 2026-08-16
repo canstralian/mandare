@@ -79,10 +79,21 @@ RIF Runtime operates on a principle of **defense in depth** with multiple securi
 **Threat**: Attacker compromises build pipeline or dependencies to inject malicious code.
 
 **Mitigations**:
-- **Dependency Pinning**: Exact versions in `requirements.txt`
-- **SBOM Generation**: Software Bill of Materials generated on release
-- **Signed Releases**: Binaries and containers signed with release key
-- **Reproducible Builds**: Docker builds tagged with Git SHA for verification
+- **Dependency Pinning**: `requirements/runtime.txt` and `requirements/dev.txt`
+  are compiled from `pyproject.toml` with `pip-compile --generate-hashes`. CI
+  installs them with `pip install --require-hashes`, so pip rejects any
+  artefact whose digest is not in the lock. The `lock-sync` job fails any PR
+  that edits dependencies without recompiling. See `requirements/README.md`.
+- **Vulnerability Scanning**: `pip-audit` runs against both locks in the
+  `dependency-security` job of `merge-gate.yml` and can fail the build.
+- **Unconstrained Resolution Check**: the `clean-clone` job installs the
+  unpinned runtime set with no cache, so a pin cannot hide upstream breakage.
+
+**Not yet implemented** (tracked, do not treat as active controls):
+- **SBOM Generation**: no Software Bill of Materials is produced on release.
+- **Signed Releases**: release artefacts are not signed.
+- **Reproducible Builds**: Docker builds are not yet tagged with the Git SHA
+  for verification.
 
 ## Security Controls
 
