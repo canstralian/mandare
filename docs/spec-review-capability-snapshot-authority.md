@@ -203,8 +203,35 @@ If RIF hashed the server's ordering directly, a server could force spurious
 re-authorizations — or, worse, a benign reordering could mask a material change
 by producing churn that operators learn to ignore.
 
+- [x] **Resolved — Normative (hash input).** Not every field on an observed
+  catalog entry or on `ResourceSnapshot` (`resources/snapshot.py`) is identity-
+  bearing. The hash covers only the fields that describe *what the server can
+  do*; freshness and reuse metadata are recorded alongside the snapshot, not
+  folded into it — otherwise two byte-identical capability sets would get
+  different snapshot ids merely because they were observed a second apart,
+  defeating content-addressing and the merged-snapshot dedup in OD-C2.
+
+  | Field | In hash? | Why |
+  | --- | --- | --- |
+  | Tool/resource name, description, input schema, annotations | **Yes** | This *is* the capability being authorized against. |
+  | `generated_at` / observation timestamp | **No** | Records when RIF observed, not what was observed; including it would make every re-observation produce a new id even with no change. |
+  | `ttlMs` | **No** | Freshness metadata (§4.1) — a re-observation trigger, not part of identity. |
+  | `cacheScope` | **No** | Governs *reuse eligibility* of the snapshot (§4.4), not its content. Recorded as sibling metadata on the snapshot record. |
+  | `content_hash` (existing `ResourceSnapshot` field) | N/A | This table defines what feeds *into* that hash for a capability snapshot specifically. |
+
+  Recipe: select the identity-bearing fields above per catalog entry, sort
+  entries and fields deterministically, apply RFC8785-JCS, hash the canonical
+  bytes. This is the identity §4.2's "unchanged-world" claim is checked against.
+
 ### 4.4 `cacheScope` governs snapshot sharing
 
+- [x] **Resolved — Normative floor, pending OD-C1.** Regardless of how OD-C1's
+  exact mapping resolves, a snapshot MUST NOT be reused as the authorization
+  basis for a different actor or environment than the one it was observed
+  under unless its `cacheScope` explicitly permits that reuse. Until OD-C1 is
+  ratified, the floor is the narrowest interpretation: **no cross-actor,
+  cross-environment reuse at all.** This rule binds now; only the precise
+  `cacheScope` → identity mapping is open.
 - [ ] **Open (OD-C1).** `cacheScope` is a governance signal, not merely a caching
   hint: it bears on whether one observation may be reused as the authorization
   basis for a different actor, environment, or identity. Proposed default —
@@ -222,6 +249,13 @@ by producing churn that operators learn to ignore.
   in the audit trail from one made against an observed empty catalog. Deny-by-
   default still governs the decision itself; this rule is about the evidence being
   honest.
+
+  The sentinel is the reserved string `urn:rif:capability-snapshot:absent`. Real
+  `capability_snapshot_id` values are lowercase hex SHA-256 digests (64
+  characters, per §4.3's RFC8785-JCS recipe) — the `urn:` prefix makes the
+  sentinel unable to collide with one *by construction*, not by convention.
+  `Decision`, evidence, and replay-capture records use this identical value;
+  no per-producer encoding of absence is permitted.
 
 ---
 
@@ -286,14 +320,20 @@ A conforming implementation of this contract MUST:
 2. Bind exactly one `capability_snapshot_id` to each `Decision` (§3.1).
 3. Inherit, never re-observe, the snapshot for each `Execution` under a
    `Decision` (§3.1).
-4. Canonicalize snapshots order-independently via RFC8785-JCS (§4.3).
+4. Canonicalize snapshots order-independently via RFC8785-JCS, hashing only the
+   identity-bearing fields in §4.3's table — never `generated_at`, `ttlMs`, or
+   `cacheScope` (§4.3).
 5. Treat `ttlMs` expiry as a re-observation trigger, never as invalidation of an
    in-flight `Decision` (§4.1).
 6. Evaluate a new `Decision` when re-observation yields a differing snapshot id
    (§4.2).
-7. Record absent observation explicitly rather than as a null (§4.5).
-8. Keep `EvaluationEvidence` out of replay and out of policy (§5).
-9. Keep replay side-effect free and API-distinct from recovery (§6).
+7. Never reuse a snapshot across actors or environments beyond what its
+   `cacheScope` permits; default to no cross-actor/cross-environment reuse
+   until OD-C1 ratifies the exact mapping (§4.4).
+8. Record absent observation explicitly as `urn:rif:capability-snapshot:absent`,
+   never as a null (§4.5).
+9. Keep `EvaluationEvidence` out of replay and out of policy (§5).
+10. Keep replay side-effect free and API-distinct from recovery (§6).
 
 ---
 
@@ -312,7 +352,9 @@ A conforming implementation of this contract MUST:
 
 ## 9. Open decisions
 
-- **OD-C1.** `cacheScope` → RIF environment/identity mapping (§4.4).
+- **OD-C1.** `cacheScope` → RIF environment/identity mapping (§4.4). The floor
+  rule (no cross-actor/cross-environment reuse) is already normative and binds
+  regardless of how this resolves; only the precise mapping is open.
 - **OD-C2.** Snapshot scope granularity: one snapshot per MCP server, or one
   merged snapshot across all servers consulted by a `Decision`? Per-server is
   simpler to invalidate; merged is simpler to bind to a single

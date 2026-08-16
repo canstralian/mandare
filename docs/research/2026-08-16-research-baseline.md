@@ -404,3 +404,36 @@ Hugging Face evaluation post, vLLM/llama.cpp/Gradio/smolagents versions, and the
 agent-baiting reporting — remain unverified. None gates a promoted item. Any
 future proposal that depends on one must verify it against a primary source
 first.
+
+## 12. Sources consulted (16 Aug 2026)
+
+Listed so a reviewer can re-check any **[V]**/**[C]** marker directly, rather
+than taking this document's word for it. Two tiers, marked explicitly — full
+first-party text retrieval is stronger evidence than a search-engine summary
+of one, and this baseline's own discipline (§0) requires saying which is which:
+
+**Retrieved directly (full first-party text):**
+- MCP `2026-07-28` release announcement —
+  <https://blog.modelcontextprotocol.io/posts/2026-07-28/>
+  (§1: stateless core, `server/discover`, `Mcp-Method`/`Mcp-Name`, `ttlMs` +
+  `cacheScope`, deterministic ordering, Tasks extension)
+- MCP `2026-07-28` specification index —
+  <https://modelcontextprotocol.io/specification/2026-07-28>
+  (§1: base protocol, extensions overview, security/trust principles)
+
+**Consulted via search-engine summary (not independently fetched in full —
+verify directly before citing further):**
+- W3C Trace Context absence from the MCP spec — upstream tracking issue
+  <https://github.com/modelcontextprotocol/modelcontextprotocol/issues/246>
+  (§2 correction)
+- ARD provenance and adoption — Google's ARD announcement and Hugging Face's
+  Discover Tool post, <https://huggingface.co/blog/agentic-resource-discovery-launch>,
+  plus third-party coverage of the launch and the post-launch adoption census
+  (§4 correction)
+- OpenAI Agents SDK harness/sandbox separation —
+  <https://openai.com/index/the-next-evolution-of-the-agents-sdk/> (§5)
+- OpenAI Agent Builder/Evals wind-down timeline — OpenAI's own announcement,
+  corroborated by third-party migration-guide coverage (§5)
+
+Every **[U]**-marked claim (§3, §6, §7) was **not** checked against any
+source this cycle and is not included above.

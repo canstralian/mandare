@@ -33,6 +33,8 @@ def test_drive_capability_layer_driver_runs_clean() -> None:
     assert "policy decision: allow" in result.stdout
     assert "execution status: succeeded" in result.stdout
     assert '"payload": "hello from the run-skill driver"' in result.stdout
+    assert "policy decision: deny (runtime locked)" in result.stdout
+    assert "execution skipped: policy denied" in result.stdout
     assert (
         "CapabilityNotFoundError (expected): Unknown capability: huggingface.infer"
         in result.stdout

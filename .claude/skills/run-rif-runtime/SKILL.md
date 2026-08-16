@@ -99,7 +99,7 @@ curl -sf -X POST http://127.0.0.1:8000/v1/policy/evaluate \
 
 Expected output:
 
-```
+```text
 {"status":"ok","environment":"RIF_Runtime","posture":"normal"}
 {"current":"RIF_Runtime","environments":{...}}
 {"agent":"agent:auditor",...}
@@ -146,15 +146,18 @@ python .claude/skills/run-rif-runtime/drive_capability_layer.py
 
 Expected output:
 
-```
+```text
 policy decision: allow (allowed by constraints)
 execution status: succeeded
 execution output: {"actor": "agent:demo", "action": "ping", "parameters": {"payload": "hello from the run-skill driver"}}
 ---
+policy decision: deny (runtime locked)
+execution skipped: policy denied
+---
 CapabilityNotFoundError (expected): Unknown capability: huggingface.infer
 ```
 
-The script does two things, both worth reading before extending this layer:
+The script does three things, all worth reading before extending this layer:
 
 1. **Policy-then-execute, wired manually.** `PolicyEngine.evaluate()` and
    `ExecutionKernel.execute()` are two independent calls in the script, not
@@ -165,7 +168,15 @@ The script does two things, both worth reading before extending this layer:
    `kernel.execute()` will run an unauthorized capability with no gate at
    all. Always call `evaluate()` first and check `decision.decision ==
    Decision.allow` yourself, as the script does.
-2. **What an unregistered capability looks like.** The second half shows
+2. **Both policy outcomes are exercised, not just the happy path.**
+   `run_allowed_echo()` raises if `Posture.normal` ever unexpectedly denies,
+   and `run_locked_posture_denial()` demonstrates the deny path explicitly
+   with `Posture.locked` — which `PolicyEngine.evaluate()` denies
+   unconditionally as its first check, before any capability is resolved.
+   Either function raising means the driver's own assumptions about the
+   policy engine's behavior broke, not just that a demo printed the wrong
+   line.
+3. **What an unregistered capability looks like.** The third block shows
    `CapabilityNotFoundError: Unknown capability: huggingface.infer` — this is
    the exact, real error you get today for any capability that doesn't exist
    yet. Building an HF (or any other) provider adapter means writing a class

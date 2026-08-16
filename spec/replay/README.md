@@ -26,3 +26,14 @@ Define a `replay_capture.schema.json` describing the minimal shape a capture mus
 have (inputs, environment, timestamps, and evidence references) to be replayable —
 including the `capability_snapshot_id` the captured decision was authorized
 against, without which a capture is not reconstructable.
+
+Storing the id is not sufficient by itself: a capture MUST resolve to the
+immutable snapshot it names, not merely reference it. The schema needs to
+define *how* — embedding the canonical snapshot in the capture, or resolving
+it from the append-only store proposed in OD-C3
+(`docs/spec-review-capability-snapshot-authority.md`) — plus retention and
+the replay outcome when the referenced snapshot is unavailable (fail closed,
+per the same deny-by-default posture as an absent observation, §4.5 of that
+review). Undefined today: `src/rif_runtime/replay.py` rebuilds state from
+`decisions.jsonl` rows alone and does not load or validate a capability
+snapshot as part of that reconstruction.

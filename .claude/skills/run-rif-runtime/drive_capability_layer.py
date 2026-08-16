@@ -23,6 +23,10 @@ from rif_runtime.schemas import Decision, EnvironmentProfile, PolicyRequest, Pos
 
 
 def run_allowed_echo() -> None:
+    """Demonstrates the allow path. Posture.normal + an unrestricted profile
+    is expected to allow unconditionally, so an unexpected denial here means
+    the policy/environment setup changed — raise rather than silently
+    reporting success with nothing executed."""
     registry = CapabilityRegistry([EchoCapability()])
     kernel = ExecutionKernel(registry)
     policy = PolicyEngine()
@@ -33,8 +37,7 @@ def run_allowed_echo() -> None:
     print(f"policy decision: {decision.decision} ({decision.reason})")
 
     if decision.decision != Decision.allow:
-        print("execution skipped: policy denied")
-        return
+        raise RuntimeError(f"unexpected policy denial: {decision.reason}")
 
     manifest = ExecutionManifest(
         actor="agent:demo",
@@ -45,6 +48,23 @@ def run_allowed_echo() -> None:
     result = kernel.execute(manifest)
     print(f"execution status: {result.status}")
     print(f"execution output: {json.dumps(result.output)}")
+
+
+def run_locked_posture_denial() -> None:
+    """Demonstrates the deny path: Posture.locked denies unconditionally
+    (PolicyEngine.evaluate()'s first check), before the capability is ever
+    resolved or executed."""
+    policy = PolicyEngine()
+    profile = EnvironmentProfile(networking_type="unrestricted")
+
+    req = PolicyRequest(actor="agent:demo", action="capability.echo", target="echo")
+    decision = policy.evaluate(req, "demo", profile, Posture.locked)
+    print(f"policy decision: {decision.decision} ({decision.reason})")
+
+    if decision.decision == Decision.allow:
+        raise RuntimeError("expected posture.locked to deny, but it allowed")
+
+    print("execution skipped: policy denied")
 
 
 def run_unregistered_capability() -> None:
@@ -63,6 +83,8 @@ def run_unregistered_capability() -> None:
 
 if __name__ == "__main__":
     run_allowed_echo()
+    print("---")
+    run_locked_posture_denial()
     print("---")
     run_unregistered_capability()
     sys.exit(0)
