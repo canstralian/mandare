@@ -30,10 +30,13 @@ If it doesn't, use an explicit interpreter (this container also has
 ## Setup
 
 ```bash
-python3.12 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 pip install -r requirements-dev.txt
 ```
+
+(Substitute `python3.12` or `python3.13` here if the `python3 --version` check
+above showed something older.)
 
 No build step — it's a plain installable Python package.
 
@@ -64,10 +67,14 @@ curl -sf http://127.0.0.1:8000/health; echo
 ```
 
 Then drive it with the project's own smoke script for the unauthenticated
-routes — health, environment listing, and audit:
+routes — health, environment listing, and audit. Append `|| true`: the
+script's own two `POST /v1/policy/evaluate` calls will fail with `401` and
+abort it under its own `set -euo pipefail` (see below), and without `|| true`
+that nonzero exit will look like a launch failure to any caller/script
+checking `$?`, when the three preceding checks actually succeeded:
 
 ```bash
-BASE=http://127.0.0.1:8000 bash scripts/smoke.sh
+BASE=http://127.0.0.1:8000 bash scripts/smoke.sh || true
 ```
 
 **`scripts/smoke.sh`'s own two `POST /v1/policy/evaluate` calls will fail

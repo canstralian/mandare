@@ -48,7 +48,7 @@ def run_allowed_echo() -> None:
 
 
 def run_unregistered_capability() -> None:
-    """Shows the error a new provider adapter (e.g. a HuggingFace capability)
+    """Shows the error a new provider adapter (e.g. a Hugging Face capability)
     must resolve by registering itself — this is the exact failure mode
     before that registration exists."""
     kernel = ExecutionKernel(CapabilityRegistry([]))
