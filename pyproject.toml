@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rif-runtime"
-version = "0.3.0rc1"
+version = "0.3.0rc2"
 description = "Governed execution substrate for intelligent systems."
 readme = "README.md"
 requires-python = ">=3.12"
