@@ -260,9 +260,56 @@ def load_config(path: str | Path | None = None) -> RuntimeConfig:
         # Provide sensible defaults when environments file is absent
         from .schemas import EnvironmentProfile
 
+        # #region agent log
+        import json as _json
+        import time as _time
+
+        open("/opt/cursor/logs/debug.log", "a").write(
+            _json.dumps(
+                {
+                    "hypothesisId": "H1",
+                    "location": "config.py:load_config",
+                    "message": "environments.yaml absent; using production fallback",
+                    "data": {
+                        "path": str(path),
+                        "cwd": os.getcwd(),
+                        "fallback_default": "production",
+                        "fallback_env_keys": ["production"],
+                        "rif_environment_env": os.environ.get("RIF_ENVIRONMENT"),
+                        "rif_config_dir_env": os.environ.get("RIF_CONFIG_DIR"),
+                    },
+                    "timestamp": int(_time.time() * 1000),
+                }
+            )
+            + "\n"
+        )
+        # #endregion
         return RuntimeConfig(
             default_environment="production",
             environments={"production": EnvironmentProfile()},
         )
 
-    return RuntimeConfig.model_validate(yaml.safe_load(path.read_text()))
+    _cfg = RuntimeConfig.model_validate(yaml.safe_load(path.read_text()))
+    # #region agent log
+    import json as _json
+    import time as _time
+
+    open("/opt/cursor/logs/debug.log", "a").write(
+        _json.dumps(
+            {
+                "hypothesisId": "H1",
+                "location": "config.py:load_config",
+                "message": "environments.yaml loaded",
+                "data": {
+                    "path": str(path),
+                    "default_environment": _cfg.default_environment,
+                    "env_keys": sorted(_cfg.environments.keys()),
+                    "rif_environment_env": os.environ.get("RIF_ENVIRONMENT"),
+                },
+                "timestamp": int(_time.time() * 1000),
+            }
+        )
+        + "\n"
+    )
+    # #endregion
+    return _cfg
