@@ -128,9 +128,13 @@ ensure_venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip
-# pyproject.toml currently declares no runtime deps; they live in requirements.txt.
-pip install -e .
+# Install runtime deps and the package (non-editable) first, then switch the
+# package to editable so the source-tree path in _version.py resolves correctly.
+# requirements.txt includes `.` so pip installs the package from the local tree;
+# the follow-up `pip install -e . --no-deps` upgrades that to an editable link
+# without reinstalling deps that are already satisfied.
 pip install -r requirements.txt
+pip install -e . --no-deps
 pip install -r requirements-dev.txt
 
 if ! venv_acceptance_ok; then
