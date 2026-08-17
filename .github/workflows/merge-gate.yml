@@ -121,15 +121,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Mirrors scripts/cloud-agent-install.sh exactly: runtime deps first (which
-      # includes `.` so pip installs the package non-editably from the local tree),
-      # then editable re-install with --no-deps so the source-tree __file__ path
-      # resolves correctly for tests, then the unpinned dev set.
+      # Mirrors scripts/cloud-agent-install.sh: runtime deps, then editable
+      # install so the source-tree __file__ path resolves for _version.py tests,
+      # then the unpinned dev set. requirements.txt must not contain `.`.
       - name: Install unconstrained
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install -e . --no-deps
+          python -m pip install -e .
           python -m pip install -r requirements-dev.txt
 
       # Deliberately not linting here: ruff and mypy findings shift with every

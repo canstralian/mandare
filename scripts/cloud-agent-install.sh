@@ -128,13 +128,12 @@ ensure_venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip
-# Install runtime deps and the package (non-editable) first, then switch the
-# package to editable so the source-tree path in _version.py resolves correctly.
-# requirements.txt includes `.` so pip installs the package from the local tree;
-# the follow-up `pip install -e . --no-deps` upgrades that to an editable link
-# without reinstalling deps that are already satisfied.
+# Runtime deps first (unpinned mirror of [project.dependencies]), then an
+# editable install so src/rif_runtime/_version.py resolves pyproject.toml via
+# the source-tree __file__ path. Do not put `.` in requirements.txt — that
+# reinstalls the package non-editably into site-packages and breaks that path.
 pip install -r requirements.txt
-pip install -e . --no-deps
+pip install -e .
 pip install -r requirements-dev.txt
 
 if ! venv_acceptance_ok; then
