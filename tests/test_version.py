@@ -48,13 +48,57 @@ def test_version_matches_pyproject() -> None:
 
 def test_read_version_from_pyproject_path_resolution() -> None:
     """_read_version_from_pyproject() resolves pyproject.toml via the 3-parent path."""
+    from rif_runtime import _version as _ver_mod
     from rif_runtime._version import _read_version_from_pyproject
 
     pyproject = Path(__file__).parent.parent / "pyproject.toml"
     with pyproject.open("rb") as f:
         expected = tomllib.load(f)["project"]["version"]
 
+    # #region agent log
+    import json
+    import time
+
+    _mod_file = _ver_mod.__file__ or ""
+    with open("/workspace/.cursor/debug-1e76.log", "a") as _f:
+        _f.write(
+            json.dumps(
+                {
+                    "sessionId": "1e76",
+                    "hypothesisId": "H1",
+                    "location": "test_version.py:before_call",
+                    "message": "before calling _read_version_from_pyproject",
+                    "data": {
+                        "module__file__": _mod_file,
+                        "in_site_packages": "site-packages" in _mod_file,
+                        "in_src_tree": "/src/" in _mod_file.replace("\\", "/"),
+                        "expected": expected,
+                        "test__file__": __file__,
+                    },
+                    "timestamp": int(time.time() * 1000),
+                }
+            )
+            + "\n"
+        )
+    # #endregion
+
     result = _read_version_from_pyproject()
+    # #region agent log
+    with open("/workspace/.cursor/debug-1e76.log", "a") as _f:
+        _f.write(
+            json.dumps(
+                {
+                    "sessionId": "1e76",
+                    "hypothesisId": "H1",
+                    "location": "test_version.py:after_call",
+                    "message": "after _read_version_from_pyproject",
+                    "data": {"result": result, "expected": expected},
+                    "timestamp": int(time.time() * 1000),
+                }
+            )
+            + "\n"
+        )
+    # #endregion
     assert result == expected, (
         f"_read_version_from_pyproject() returned {result!r}, expected {expected!r}; "
         "check that Path(__file__).parent.parent.parent resolves to the repo root"
