@@ -267,7 +267,15 @@ block in `CLAUDE.md`. It is also the only route using Supabase JWT identity
 (`IdentityId`) rather than `ControlPlaneAuth`, which is a security-relevant
 distinction no document currently records.
 
-*Fixed in this change — see "Corrections applied" below.*
+**Status: being fixed elsewhere.** PR #110 (`claude/doc-sync`) is a dedicated
+API-surface sync that corrects `docs/API.md`, `docs/RIF_RUNTIME_MVP.md`, and
+`README.md` together, including per-route descriptions and the auth split above.
+This audit deliberately leaves `docs/API.md` untouched so the two changes do not
+conflict on the same file. If #110 is abandoned, this finding reverts to open.
+
+Note that `CLAUDE.md`'s own API-surface block is a third copy of the same list and
+is malformed — the routes after the first `GET /` are run together on one line with
+literal `\n` escapes rather than newlines. #110 does not cover `CLAUDE.md`.
 
 ### M5. `spec/capability/README.md` points at an unrelated module
 
@@ -370,9 +378,9 @@ does — were corrected. Design-level divergences (H1, H2, H5, M1, M2, M3) are
 reported, not silently resolved, because each requires an owner's decision about
 which side should move.
 
-- `docs/API.md` — replaced the route list with the actual surface from
-  `api.py`, including the previously undocumented `POST /v1/runs`, and marked
-  which routes require control-plane auth.
+- `docs/API.md` — **deliberately untouched.** PR #110 is a dedicated API-surface
+  sync covering this file plus `README.md` and `docs/RIF_RUNTIME_MVP.md` together;
+  editing it here would only produce a conflict on the same file. See M4.
 - `spec/capability/README.md` — corrected the runtime-implementation pointer.
 - `spec/skill/README.md` — corrected `skill.yaml` to `manifest.yaml`.
 - `spec/README.md` — replaced "migrated" with an accurate description of the
