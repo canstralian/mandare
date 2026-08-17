@@ -6,7 +6,7 @@ renamed, or removed in `api.py`.
 
 ## Routes
 
-```
+```text
 GET    /
 GET    /health
 GET    /v1/environments
@@ -35,8 +35,10 @@ running instance.
 
 ## Authentication notes
 
-- Routes guarded by `ControlPlaneAuth` require a control-plane Bearer token
-  (`RIF_CONTROL_KEY` env var). These include `/v1/environment/{name}`,
+- Routes guarded by `ControlPlaneAuth` require an `X-API-Key` request header.
+  Configure allowed keys via `RIF_CONTROL_PLANE_API_KEYS` (comma-separated list of
+  raw key strings). If the variable is unset or empty, every guarded request is
+  rejected with HTTP 503. These include `/v1/environment/{name}`,
   `/v1/policy/evaluate`, `/v1/posture/reset`, `/v1/posture/{posture}`,
   `/v1/mcp/metasploit/token`, `/v1/policies/{rule_id}` (PUT/DELETE).
 - `POST /v1/runs` requires a Supabase JWT Bearer token (end-user identity).
