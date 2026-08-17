@@ -31,6 +31,9 @@ from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from .schemas import RuntimeConfig
 
 _SETTINGS_TOML_PATH = Path("rif.toml")
+_PACKAGED_ENVIRONMENTS = (
+    Path(__file__).resolve().parent / "bundled_config" / "environments.yaml"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -244,11 +247,21 @@ def reset_settings() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _load_environments_yaml(path: Path) -> RuntimeConfig:
+    return RuntimeConfig.model_validate(yaml.safe_load(path.read_text()))
+
+
 def load_config(path: str | Path | None = None) -> RuntimeConfig:
     """Load the environments config from YAML (legacy interface).
 
     Used by ``RIFRuntime.__init__``.  The path now defaults to
     ``<settings.paths.config_dir>/environments.yaml``.
+
+    Resolution order when the configured path is missing:
+    1. Packaged copy shipped with the install
+       (``rif_runtime/bundled_config/environments.yaml``) so site-packages /
+       Vercel deploys without a CWD ``config/`` still get real profiles.
+    2. Bare ``production`` profile with empty ``allowed_hosts`` (deny-by-default).
     """
     if path is None:
         settings = get_settings()
@@ -256,60 +269,16 @@ def load_config(path: str | Path | None = None) -> RuntimeConfig:
     else:
         path = Path(path)
 
-    if not path.is_file():
-        # Provide sensible defaults when environments file is absent
-        from .schemas import EnvironmentProfile
+    if path.is_file():
+        return _load_environments_yaml(path)
 
-        # #region agent log
-        import json as _json
-        import time as _time
+    if _PACKAGED_ENVIRONMENTS.is_file():
+        return _load_environments_yaml(_PACKAGED_ENVIRONMENTS)
 
-        open("/opt/cursor/logs/debug.log", "a").write(
-            _json.dumps(
-                {
-                    "hypothesisId": "H1",
-                    "location": "config.py:load_config",
-                    "message": "environments.yaml absent; using production fallback",
-                    "data": {
-                        "path": str(path),
-                        "cwd": os.getcwd(),
-                        "fallback_default": "production",
-                        "fallback_env_keys": ["production"],
-                        "rif_environment_env": os.environ.get("RIF_ENVIRONMENT"),
-                        "rif_config_dir_env": os.environ.get("RIF_CONFIG_DIR"),
-                    },
-                    "timestamp": int(_time.time() * 1000),
-                }
-            )
-            + "\n"
-        )
-        # #endregion
-        return RuntimeConfig(
-            default_environment="production",
-            environments={"production": EnvironmentProfile()},
-        )
+    # Last resort when even the packaged copy is absent (broken install).
+    from .schemas import EnvironmentProfile
 
-    _cfg = RuntimeConfig.model_validate(yaml.safe_load(path.read_text()))
-    # #region agent log
-    import json as _json
-    import time as _time
-
-    open("/opt/cursor/logs/debug.log", "a").write(
-        _json.dumps(
-            {
-                "hypothesisId": "H1",
-                "location": "config.py:load_config",
-                "message": "environments.yaml loaded",
-                "data": {
-                    "path": str(path),
-                    "default_environment": _cfg.default_environment,
-                    "env_keys": sorted(_cfg.environments.keys()),
-                    "rif_environment_env": os.environ.get("RIF_ENVIRONMENT"),
-                },
-                "timestamp": int(_time.time() * 1000),
-            }
-        )
-        + "\n"
+    return RuntimeConfig(
+        default_environment="production",
+        environments={"production": EnvironmentProfile()},
     )
-    # #endregion
-    return _cfg

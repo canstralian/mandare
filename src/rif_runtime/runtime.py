@@ -1,3 +1,4 @@
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -24,10 +25,21 @@ class RIFRuntime:
     def __init__(self, data_dir: str | Path | None = None) -> None:
         self.config = load_config()
         _settings_env = get_settings().runtime.environment
-        _env_in_map = _settings_env in self.config.environments
+        # An explicit RIF_ENVIRONMENT typo must not silently fall back to the
+        # default profile (that made vercel.json's RIF_ENVIRONMENT a no-op when
+        # only the bare production fallback was loaded). The settings default
+        # ("production") is allowed to miss the map when the env var is unset.
+        if (
+            "RIF_ENVIRONMENT" in os.environ
+            and _settings_env not in self.config.environments
+        ):
+            raise ValueError(
+                f"unknown environment from RIF_ENVIRONMENT={_settings_env!r}; "
+                f"known: {sorted(self.config.environments)}"
+            )
         self.environment_name = (
             _settings_env
-            if _env_in_map
+            if _settings_env in self.config.environments
             else self.config.default_environment
         )
         # One configured directory owns every piece of persistent state —
@@ -37,62 +49,6 @@ class RIFRuntime:
         self.data_dir = Path(
             data_dir if data_dir is not None else get_settings().paths.data_dir
         )
-        # #region agent log
-        import json as _json
-        import os as _os
-        import time as _time
-
-        _hosts = list(self.config.environments[self.environment_name].allowed_hosts)
-        open("/opt/cursor/logs/debug.log", "a").write(
-            _json.dumps(
-                {
-                    "hypothesisId": "H1",
-                    "location": "runtime.py:RIFRuntime.__init__",
-                    "message": "environment selection after load_config",
-                    "data": {
-                        "settings_env": _settings_env,
-                        "settings_env_in_map": _env_in_map,
-                        "chosen_environment": self.environment_name,
-                        "config_env_keys": sorted(self.config.environments.keys()),
-                        "default_environment": self.config.default_environment,
-                        "allowed_hosts": _hosts,
-                        "allowed_hosts_empty": len(_hosts) == 0,
-                        "rif_environment_env": _os.environ.get("RIF_ENVIRONMENT"),
-                    },
-                    "timestamp": int(_time.time() * 1000),
-                }
-            )
-            + "\n"
-        )
-        # #endregion
-        # #region agent log
-        _mkdir_ok = None
-        _mkdir_err = None
-        try:
-            self.data_dir.mkdir(parents=True, exist_ok=True)
-            _mkdir_ok = True
-        except OSError as _e:
-            _mkdir_ok = False
-            _mkdir_err = str(_e)
-        open("/opt/cursor/logs/debug.log", "a").write(
-            _json.dumps(
-                {
-                    "hypothesisId": "H4",
-                    "location": "runtime.py:RIFRuntime.__init__:data_dir",
-                    "message": "cold-start data_dir probe",
-                    "data": {
-                        "data_dir": str(self.data_dir),
-                        "exists": self.data_dir.exists(),
-                        "mkdir_ok": _mkdir_ok,
-                        "mkdir_err": _mkdir_err,
-                        "rif_data_dir_env": _os.environ.get("RIF_DATA_DIR"),
-                    },
-                    "timestamp": int(_time.time() * 1000),
-                }
-            )
-            + "\n"
-        )
-        # #endregion
         self.policy = PolicyEngine()
         self.policy_store = PolicyStore(self.data_dir / "policies.json")
         self.reflexive = ReflexiveLoop()
@@ -166,30 +122,6 @@ class RIFRuntime:
                 self.posture,
                 self.policy_store.list(),
             )
-            # #region agent log
-            if "anthropic.com" in req.target or "blocked.example" in req.target:
-                import json as _json
-                import time as _time
-
-                open("/opt/cursor/logs/debug.log", "a").write(
-                    _json.dumps(
-                        {
-                            "hypothesisId": "H1",
-                            "location": "runtime.py:evaluate",
-                            "message": "policy decision for probe target",
-                            "data": {
-                                "target": req.target,
-                                "decision": str(decision.decision),
-                                "matched_rule": decision.matched_rule,
-                                "environment": decision.environment,
-                                "allowed_hosts": list(self.profile.allowed_hosts),
-                            },
-                            "timestamp": int(_time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-            # #endregion
             # record=False is a side-effect-free dry run: return the computed
             # decision without mutating posture or appending to the JSONL
             # stores. The unauthenticated simulation routes (e.g.

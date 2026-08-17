@@ -16,57 +16,8 @@ def _read_version_from_pyproject() -> str | None:
         _pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
         with _pyproject.open("rb") as _f:
             version: str = tomllib.load(_f)["project"]["version"]
-            # #region agent log
-            import json as _json
-            import time as _time
-
-            open("/opt/cursor/logs/debug.log", "a").write(
-                _json.dumps(
-                    {
-                        "hypothesisId": "H3",
-                        "location": "_version.py:_read_version_from_pyproject",
-                        "message": "pyproject version path resolved",
-                        "data": {
-                            "version_file": str(Path(__file__).resolve()),
-                            "pyproject_path": str(_pyproject.resolve()),
-                            "in_site_packages": "site-packages" in str(Path(__file__)),
-                            "version": version,
-                        },
-                        "timestamp": int(_time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-            # #endregion
             return version
-    except (FileNotFoundError, KeyError, tomllib.TOMLDecodeError) as _exc:
-        # #region agent log
-        import json as _json
-        import time as _time
-        from pathlib import Path as _Path
-
-        open("/opt/cursor/logs/debug.log", "a").write(
-            _json.dumps(
-                {
-                    "hypothesisId": "H3",
-                    "location": "_version.py:_read_version_from_pyproject",
-                    "message": "pyproject version path FAILED",
-                    "data": {
-                        "version_file": str(_Path(__file__).resolve()),
-                        "resolved_root_candidate": str(
-                            _Path(__file__).parent.parent.parent.resolve()
-                        ),
-                        "in_site_packages": "site-packages"
-                        in str(_Path(__file__).resolve()),
-                        "error_type": type(_exc).__name__,
-                        "error": str(_exc),
-                    },
-                    "timestamp": int(_time.time() * 1000),
-                }
-            )
-            + "\n"
-        )
-        # #endregion
+    except (FileNotFoundError, KeyError, tomllib.TOMLDecodeError):
         return None
 
 
@@ -81,32 +32,7 @@ def _read_version() -> str:
     try:
         from importlib.metadata import PackageNotFoundError, version
 
-        _meta = version("rif-runtime")
-        # #region agent log
-        import json as _json
-        import time as _time
-        from pathlib import Path as _Path
-
-        open("/opt/cursor/logs/debug.log", "a").write(
-            _json.dumps(
-                {
-                    "hypothesisId": "H3",
-                    "location": "_version.py:_read_version",
-                    "message": "version via importlib.metadata",
-                    "data": {
-                        "source": "importlib.metadata",
-                        "version": _meta,
-                        "version_file": str(_Path(__file__).resolve()),
-                        "in_site_packages": "site-packages"
-                        in str(_Path(__file__).resolve()),
-                    },
-                    "timestamp": int(_time.time() * 1000),
-                }
-            )
-            + "\n"
-        )
-        # #endregion
-        return _meta
+        return version("rif-runtime")
     except PackageNotFoundError:
         pass
 

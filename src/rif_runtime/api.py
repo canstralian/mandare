@@ -24,34 +24,6 @@ from .runtime import RIFRuntime
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
 from .startup import register_config_startup
 
-# #region agent log
-import json as _json
-import time as _time
-from pathlib import Path as _Path
-
-import rif_runtime as _rif_pkg
-
-open("/opt/cursor/logs/debug.log", "a").write(
-    _json.dumps(
-        {
-            "hypothesisId": "H2",
-            "location": "api.py:module",
-            "message": "api module load (shared by both Vercel entrypoints)",
-            "data": {
-                "api_file": str(_Path(__file__).resolve()),
-                "pkg_file": str(_Path(_rif_pkg.__file__).resolve())
-                if _rif_pkg.__file__
-                else None,
-                "pkg_in_site_packages": "site-packages" in str(_rif_pkg.__file__ or ""),
-                "import_name": __name__,
-            },
-            "timestamp": int(_time.time() * 1000),
-        }
-    )
-    + "\n"
-)
-# #endregion
-
 runtime = RIFRuntime()
 app = FastAPI(
     title="RIF Runtime",

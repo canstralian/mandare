@@ -87,8 +87,15 @@ rif = "rif_runtime.cli:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# Ship environments.yaml with the install so Vercel / site-packages cold starts
+# still resolve RIF_Runtime hosts without a CWD config/ tree. Keep in sync with
+# config/environments.yaml (asserted by tests/test_packaged_environments.py).
+[tool.setuptools.package-data]
+rif_runtime = ["bundled_config/*.yaml", "py.typed"]
+
 # Vercel FastAPI builder looks for app in default locations; src/ layout needs
 # an explicit entrypoint (see https://vercel.com/docs/frameworks/backend/fastapi).
+# vercel.json holds env only (no legacy builds/routes) so this is the sole entrypoint.
 [tool.vercel]
 entrypoint = "src.rif_runtime.api:app"
 
