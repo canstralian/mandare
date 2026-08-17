@@ -27,6 +27,7 @@ RIF Runtime is a governed execution substrate for agents and tools. It compiles 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+export RIF_CONTROL_PLANE_API_KEYS=dev-key
 rif serve
 ```
 
@@ -36,21 +37,34 @@ rif serve
 curl http://127.0.0.1:8000/health
 curl -X POST http://127.0.0.1:8000/v1/policy/evaluate \
   -H 'content-type: application/json' \
+  -H 'X-API-Key: dev-key' \
   -d '{"actor":"agent:orchestrator","action":"http.request","target":"https://api.anthropic.com/v1/messages"}'
 ```
 
 ## RIF Governance Layer
 
-Endpoints:
+Endpoints (see [docs/API.md](docs/API.md) for the full reference):
 
-- `GET /health`
-- `GET /docs`
+- `GET /` — root / route index
+- `GET /health` — liveness; returns environment and posture
 - `GET /v1/environments`
+- `POST /v1/environment/{name}`
 - `POST /v1/policy/evaluate`
+- `POST /v1/posture/reset`
+- `POST /v1/posture/{posture}`
 - `GET /v1/graph/summary`
 - `GET /v1/telemetry/summary`
+- `GET /v1/persistence/summary`
+- `GET /v1/recovered-state`
 - `GET /v1/audit`
 - `POST /v1/mcp/invoke`
+- `GET /v1/mcp/metasploit/capabilities`
+- `POST /v1/mcp/metasploit/evaluate`
+- `POST /v1/mcp/metasploit/token`
+- `GET /v1/policies`
+- `PUT /v1/policies/{rule_id}`
+- `DELETE /v1/policies/{rule_id}`
+- `POST /v1/runs`
 
 Persistence:
 

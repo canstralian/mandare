@@ -44,9 +44,12 @@ curl -sf http://127.0.0.1:8000/health; echo
 
 Then drive it with the project's own smoke script — it exercises health,
 environment listing, audit, and both an allow and a deny policy decision
-(the deny also escalates posture to `elevated`):
+(the deny also escalates posture to `elevated`). `POST /v1/policy/evaluate`
+requires control-plane auth, so set the same key the server process sees:
 
 ```bash
+export RIF_CONTROL_PLANE_API_KEYS=dev-key
+# restart uvicorn after exporting if it was already running without the env var
 BASE=http://127.0.0.1:8000 bash scripts/smoke.sh
 ```
 
