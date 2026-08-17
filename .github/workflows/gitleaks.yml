@@ -6,9 +6,15 @@ on:
   pull_request:
   workflow_dispatch:
 
+# `pull-requests: write` was only needed so gitleaks-action could post a comment
+# on a PR where it found a leak. Comments are turned off explicitly below, so
+# the elevated scope is dropped: a secrets scanner is a poor thing to hand write
+# access to, and quoting a discovered secret into a PR comment widens the very
+# exposure it is reporting. The job still fails on a finding, and the detail is
+# in the run log.
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   gitleaks:
@@ -24,3 +30,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Set explicitly rather than left to the action's default, which is to
+          # comment. Without this the permission narrowing above would silently
+          # break comment posting instead of deliberately disabling it.
+          GITLEAKS_ENABLE_COMMENTS: "false"
