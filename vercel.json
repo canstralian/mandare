@@ -1,17 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "api/index.py"
-    }
-  ],
+  "installCommand": "pip install .",
   "env": {
     "RIF_DATA_DIR": "/tmp/rif-data",
     "RIF_ENVIRONMENT": "RIF_Runtime"
