@@ -27,6 +27,7 @@ RIF Runtime is a governed execution substrate for agents and tools. It compiles 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+export RIF_CONTROL_PLANE_API_KEYS=dev-key
 rif serve
 ```
 
@@ -36,6 +37,7 @@ rif serve
 curl http://127.0.0.1:8000/health
 curl -X POST http://127.0.0.1:8000/v1/policy/evaluate \
   -H 'content-type: application/json' \
+  -H 'X-API-Key: dev-key' \
   -d '{"actor":"agent:orchestrator","action":"http.request","target":"https://api.anthropic.com/v1/messages"}'
 ```
 
