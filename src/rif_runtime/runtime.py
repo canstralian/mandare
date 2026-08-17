@@ -61,10 +61,54 @@ class RIFRuntime:
         """
         for row in reversed(self.posture_store.read_all()):
             try:
-                return Posture(row["new_posture"])
+                restored = Posture(row["new_posture"])
+                # #region agent log
+                import json
+                import time
+
+                open("/workspace/.cursor/debug-d042.log", "a").write(
+                    json.dumps(
+                        {
+                            "id": f"log_{int(time.time() * 1000)}_rp",
+                            "timestamp": int(time.time() * 1000),
+                            "location": "runtime.py:_restore_posture",
+                            "message": "restored posture from history",
+                            "data": {
+                                "restored": str(restored),
+                                "source": "posture_history.jsonl",
+                            },
+                            "hypothesisId": "B",
+                        }
+                    )
+                    + "\n"
+                )
+                # #endregion
+                return restored
             except (KeyError, ValueError):
                 continue
-        return ReplayEngine(self.decisions_path).recover_posture()
+        recovered = ReplayEngine(self.decisions_path).recover_posture()
+        # #region agent log
+        import json
+        import time
+
+        open("/workspace/.cursor/debug-d042.log", "a").write(
+            json.dumps(
+                {
+                    "id": f"log_{int(time.time() * 1000)}_rp2",
+                    "timestamp": int(time.time() * 1000),
+                    "location": "runtime.py:_restore_posture",
+                    "message": "restored posture from decisions replay",
+                    "data": {
+                        "restored": str(recovered),
+                        "source": "decisions.jsonl",
+                    },
+                    "hypothesisId": "B",
+                }
+            )
+            + "\n"
+        )
+        # #endregion
+        return recovered
 
     @property
     def profile(self) -> EnvironmentProfile:
@@ -128,6 +172,29 @@ class RIFRuntime:
             self.governance_graph.record_decision(decision)
             old_posture = self.posture
             self.posture = self.reflexive.observe(decision, self.posture)
+            # #region agent log
+            import json
+            import time
+
+            open("/workspace/.cursor/debug-d042.log", "a").write(
+                json.dumps(
+                    {
+                        "id": f"log_{int(time.time() * 1000)}_rd",
+                        "timestamp": int(time.time() * 1000),
+                        "location": "runtime.py:record_decision",
+                        "message": "posture after observe",
+                        "data": {
+                            "old_posture": str(old_posture),
+                            "new_posture": str(self.posture),
+                            "decision": str(decision.decision),
+                            "changed": old_posture != self.posture,
+                        },
+                        "hypothesisId": "C",
+                    }
+                )
+                + "\n"
+            )
+            # #endregion
 
             self.decisions_store.append(decision.model_dump())
 

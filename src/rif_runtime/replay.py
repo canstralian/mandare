@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import get_settings
+from .governance.posture import posture_for_denials
 from .graph.memory import GovernanceGraph
 from .schemas import Decision, PolicyDecision, Posture
 
@@ -86,10 +87,6 @@ class ReplayEngine:
         )
 
     def _posture_from_denials(self, denials: int) -> Posture:
-        if denials >= 20:
-            return Posture.locked
-        if denials >= 10:
-            return Posture.restricted
-        if denials >= 3:
-            return Posture.elevated
-        return Posture.normal
+        # Shared thresholds with PostureManager.next_posture (absolute map —
+        # restore has no "current" to ratchet against; history is authoritative).
+        return posture_for_denials(denials)
