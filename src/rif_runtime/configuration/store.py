@@ -6,7 +6,7 @@ from typing import Any
 
 
 class JsonStore:
-    def __init__(self, path: str, default: dict[str, Any]):
+    def __init__(self, path: str | Path, default: dict[str, Any]):
         self.path = Path(path)
         self.default = default
         self.path.parent.mkdir(parents=True, exist_ok=True)

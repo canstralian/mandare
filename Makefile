@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format clean build push docs serve deploy logs
+.PHONY: help install dev test lint format clean build push docs serve deploy logs lock lock-upgrade sync requirements-freeze requirements-check
 
 help:
 	@echo "RIF Runtime Development Makefile"
@@ -210,12 +210,40 @@ all: docker-down clean install dev docker-up
 	@echo "  Docs: http://localhost:8000/docs"
 	@echo "  Logs: make docker-logs"
 
+# Dependency locks (see requirements/README.md)
+PIP_COMPILE_ARGS = --quiet --generate-hashes --strip-extras --allow-unsafe
+
+# Recompile the locks from pyproject.toml. pip-compile keeps the versions
+# already pinned in the output files, so this is a no-op unless pyproject.toml
+# changed. CI's `lock-sync` job runs the same commands and fails on any diff.
+lock:
+	pip-compile $(PIP_COMPILE_ARGS) \
+		--output-file requirements/runtime.txt pyproject.toml
+	pip-compile $(PIP_COMPILE_ARGS) \
+		--extra dev --output-file requirements/dev.txt pyproject.toml
+
+# Deliberately pull in newer upstream releases within the declared ranges.
+lock-upgrade:
+	pip-compile $(PIP_COMPILE_ARGS) --upgrade \
+		--output-file requirements/runtime.txt pyproject.toml
+	pip-compile $(PIP_COMPILE_ARGS) --upgrade \
+		--extra dev --output-file requirements/dev.txt pyproject.toml
+
+# Install exactly what CI installs — including the pip upgrade the CI jobs do,
+# so a local `make sync` and a CI run start from the same pip.
+sync:
+	python -m pip install --upgrade pip
+	python -m pip install --require-hashes -r requirements/dev.txt
+	python -m pip install -e . --no-deps
+
 # Maintenance
 requirements-freeze:
 	pip freeze > requirements.txt.frozen
 
+# Audits the locks, matching the `dependency-security` job in merge-gate.yml.
 requirements-check:
-	pip-audit --desc
+	pip-audit --requirement requirements/runtime.txt --disable-pip
+	pip-audit --requirement requirements/dev.txt --disable-pip
 
 # Help for specific topics
 help-docker:

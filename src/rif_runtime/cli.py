@@ -25,13 +25,14 @@ def check(actor: str, action: str, target: str) -> None:
     )
 
 
-if __name__ == "__main__":
-    app()
-
-
 @app.command()
-def replay(decisions_path: str = "data/decisions.jsonl") -> None:
-    state = ReplayEngine(decisions_path).recover()
+def replay(decisions_path: str = "") -> None:
+    """Rebuild graph and posture state from a decisions log.
+
+    Defaults to decisions.jsonl under the configured data directory
+    (RIF_DATA_DIR, or [paths] data_dir in rif.toml).
+    """
+    state = ReplayEngine(decisions_path or None).recover()
     print(state.__dict__)
 
 
@@ -50,3 +51,11 @@ def msf_check(
     outcome = r.evaluate_metasploit(intent, mode=GovernanceMode(mode))
     print(outcome.decision.model_dump_json(indent=2))
     print(outcome.evidence.model_dump_json(indent=2))
+
+
+# Must stay last: Typer registers commands as the @app.command() decorators run,
+# so calling app() above `replay`/`msf-check` left them off `python -m
+# rif_runtime.cli` entirely (the `rif` console script was unaffected — it
+# imports the module fully before calling app).
+if __name__ == "__main__":
+    app()

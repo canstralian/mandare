@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+ARG PYTHON_VERSION=3.12.3
+FROM python:${PYTHON_VERSION}-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src PIP_DISABLE_PIP_VERSION_CHECK=1
+WORKDIR /app
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid "${GID}" rifdev && useradd --uid "${UID}" --gid "${GID}" --create-home --shell /bin/bash rifdev
+RUN --mount=type=cache,target=/root/.cache/pip --mount=type=bind,source=requirements.txt,target=requirements.txt python -m pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip --mount=type=bind,source=requirements-dev.txt,target=requirements-dev.txt python -m pip install -r requirements-dev.txt
+COPY . .
+RUN python -m pip install -e . && mkdir -p /app/.cache /app/.pytest_cache && chown -R rifdev:rifdev /app
+ENV HOME=/home/rifdev
+USER rifdev
+CMD ["bash"]

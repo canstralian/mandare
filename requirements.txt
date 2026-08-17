@@ -1,3 +1,14 @@
+# Runtime dependencies, unconstrained, mirroring [project.dependencies] in
+# pyproject.toml.
+#
+# This file is deliberately NOT pinned. It is the set a fresh consumer resolves
+# today, and it is what the Dockerfile and scripts/cloud-agent-install.sh
+# install. The `clean-clone` job in .github/workflows/merge-gate.yml installs
+# from this file with no lock and no cache, so upstream breakage surfaces here
+# rather than being masked by a pin.
+#
+# The reproducible, hash-pinned set that CI installs is requirements/runtime.txt
+# and requirements/dev.txt. See requirements/README.md.
 fastapi
 uvicorn[standard]
 pydantic
