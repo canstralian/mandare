@@ -15,6 +15,11 @@ class TelemetryStore:
         while len(self.events) > self.max_events:
             self.events.popleft()
 
+    def clear(self) -> None:
+        """Drop the rolling window (used by posture reset)."""
+
+        self.events.clear()
+
     def recent(self, minutes: int = 60) -> list[PolicyDecision]:
         cutoff = datetime.now(UTC) - timedelta(minutes=minutes)
         return [e for e in self.events if e.timestamp >= cutoff]

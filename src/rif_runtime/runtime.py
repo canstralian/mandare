@@ -3,6 +3,7 @@ from typing import Any
 
 from .config import load_config
 from .configuration.policies import PolicyStore
+from .evidence import EvidenceLedger
 from .governance.posture import escalate_posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
@@ -27,7 +28,11 @@ class RIFRuntime:
         self.policy_store = PolicyStore()
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
-        self.decisions_store = JsonlStore("data/decisions.jsonl")
+        # EvidenceLedger owns the decisions.jsonl store and adds the v1
+        # causal envelope on every append. decisions_store remains the
+        # underlying JsonlStore for count/summary helpers.
+        self.evidence_ledger = EvidenceLedger("data/decisions.jsonl")
+        self.decisions_store = self.evidence_ledger.store
         self.posture_store = JsonlStore("data/posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore("data/metasploit_evidence.jsonl")
@@ -43,20 +48,30 @@ class RIFRuntime:
         self.environment_name = name
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
-        decision = self.policy.evaluate(
-            req,
-            self.environment_name,
-            self.profile,
-            self.posture,
-            self.policy_store.list(),
-        )
         # record=False is a side-effect-free dry run: return the computed
         # decision without mutating posture or appending to the JSONL stores.
         # The unauthenticated simulation routes (e.g. /v1/mcp/invoke) use it so
         # they cannot drive posture escalation or flood the audit log.
         if not record:
-            return decision
-        return self.record_decision(decision)
+            return self.policy.evaluate(
+                req,
+                self.environment_name,
+                self.profile,
+                self.posture,
+                self.policy_store.list(),
+            )
+        # Hold the lock across evaluate+record so the posture stamped on the
+        # decision matches the posture RMW that follows (no TOCTOU under the
+        # FastAPI sync threadpool).
+        with self._lock:
+            decision = self.policy.evaluate(
+                req,
+                self.environment_name,
+                self.profile,
+                self.posture,
+                self.policy_store.list(),
+            )
+            return self._record_decision_unlocked(decision)
 
     def record_decision(self, decision: PolicyDecision) -> PolicyDecision:
         """Feed an already-computed decision through the governance circuit.
@@ -67,17 +82,38 @@ class RIFRuntime:
         `PolicyEngine.evaluate()` itself but should still drive posture
         escalation and land in the audit trail.
         """
+        # Same lock as evaluate_metasploit: FastAPI's sync threadpool can run
+        # concurrent evaluates against one RIFRuntime, and posture RMW + JSONL
+        # appends must not interleave.
+        with self._lock:
+            return self._record_decision_unlocked(decision)
+
+    def _record_decision_unlocked(self, decision: PolicyDecision) -> PolicyDecision:
         self.governance_graph.record_decision(decision)
         old_posture = self.posture
         self.posture = self.reflexive.observe(decision, self.posture)
 
-        self.decisions_store.append(decision.model_dump())
+        # Evidence ledger appends a v1 causal envelope (schema_version,
+        # sequence, previous_hash, record_hash) around the JSON-native
+        # decision payload. Legacy rows without the envelope stay readable.
+        self.evidence_ledger.append_decision(decision)
 
         if old_posture != self.posture:
             self.posture_store.append(
-                {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                {
+                    "old_posture": str(old_posture),
+                    "new_posture": str(self.posture),
+                }
             )
         return decision
+
+    def reset_posture(self) -> Posture:
+        """Return to ``normal`` and clear denial pressure so reset sticks."""
+
+        with self._lock:
+            self.posture = Posture.normal
+            self.reflexive.telemetry.clear()
+            return self.posture
 
     def evaluate_metasploit(
         self,
@@ -108,12 +144,15 @@ class RIFRuntime:
             if outcome.severe:
                 self.posture = escalate_posture(self.posture)
 
-            self.decisions_store.append(decision.model_dump())
-            self.evidence_store.append(outcome.evidence.model_dump())
+            self.evidence_ledger.append_decision(decision)
+            self.evidence_store.append(outcome.evidence.model_dump(mode="json"))
 
             if old_posture != self.posture:
                 self.posture_store.append(
-                    {"old_posture": str(old_posture), "new_posture": str(self.posture)}
+                    {
+                        "old_posture": str(old_posture),
+                        "new_posture": str(self.posture),
+                    }
                 )
             return outcome
 

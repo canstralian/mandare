@@ -68,7 +68,7 @@ class PolicyEngine:
             return self.deny(
                 req,
                 env_name,
-                Posture.elevated,
+                posture,
                 "package manager egress disabled",
                 "package.egress.disabled",
             )
@@ -79,7 +79,7 @@ class PolicyEngine:
             return self.deny(
                 req,
                 env_name,
-                Posture.elevated,
+                posture,
                 "MCP egress disabled",
                 "mcp.egress.disabled",
             )
@@ -91,7 +91,7 @@ class PolicyEngine:
                 return self.deny(
                     req,
                     env_name,
-                    Posture.elevated,
+                    posture,
                     f"host denied: {h}",
                     "network.host.denied",
                 )

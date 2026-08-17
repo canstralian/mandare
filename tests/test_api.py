@@ -105,6 +105,45 @@ def test_posture_reset(monkeypatch):
     assert health.json()["posture"] == "normal"
 
 
+def test_posture_reset_clears_telemetry_so_escalation_does_not_snap_back(
+    monkeypatch,
+):
+    # Regression: reset only flipped the posture flag; residual denials in the
+    # 60m telemetry window made the next observe re-escalate immediately.
+    from rif_runtime import api
+    from rif_runtime.schemas import PolicyRequest
+
+    monkeypatch.setenv(ENV_VAR, "test-key")
+    headers = {"X-API-Key": "test-key"}
+
+    # Drive three denials through the shared runtime (records into telemetry).
+    for i in range(3):
+        api.runtime.evaluate(
+            PolicyRequest(
+                actor="agent:reset-test",
+                action="http.request",
+                target=f"https://reset-evil-{i}.example.com",
+            )
+        )
+    assert api.runtime.posture == "elevated"
+    assert api.runtime.reflexive.telemetry.denial_count(60) >= 3
+
+    reset = client.post("/v1/posture/reset", headers=headers)
+    assert reset.status_code == 200
+    assert reset.json()["posture"] == "normal"
+    assert api.runtime.reflexive.telemetry.denial_count(60) == 0
+
+    # One more denial must not instantly re-elevate (needs 3 again).
+    api.runtime.evaluate(
+        PolicyRequest(
+            actor="agent:reset-test",
+            action="http.request",
+            target="https://reset-evil-after.example.com",
+        )
+    )
+    assert api.runtime.posture == "normal"
+
+
 def test_metasploit_token_bad_ttl_returns_422_not_500(monkeypatch):
     # int(None) and int({}) raise TypeError rather than ValueError, so these
     # payloads used to escape the handler's except clause as a 500 while a

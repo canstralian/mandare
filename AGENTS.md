@@ -32,11 +32,12 @@ service see `.claude/skills/run-rif-runtime/SKILL.md`.
   the direct uvicorn process is a single PID that `kill` stops cleanly (see
   SKILL.md). Interactive Swagger UI is at `/docs`.
 - Quick end-to-end check once the server is up:
-  `BASE=http://127.0.0.1:8000 bash scripts/smoke.sh` (exercises an allow + a deny
-  decision; the deny escalates posture to `elevated`). No server needed for a
-  single decision: `rif check "agent:test" "http.request" "https://blocked.example.com"`.
-  Action names matter: only real network actions (`http.request`, `api.call`,
-  `mcp.invoke`, `package.install`) are checked against `allowed_hosts`.
+ `BASE=http://127.0.0.1:8000 bash scripts/smoke.sh` (exercises an allow + a deny
+ decision; a single deny does not yet escalate posture — that takes three denials
+ in the rolling window). No server needed for a
+ single decision: `rif check "agent:test" "http.request" "https://blocked.example.com"`.
+ Action names matter: only real network actions (`http.request`, `api.call`,
+ `mcp.invoke`, `package.install`) are checked against `allowed_hosts`.
 - Running any real `RIFRuntime()` (server, CLI, or most tests) appends to
   `data/decisions.jsonl` / `data/posture_history.jsonl` (gitignored) — expected
   and harmless. Posture accumulates across runs, so a fresh checkout may already
