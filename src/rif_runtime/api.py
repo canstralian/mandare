@@ -1,5 +1,4 @@
 import os
-from dataclasses import asdict
 from typing import Annotated, Any
 from uuid import uuid4
 
@@ -8,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError
 
-from .agents.auditor import AuditorAgent
 from .auth import ControlPlaneAuth
 from .configuration.policies import PolicyRule
 from .integrations import supabase as sb
@@ -18,12 +16,13 @@ from .mcp.metasploit import (
     GovernanceMode,
     MetasploitIntent,
 )
-from .replay import ReplayEngine
 from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
 from .startup import register_config_startup
 
+# Module-level composition root. Routes adapt HTTP ↔ Runtime; behaviour lives
+# on ``runtime`` (see docs/adr/ADR-0028-runtime-composition-root.md).
 runtime = RIFRuntime()
 app = FastAPI(
     title="RIF Runtime",
@@ -101,14 +100,12 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
+    return {"posture": runtime.reset_posture().value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
-    return {"posture": runtime.posture}
+    return {"posture": runtime.set_posture(posture).value}
 
 
 @app.get("/")
@@ -132,7 +129,7 @@ def telemetry_summary() -> dict[str, Any]:
 
 @app.get("/v1/audit")
 def audit() -> dict[str, Any]:
-    return AuditorAgent().audit(runtime)
+    return runtime.audit()
 
 
 @app.post("/v1/mcp/invoke")
@@ -211,7 +208,7 @@ def persistence_summary() -> dict[str, Any]:
 def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
     # the response is meaningful after a restart.
-    return asdict(ReplayEngine().recover())
+    return runtime.recovered_state()
 
 
 @app.get("/v1/policies")

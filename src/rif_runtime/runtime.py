@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import threading
+from dataclasses import asdict
 from typing import Any
 
+from .agents.auditor import AuditorAgent
 from .config import load_config
 from .configuration.policies import PolicyStore
 from .governance.posture import escalate_posture
@@ -14,12 +18,24 @@ from .mcp.metasploit import (
     MetasploitIntent,
 )
 from .policy import PolicyEngine
+from .replay import ReplayEngine
 from .schemas import EnvironmentProfile, PolicyDecision, PolicyRequest, Posture
 from .storage.jsonl import JsonlStore
 
 
 class RIFRuntime:
-    def __init__(self) -> None:
+    """Composition root for the governed runtime.
+
+    HTTP, CLI, and other transports should construct or receive one
+    ``RIFRuntime`` and delegate into it. Behaviour lives here (and in the
+    collaborators it owns); transports adapt requests/responses only.
+    """
+
+    def __init__(
+        self,
+        *,
+        replay: ReplayEngine | None = None,
+    ) -> None:
         self.config = load_config()
         self.environment_name = self.config.default_environment
         self.posture = Posture.normal
@@ -31,6 +47,10 @@ class RIFRuntime:
         self.posture_store = JsonlStore("data/posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore("data/metasploit_evidence.jsonl")
+        # Replay rebuilds from the same decision log the evaluate circuit
+        # appends to — keep the path coupled unless a caller injects a
+        # substitute (tests).
+        self.replay = replay or ReplayEngine(str(self.decisions_store.path))
         self._lock = threading.Lock()
 
     @property
@@ -41,6 +61,18 @@ class RIFRuntime:
         if name not in self.config.environments:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
+
+    def set_posture(self, posture: Posture) -> Posture:
+        """Set live posture without recording a transition event."""
+        with self._lock:
+            self.posture = posture
+            return self.posture
+
+    def reset_posture(self) -> Posture:
+        """Return live posture to ``normal`` without recording a transition."""
+        with self._lock:
+            self.posture = Posture.normal
+            return self.posture
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
         decision = self.policy.evaluate(
@@ -117,6 +149,14 @@ class RIFRuntime:
                 )
             return outcome
 
+    def recovered_state(self) -> dict[str, Any]:
+        """Rebuild graph/posture summary from the persisted decision log.
+
+        Independent of live in-memory state, so it remains meaningful after a
+        process restart.
+        """
+        return asdict(self.replay.recover())
+
     def graph_summary(self) -> dict[str, Any]:
         return self.governance_graph.summary()
 
@@ -146,3 +186,7 @@ class RIFRuntime:
             },
             "persisted": self.persisted_summary(),
         }
+
+    def audit(self) -> dict[str, Any]:
+        """Operator-facing audit view (delegates to ``AuditorAgent``)."""
+        return AuditorAgent().audit(self)
