@@ -30,7 +30,19 @@ schemas seeded into `capability/`, `governance/`, and `evidence/` above. A later
 slice should decide whether `contracts/rif_familiar/` re-exports from `spec/` or is
 retired in favor of it; that decision is out of scope here.
 
+## Specification reviews in flight
+
+Contract changes that cross more than one domain are worked as specification
+reviews under `docs/` before landing as schemas here. Builder work on a domain is
+held while a review governing it is open.
+
+| Review | Governs | Status |
+| --- | --- | --- |
+| `docs/spec-review-identity-spine-migration.md` | Identity hierarchy, `Run` as aggregate root | Approved Pending Governance Completion |
+| `docs/spec-review-capability-snapshot-authority.md` | `capability/`, `replay/`, `mcp/` — what capability observation authorizes a unit of work | Draft |
+
 ## Next slices
-- Extract a `replay/` contract from `src/rif_runtime/replay.py`.
+- Extract a `replay/` contract from `src/rif_runtime/replay.py`, including the
+  replay-is-not-recovery constraint stated in the capability-snapshot review §6.
 - Extract a `state/` contract from the current `runtime_state.json` shape.
 - Define the `skill/` package format contract (`SKILL.md` + `skill.yaml` schema).

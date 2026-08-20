@@ -32,6 +32,9 @@ RIF is not an autonomous agent framework; it is a governance and execution subst
 
 - Stabilize the causal-path/explainability contract.
 - Define policy precedence and frozen environment snapshots.
+- Settle capability-snapshot authority — what external capability observation a
+  decision is authorized against, and what governs its replacement. Held at
+  specification review: `docs/spec-review-capability-snapshot-authority.md`.
 - Normalize audit, posture, and decision records.
 - Add regression coverage for deny-by-default, fallback, and policy-conflict behavior.
 
