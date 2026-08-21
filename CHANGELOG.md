@@ -6,6 +6,14 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ### Fixed
 
+- **Concurrent writers no longer fork the decision chain.** The tail hash was
+  cached for a store object's lifetime, so a `rif check` run against a live
+  `rif serve` — both building a `RIFRuntime` over the same `RIF_DATA_DIR` —
+  produced a forked chain, and `/v1/audit` then reported `verified: false`
+  permanently, indistinguishable from tampering. Appends now take an exclusive
+  `flock` and re-read the tail from the end of the file inside it. Covered by a
+  test running three real processes; verified that it fails without the lock.
+
 - **The container could not write its own state.** Every layer before
   `USER appuser` runs as root, so `COPY . .` left `/app/data` root-owned while
   the process ran unprivileged: the container reported healthy and then failed

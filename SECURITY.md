@@ -55,7 +55,7 @@ The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`.
 - the chain is unwitnessed, so it establishes internal consistency, not third-party attestation;
 - rows written before chaining was introduced carry no envelope. They are reported as `unchained_leading` and are explicitly **not** counted as verified;
 - other stores (`posture_history.jsonl`, `metasploit_evidence.jsonl`) remain plain append-only JSONL and are not chained;
-- there is no cross-process file lock. Two processes appending to one log will fork the chain and verification will fail — correctly, but for a concurrency reason rather than an attack.
+- concurrent appends are serialised by an advisory `flock`, and each writer re-reads the tail inside that lock, so two processes appending to one log (a `rif check` alongside a running `rif serve`) produce one chain rather than a fork. `fcntl` is POSIX-only; on a platform without it the lock degrades to a no-op and the single-writer assumption returns.
 
 Tamper-*evidence* is therefore what this provides. Tamper-*proofing* would require external anchoring or an append-only medium the runtime does not control.
 

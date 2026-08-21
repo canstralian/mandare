@@ -1,6 +1,14 @@
 import json
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
+
+try:  # POSIX only; absent on Windows.
+    import fcntl
+except ImportError:  # pragma: no cover - platform dependent
+    fcntl = None  # type: ignore[assignment]
 
 from ..audit import GENESIS_HASH, AuditRecord, utc_now_iso
 from ..security import normalize_for_json
@@ -82,45 +90,84 @@ class HashChainedJsonlStore(JsonlStore):
     datetime as ``"... 09:55:37+00:00"`` while the digest covered
     ``"...T09:55:37+00:00"``, and verification could never succeed.
 
-    Single-writer assumption: the last hash is cached after the first read, so
-    a second *process* appending to the same file will fork the chain. That is
-    the same constraint ``JsonlStore`` already has -- neither takes a file
-    lock. Within a process, ``RIFRuntime`` serialises appends under its lock.
+    Concurrent writers are the case this has to get right. ``rif check`` builds
+    its own ``RIFRuntime`` against the same ``RIF_DATA_DIR`` as a running
+    ``rif serve``, so two processes appending to one log is ordinary use, not an
+    edge case. Caching the tail hash for the object's lifetime forked the chain
+    the moment that happened, and a forked chain reports ``verified: false``
+    forever -- indistinguishable from tampering, which is the one thing this
+    class exists to detect.
+
+    So the tail is read back under an exclusive ``flock`` on every append, and
+    the link is computed inside that lock. The read seeks from the end rather
+    than parsing the file, so it stays cheap as the log grows. Within a process
+    ``RIFRuntime`` also serialises appends under its own lock; this covers the
+    cross-process case that one cannot.
+
+    ``fcntl`` is POSIX-only. Without it (Windows) the lock degrades to a no-op
+    and the single-writer assumption returns; the runtime targets Linux.
     """
 
-    def __init__(self, path: str | Path) -> None:
-        super().__init__(path)
-        self._last_hash: str | None = None
+    #: Bytes to read back when locating the final line. One row is ~1 KB.
+    _TAIL_WINDOW = 65536
 
-    def _tail_hash(self) -> str:
-        """Hash the next row must link to, read from disk on first use."""
-        if self._last_hash is None:
-            self._last_hash = GENESIS_HASH
-            for row in self.read_all():
-                chain = row.get(CHAIN_KEY)
-                if isinstance(chain, dict) and "current_hash" in chain:
-                    self._last_hash = str(chain["current_hash"])
-        return self._last_hash
+    @contextmanager
+    def _locked(self) -> Iterator[IO[str]]:
+        """Open for append with an exclusive advisory lock held throughout."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a+", encoding="utf-8") as handle:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield handle
+            finally:
+                if fcntl is not None:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def _tail_hash(self, handle: IO[str]) -> str:
+        """Hash the next row must link to, read from the end of the open file.
+
+        Must be called with the lock held: the value is only true for as long
+        as no other writer can append.
+        """
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        if size == 0:
+            return GENESIS_HASH
+
+        handle.seek(max(0, size - self._TAIL_WINDOW))
+        lines = [line for line in handle.read().splitlines() if line.strip()]
+        if not lines:
+            return GENESIS_HASH
+
+        try:
+            chain = json.loads(lines[-1]).get(CHAIN_KEY)
+        except json.JSONDecodeError:
+            return GENESIS_HASH
+        if isinstance(chain, dict) and "current_hash" in chain:
+            return str(chain["current_hash"])
+        # Final row predates chaining: start the chain from genesis. verify()
+        # counts those rows as unchained_leading rather than verified.
+        return GENESIS_HASH
 
     def append(self, record: dict[str, Any]) -> None:
         payload = normalize_for_json(record)
-        entry = AuditRecord(
-            event_id=AuditRecord.new_event_id(),
-            timestamp=utc_now_iso(),
-            payload=payload,
-            previous_hash=self._tail_hash(),
-        )
-        row = dict(payload)
-        row[CHAIN_KEY] = {
-            "event_id": entry.event_id,
-            "timestamp": entry.timestamp,
-            "previous_hash": entry.previous_hash,
-            "current_hash": entry.current_hash,
-        }
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(row) + "\n")
-        self._last_hash = entry.current_hash
+        with self._locked() as handle:
+            entry = AuditRecord(
+                event_id=AuditRecord.new_event_id(),
+                timestamp=utc_now_iso(),
+                payload=payload,
+                previous_hash=self._tail_hash(handle),
+            )
+            row = dict(payload)
+            row[CHAIN_KEY] = {
+                "event_id": entry.event_id,
+                "timestamp": entry.timestamp,
+                "previous_hash": entry.previous_hash,
+                "current_hash": entry.current_hash,
+            }
+            handle.seek(0, os.SEEK_END)
+            handle.write(json.dumps(row) + "\n")
 
     def verify(self) -> ChainVerification:
         """Recompute every link and report where, if anywhere, it breaks."""

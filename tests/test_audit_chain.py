@@ -1,5 +1,8 @@
 import json
 from dataclasses import replace
+from pathlib import Path
+
+import pytest
 
 from rif_runtime.audit import GENESIS_HASH, append_record, verify_chain
 from rif_runtime.configuration.policies import PolicyRule
@@ -255,3 +258,97 @@ def test_audit_summary_reports_chain_state(tmp_path):
     chain = runtime.audit_summary()["decision_chain"]
     assert chain["verified"] is True
     assert chain["chained_rows"] == 1
+
+
+# --- concurrent writers ------------------------------------------------------
+#
+# `rif check` builds its own RIFRuntime against the same RIF_DATA_DIR as a
+# running `rif serve`, so two processes appending to one decision log is
+# ordinary use. Caching the tail hash for an object's lifetime forked the chain
+# the moment that happened, and a forked chain reads as tampering forever.
+
+
+def test_two_runtimes_interleaving_appends_keep_one_chain(tmp_path):
+    """The in-process case: two RIFRuntime objects over the same directory."""
+    first = _allowing_runtime(tmp_path)
+    second = RIFRuntime(data_dir=tmp_path)
+
+    first.evaluate(_decision("https://a.example.com"))
+    second.evaluate(_decision("https://b.example.com"))
+    first.evaluate(_decision("https://c.example.com"))
+    second.evaluate(_decision("https://d.example.com"))
+
+    result = first.verify_decision_chain()
+    assert result["verified"] is True, result
+    assert result["chained_rows"] == 4
+
+
+def test_two_stores_interleaving_appends_keep_one_chain(tmp_path):
+    path = tmp_path / "log.jsonl"
+    left = HashChainedJsonlStore(path)
+    right = HashChainedJsonlStore(path)
+
+    for index in range(5):
+        (left if index % 2 == 0 else right).append({"event": index})
+
+    result = left.verify()
+    assert result.verified is True
+    assert result.chained_rows == 5
+
+
+def test_separate_processes_appending_concurrently_keep_one_chain(tmp_path):
+    """The case the lock exists for: real OS processes, no shared memory.
+
+    Uses flock, so this is a genuine cross-process assertion rather than a
+    threading one. Skipped where fcntl is unavailable (Windows), which is the
+    platform where the store documents a single-writer assumption.
+    """
+    import subprocess
+    import sys
+
+    pytest.importorskip("fcntl")
+
+    path = tmp_path / "log.jsonl"
+    writer = tmp_path / "writer.py"
+    writer.write_text(
+        "import sys\n"
+        "sys.path.insert(0, sys.argv[3])\n"
+        "from rif_runtime.storage.jsonl import HashChainedJsonlStore\n"
+        "store = HashChainedJsonlStore(sys.argv[1])\n"
+        "for i in range(25):\n"
+        "    store.append({'writer': sys.argv[2], 'i': i})\n",
+        encoding="utf-8",
+    )
+
+    src = str(Path(__file__).resolve().parent.parent / "src")
+    processes = [
+        subprocess.Popen(
+            [sys.executable, str(writer), str(path), name, src],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        for name in ("alpha", "beta", "gamma")
+    ]
+    for process in processes:
+        _, stderr = process.communicate(timeout=60)
+        assert process.returncode == 0, stderr.decode()
+
+    result = HashChainedJsonlStore(path).verify()
+    assert result.verified is True, (
+        f"chain broke at row {result.broken_at} under concurrent writers"
+    )
+    assert result.chained_rows == 75
+
+
+def test_tail_is_read_from_disk_not_from_a_cached_value(tmp_path):
+    """A store must not assume it was the last writer."""
+    path = tmp_path / "log.jsonl"
+    store = HashChainedJsonlStore(path)
+    store.append({"event": "mine"})
+
+    HashChainedJsonlStore(path).append({"event": "someone else's"})
+    store.append({"event": "mine again"})
+
+    rows = store.read_all()
+    assert rows[2][CHAIN_KEY]["previous_hash"] == rows[1][CHAIN_KEY]["current_hash"]
+    assert store.verify().verified is True
