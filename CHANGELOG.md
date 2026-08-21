@@ -19,6 +19,11 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **The OpenAPI document reports the real package version.** `api.py`
+  hardcoded `version="0.3.0"` while the package was `0.3.0rc2`, so
+  `/openapi.json` advertised a release the installed distribution was not. It
+  now uses `__version__`, and a test fails if a literal is reintroduced.
+
 - **`rif serve` no longer forces auto-reload.** Reload was hardcoded on, so the
   start command documented in the README quick start spawned uvicorn's
   file-watching supervisor even when serving for real. It is now `--reload`,

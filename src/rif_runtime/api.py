@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError
 
+from . import __version__
 from .agents.auditor import AuditorAgent
 from .auth import ControlPlaneAuth, ReadPlaneAuth
 from .configuration.policies import PolicyRule
@@ -27,7 +28,11 @@ from .startup import register_config_startup
 runtime = RIFRuntime()
 app = FastAPI(
     title="RIF Runtime",
-    version="0.3.0",
+    # Resolved from package metadata (falling back to pyproject.toml in a
+    # source checkout), not written out here. The literal was "0.3.0" against
+    # a package version of 0.3.0rc2, so /openapi.json advertised a release the
+    # installed distribution was not.
+    version=__version__,
     description="Governed execution substrate for intelligent systems.",
 )
 
