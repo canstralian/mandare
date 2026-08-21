@@ -1,106 +1,109 @@
 # Reflexive Evolution Pipeline
 
+> **Status: design proposal.** This document describes a target governance model. The current runtime does not implement the full repair/evolution pipeline described below.
+
 ## Purpose
 
-RIF Runtime is designed to govern intelligent action, not merely execute it. The Reflexive Evolution Pipeline defines how the runtime observes failures, proposes bounded repair, verifies changes, and accumulates evidence without allowing ungoverned self-modification.
+The proposal is to make adaptation explicit without allowing a model, diagnosis, or learned record to silently become authority.
 
-## Control loops
+The invariant is:
 
-RIF separates adaptation into three loops:
+> **Observation can inform a proposal; only a governed decision can authorize a change.**
 
-1. **Reflexive healing** restores an expected operating state through bounded, reversible repair actions.
-2. **Learning** captures diagnosis, evidence, repair outcomes, and confidence for future retrieval.
-3. **Evolution** changes policies, adapters, workflows, or architecture only through explicit review and promotion controls.
+## Proposed loops
 
-These loops must remain independently inspectable. A model error must not be able to silently become a policy change.
+1. **Observation** — collect a failure or state signal.
+2. **Diagnosis** — classify the signal and form a testable hypothesis.
+3. **Proposal** — describe a bounded repair without applying it.
+4. **Verification** — test the proposal under explicit policy constraints.
+5. **Promotion** — apply an approved change only through an external governance path.
 
-## Pipeline
+Learning may improve future proposals, but learned content is not policy authority.
+
+## Proposed pipeline
 
 ```text
 Observe
   -> Diagnose
   -> Classify
-  -> Plan repair
+  -> Propose
   -> Policy gate
-  -> Sandbox test
-  -> Apply or propose
+  -> Isolated verification
   -> Verify
   -> Record evidence
-  -> Learn
-  -> Promote evolution only when thresholds pass
+  -> Review / promote
 ```
 
-Every stage emits a typed, durable record. These names are canonical — use them consistently instead of synonyms like "remediation" or "fix":
+The following names are **proposed contract vocabulary**, not a claim that every type currently exists in the runtime:
 
 ```text
 Intent
-  -> PolicyDecision
-  -> FailureEvent
-  -> EvidenceRecord
-  -> Diagnosis
-  -> RepairProposal
-  -> SandboxResult
-  -> VerificationResult
-  -> LearningRecord
-  -> EvolutionProposal
+PolicyDecision
+FailureEvent
+EvidenceRecord
+Diagnosis
+RepairProposal
+SandboxResult
+VerificationResult
+LearningRecord
+EvolutionProposal
 ```
 
-## Autonomy levels
+## Proposed autonomy levels
 
-| Level | Capability | Default disposition |
-| --- | --- | --- |
-| L0 | Observe and record | Allowed |
-| L1 | Diagnose and classify | Allowed |
-| L2 | Propose a repair | Allowed |
-| L3 | Test a repair in an isolated sandbox | Allowed for low-risk scopes |
-| L4 | Open a pull request | Requires policy approval |
-| L5 | Merge after review | Requires human approval |
-| L6 | Autonomous merge | Not enabled in the MVP |
+| Level | Meaning | Proposed authority |
+|---|---|---|
+| L0 | Observe and record | No mutation |
+| L1 | Diagnose/classify | No mutation |
+| L2 | Propose a repair | No mutation |
+| L3 | Test a repair in isolation | No production mutation |
+| L4 | Open a change proposal | External review required |
+| L5 | Apply an approved change | Human/governed approval required |
+| L6 | Autonomous promotion | Explicitly out of scope for the current MVP |
 
-The MVP target is L0-L3.
+These levels are a design vocabulary, not an enabled runtime capability matrix.
 
 ## Repair constraints
 
-A RepairProposal must declare its target, scope, reversibility, expected verification, and fallback. Direct mutation of protected branches, policy suppression, secret handling, evidence deletion, and workflow disablement are denied by default.
+A future `RepairProposal` should declare at least:
 
-```json
-{
-  "intent": "repair.workflow.bandit",
-  "risk": "medium",
-  "scope": [".github/workflows/bandit.yml"],
-  "reversible": true,
-  "verification": ["bandit -r src", "github_actions_run"],
-  "fallback": "open_issue",
-  "requires_human_approval": true
-}
-```
+- target and scope;
+- expected effect;
+- reversibility;
+- verification criteria;
+- fallback/rollback;
+- required authority.
 
-## Evidence and learning
+Protected-branch mutation, policy suppression, secret handling, evidence deletion, and disabling security controls should require explicit policy and human-controlled promotion.
 
-LearningRecords are evidence, not authority. They may improve retrieval, triage, and proposal quality, but they do not alter policy automatically.
+## Evidence
 
-A minimum LearningRecord includes:
+A future evidence contract should distinguish:
 
-- event type and source;
-- normalized EvidenceRecord references;
-- root-cause hypothesis and confidence (the Diagnosis);
-- proposed and applied repair (the RepairProposal);
-- VerificationResult;
-- rollback outcome when applicable;
-- reviewer approval or rejection.
+- what was observed;
+- what was inferred;
+- what was proposed;
+- what was actually changed;
+- what verification established;
+- who/what authorized promotion.
+
+That distinction prevents a plausible model explanation from being mistaken for an observed fact.
 
 ## Evolution gate
 
-An EvolutionProposal changes a policy, adapter, model, workflow, or evaluation baseline. It must include:
+A future `EvolutionProposal` should carry:
 
 1. problem statement;
-2. threat model;
-3. proposed change;
-4. test and evaluation plan;
-5. rollback plan;
-6. human approval requirement;
-7. observation period and promotion criteria.
+2. affected boundary;
+3. threat model;
+4. proposed change;
+5. evaluation plan;
+6. rollback plan;
+7. approval requirement;
+8. observation/promotion criteria.
 
-## Hugging Face Space boundary
+## Current implementation boundary
 
-A Hugging Face Space may host the RIF reference runtime and demo UI. It must not be treated as a trusted control plane. The Space may demonstrate intent evaluation, failure diagnosis, sandboxed repair planning, and EvidenceRecord visualization. Credentials, production tools, and protected branch mutation remain outside the Space boundary.
+The current repository already provides policy, posture, persistence, replay, audit primitives, and governed MCP surfaces. It does **not** currently implement the complete autonomous repair/evolution pipeline specified on this page.
+
+Implementation should proceed only after the relevant contracts and fixture inventory are settled through the repository's specification-review process.
