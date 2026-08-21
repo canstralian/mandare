@@ -47,7 +47,17 @@ The application hashes supplied and configured keys before constant-time compari
 
 `src/rif_runtime/audit.py` provides hash-chain record primitives with a genesis hash and chain verification.
 
-**Important limitation:** the existence of these primitives does not mean every persisted runtime record is cryptographically signed or hash-chained. The default JSONL decision store is not an externally anchored, immutable evidence ledger.
+The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`, so editing, deleting, or reordering a row breaks every link after it. `GET /v1/audit` reports the result under `decision_chain`, and `RIFRuntime.verify_decision_chain()` returns it directly.
+
+**Scope of that property.** Chain verification detects *modification of what is on disk*. It is not proof of completeness and not an externally anchored ledger:
+
+- an attacker with write access can truncate the log and rewrite a shorter, internally valid chain — nothing in the file commits to its own length;
+- the chain is unwitnessed, so it establishes internal consistency, not third-party attestation;
+- rows written before chaining was introduced carry no envelope. They are reported as `unchained_leading` and are explicitly **not** counted as verified;
+- other stores (`posture_history.jsonl`, `metasploit_evidence.jsonl`) remain plain append-only JSONL and are not chained;
+- there is no cross-process file lock. Two processes appending to one log will fork the chain and verification will fail — correctly, but for a concurrency reason rather than an attack.
+
+Tamper-*evidence* is therefore what this provides. Tamper-*proofing* would require external anchoring or an append-only medium the runtime does not control.
 
 ### Persistence and replay
 
@@ -95,7 +105,7 @@ These are future hardening items, not active controls.
 | Unauthorized policy operation | Control-plane API-key guard | API keys are not enterprise IAM |
 | Policy bypass through malformed input | Pydantic validation and policy checks | Policy semantics are still evolving |
 | Secret leakage in structured data | Redaction helper and secret-scanning workflow | Redaction is field-name based, not a DLP system |
-| Local state tampering | Append-oriented persistence and replay | Local files can be modified by an attacker with filesystem access |
+| Local state tampering | Hash-chained decision log with verification, plus replay | Detects edits to the log; a writer who truncates it can rewrite a shorter valid chain, and other JSONL stores are unchained |
 | Replay of stale local state | Persisted posture/replay semantics | Replay is not an authorization protocol or nonce service |
 | Dependency compromise | Hash locks, audits, dependency review | No signed/SBOM/reproducible release chain yet |
 | Container privilege escalation | Non-root image baseline | Full runtime isolation is deployment-dependent |

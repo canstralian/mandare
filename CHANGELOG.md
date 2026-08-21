@@ -19,6 +19,16 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **The decision log is now hash-chained.** `audit.py` implemented the chain
+  primitives from the start, but nothing in `src/` used them, so
+  `decisions.jsonl` was append-only rather than tamper-evident. Decisions are
+  now written through `HashChainedJsonlStore`; edits, deletions, reorderings and
+  hand-spliced rows are detected. `GET /v1/audit` reports the result under
+  `decision_chain`. Rows written before this change are reported as
+  `unchained_leading`, never counted as verified. `SECURITY.md` documents what
+  the property does and does not cover — notably that truncation can be
+  rewritten into a shorter valid chain.
+
 - **`.env.example` no longer documents configuration that does not exist.**
   It listed 58 variables, of which the runtime read 3. The 55 inert names
   included `RIF_SECURITY_SANDBOX_ENABLED`, `RIF_SECURITY_NETWORK_ISOLATION`,

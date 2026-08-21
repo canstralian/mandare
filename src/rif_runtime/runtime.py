@@ -17,7 +17,7 @@ from .mcp.metasploit import (
 from .policy import PolicyEngine
 from .replay import ReplayEngine
 from .schemas import EnvironmentProfile, PolicyDecision, PolicyRequest, Posture
-from .storage.jsonl import JsonlStore
+from .storage.jsonl import HashChainedJsonlStore, JsonlStore
 
 
 class RIFRuntime:
@@ -36,7 +36,11 @@ class RIFRuntime:
         self.reflexive = ReflexiveLoop()
         self.governance_graph = GovernanceGraph()
         self.decisions_path = self.data_dir / "decisions.jsonl"
-        self.decisions_store = JsonlStore(self.decisions_path)
+        # Hash-chained: the decision log is the audit trail, so a silently
+        # edited row has to be detectable, not merely unlikely. Rows written
+        # before chaining existed are reported as `unchained_leading` rather
+        # than being counted as verified.
+        self.decisions_store = HashChainedJsonlStore(self.decisions_path)
         self.posture_store = JsonlStore(self.data_dir / "posture_history.jsonl")
         self.metasploit = MetasploitGovernor()
         self.evidence_store = JsonlStore(self.data_dir / "metasploit_evidence.jsonl")
@@ -209,6 +213,15 @@ class RIFRuntime:
             "decisions_by_rule": self.decisions_store.count_by("matched_rule"),
         }
 
+    def verify_decision_chain(self) -> dict[str, Any]:
+        """Recompute the decision log's hash chain.
+
+        Reports integrity of what is on disk. It does not prove that the log
+        records every decision the runtime made -- an attacker who can truncate
+        the file can rewrite a shorter valid chain.
+        """
+        return self.decisions_store.verify().as_dict()
+
     def audit_summary(self) -> dict[str, Any]:
         return {
             "environment": self.environment_name,
@@ -220,4 +233,5 @@ class RIFRuntime:
                 "telemetry": self.telemetry_summary(),
             },
             "persisted": self.persisted_summary(),
+            "decision_chain": self.verify_decision_chain(),
         }
