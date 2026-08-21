@@ -11,8 +11,22 @@ app = typer.Typer()
 
 
 @app.command()
-def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
-    uvicorn.run("rif_runtime.api:app", host=host, port=port, reload=True)
+def serve(
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    reload: bool = typer.Option(
+        False,
+        "--reload",
+        help="Restart the server when source files change (development only).",
+    ),
+) -> None:
+    """Run the HTTP API.
+
+    Auto-reload is off by default. It used to be unconditional, which meant
+    the start command the README documents spawned uvicorn's file-watching
+    reloader in production.
+    """
+    uvicorn.run("rif_runtime.api:app", host=host, port=port, reload=reload)
 
 
 @app.command()

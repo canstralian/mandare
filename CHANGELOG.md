@@ -19,6 +19,22 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **`rif serve` no longer forces auto-reload.** Reload was hardcoded on, so the
+  start command documented in the README quick start spawned uvicorn's
+  file-watching supervisor even when serving for real. It is now `--reload`,
+  off by default.
+- **The production image installs the hash-pinned lock.** `Dockerfile` built
+  from the deliberately unpinned `requirements.txt`, so the locked-toolchain
+  discipline stopped at the image. It now installs
+  `requirements/runtime.txt` with `--require-hashes` (which carries every
+  `uvicorn[standard]` extra), adds a `HEALTHCHECK` against `/health`, and runs
+  the installed `rif_runtime.api:app` rather than the `src.`-prefixed path that
+  only resolved via implicit namespace packages.
+- **Fixed the production compose healthcheck**, which invoked `curl` in a
+  `python:slim` image that has no curl and could therefore only fail. Its
+  environment block also set four variables nothing reads, including
+  `RIF_SECURITY_SANDBOX_MODE: "strict"`.
+
 - **The decision log is now hash-chained.** `audit.py` implemented the chain
   primitives from the start, but nothing in `src/` used them, so
   `decisions.jsonl` was append-only rather than tamper-evident. Decisions are
