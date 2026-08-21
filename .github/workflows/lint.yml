@@ -54,7 +54,10 @@ jobs:
 
       - name: Security check with Bandit
         run: |
-          bandit -r src/ -ll -f json -o bandit-report.json; BANDIT_EXIT=$?
+          # Under `bash -e` (Actions default), `cmd; EXIT=$?` never assigns on
+          # failure — the shell exits before `$?` is captured. Use `||` instead.
+          bandit -r src/ -ll -f json -o bandit-report.json || BANDIT_EXIT=$?
+          : "${BANDIT_EXIT:=0}"
           python -m json.tool bandit-report.json
           exit $BANDIT_EXIT
 
