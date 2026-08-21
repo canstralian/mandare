@@ -4,6 +4,21 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ## Unreleased
 
+### Fixed
+
+- **Breaking (governance): wildcard policy rules are now evaluated.**
+  `PolicyEngine.evaluate()` previously skipped every rule with
+  `action: "*"` or `target: "*"`, which meant the shipped
+  `deny_unknown_by_default` rule was loaded, returned by `GET /v1/policies`,
+  and never applied — an unconfigured action fell through to `default.allow`.
+  Wildcard rules now apply, so the default policy denies by default as it has
+  always claimed to. Rules are evaluated most-specific-first, and catch-all
+  (`"*"`/`"*"`) rules run after the environment constraints so a broad `allow`
+  cannot disable the `allowed_hosts` allowlist. Actions that relied on the old
+  fallthrough must now be permitted by an explicit rule; the MST eval harness
+  is one such consumer and now declares an `allow` rule for `code.refine`.
+  See "Policy evaluation order" in `docs/API.md`.
+
 ### Documentation and governance
 
 - Reworked the project overview to distinguish implemented behaviour from specification and planned work.

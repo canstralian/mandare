@@ -2,7 +2,29 @@ from run_session import ScriptedAgent, run_session
 from sandbox_exec import run_in_sandbox
 from score import score_session
 
+from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.runtime import RIFRuntime
+
+
+def refinement_runtime(tmp_path) -> RIFRuntime:
+    """A runtime that permits the harness's own `code.refine` action.
+
+    The default policy denies by default, so a governed consumer has to
+    declare the capability it needs -- the harness is no exception. Without
+    this rule every turn is blocked, `tests_passed` is None for all of them,
+    and the session scores as if nothing regressed (see `score_session`).
+    """
+    runtime = RIFRuntime(data_dir=tmp_path)
+    runtime.policy_store.upsert(
+        PolicyRule(
+            id="allow_eval_code_refine",
+            effect="allow",
+            action="code.refine",
+            target="*",
+            reason="MST eval harness refinement turns",
+        )
+    )
+    return runtime
 
 
 def test_score_session_no_regression():
@@ -50,12 +72,12 @@ CORRECT_V2 = "def add_one(value):\n    return value + 1\n"
 BROKEN_V1 = "def add_one(value):\n    return value + 2\n"
 
 
-def test_run_session_clean_solution_has_no_regression():
+def test_run_session_clean_solution_has_no_regression(tmp_path):
     agent = ScriptedAgent(
         name="static-correct",
         states=[CORRECT_V1, CORRECT_V2, CORRECT_V2, CORRECT_V2, CORRECT_V2],
     )
-    session = run_session(ADD_ONE_TASK, agent, runtime=RIFRuntime())
+    session = run_session(ADD_ONE_TASK, agent, runtime=refinement_runtime(tmp_path))
 
     result = session["result"]
     assert result["turns_attempted"] == 4
@@ -64,12 +86,12 @@ def test_run_session_clean_solution_has_no_regression():
     assert all(not event["regression_detected"] for event in result["events"])
 
 
-def test_run_session_detects_first_regression_and_escalates_posture():
+def test_run_session_detects_first_regression_and_escalates_posture(tmp_path):
     agent = ScriptedAgent(
         name="static-regresses",
         states=[CORRECT_V1, CORRECT_V2, BROKEN_V1, BROKEN_V1, BROKEN_V1],
     )
-    runtime = RIFRuntime()
+    runtime = refinement_runtime(tmp_path)
     session = run_session(ADD_ONE_TASK, agent, runtime=runtime)
 
     result = session["result"]
@@ -91,3 +113,23 @@ def test_run_session_detects_first_regression_and_escalates_posture():
     assert session["posture_start"] == "normal"
     assert session["posture_end"] == "elevated"
     assert runtime.posture == "elevated"
+
+
+def test_run_session_blocks_every_turn_without_a_permitting_rule(tmp_path):
+    """Under the default deny-by-default policy the harness is gated shut.
+
+    This is the harness's contract with governance, not a quirk: `code.refine`
+    has to be allowed explicitly. It is asserted so the day someone widens the
+    default policy, the change is visible here rather than silently restoring
+    a fallthrough the runtime no longer promises.
+    """
+    agent = ScriptedAgent(
+        name="static-regresses",
+        states=[CORRECT_V1, CORRECT_V2, BROKEN_V1, BROKEN_V1, BROKEN_V1],
+    )
+    session = run_session(ADD_ONE_TASK, agent, runtime=RIFRuntime(data_dir=tmp_path))
+
+    events = session["result"]["events"]
+    assert [event["verification_status"] for event in events] == ["blocked"] * 4
+    assert all(event["policy_decision"] == "deny" for event in events)
+    assert all(event["tests_passed"] is None for event in events)

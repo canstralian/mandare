@@ -38,6 +38,29 @@ These routes are guarded by `X-API-Key` through `RIF_CONTROL_PLANE_API_KEYS`.
 | `DELETE` | `/v1/policies/{rule_id}` | Delete a policy rule |
 | `POST` | `/v1/mcp/metasploit/token` | Mint a governed capability token |
 
+## Policy evaluation order
+
+`PolicyEngine.evaluate()` decides in this order, stopping at the first match:
+
+1. **Posture** — a `locked` runtime denies everything (`posture.locked`).
+2. **Selective rules** — configured rules that name an action, a target, or
+   both. Evaluated most-specific-first: a rule with both selectors concrete
+   beats one with a single wildcard. Rules of equal specificity keep their
+   order in `policies.json`, so position still breaks ties. A selective rule
+   overrides the environment constraints below — naming an action/target pair
+   is read as a deliberate operator intent.
+3. **Environment constraints** — package-manager egress, MCP egress, and the
+   `allowed_hosts` allowlist for `limited` networking.
+4. **Catch-all rules** — rules with `action: "*"` *and* `target: "*"`. These
+   are the configured fallback for everything not already decided. They run
+   last on purpose: a catch-all `allow` evaluated earlier would silently
+   disable the host allowlist in step 3.
+5. **`default.allow`** — the built-in fallback when no catch-all is configured.
+
+The shipped `data/policies.json` configures a catch-all deny
+(`deny_unknown_by_default`), so an unconfigured action is denied rather than
+allowed.
+
 ## Authentication
 
 Configure one or more control-plane keys:
