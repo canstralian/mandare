@@ -174,6 +174,17 @@ class HashChainedJsonlStore(JsonlStore):
 
     def append(self, record: dict[str, Any]) -> None:
         payload = normalize_for_json(record)
+        if CHAIN_KEY in payload:
+            # The envelope is written over the payload below, but the hash was
+            # computed *including* the caller's value -- and verify() strips
+            # CHAIN_KEY before recomputing. The digests could never agree, so an
+            # untampered record would report a broken chain, which is exactly
+            # the signal this class exists to make trustworthy. Reject the
+            # collision rather than silently produce an unverifiable row.
+            raise ValueError(
+                f"{CHAIN_KEY!r} is reserved for chain metadata and cannot "
+                "appear in a record"
+            )
         with self._locked() as handle:
             entry = AuditRecord(
                 event_id=AuditRecord.new_event_id(),

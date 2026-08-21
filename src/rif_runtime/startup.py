@@ -26,8 +26,8 @@ propagates.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
 
 from fastapi import FastAPI
 
@@ -50,6 +50,29 @@ def validate_config() -> RifSettings:
         logger.critical(
             "Configuration validation failed; refusing to start. "
             "Check rif.toml and RIF_* environment variables.",
+            exc_info=True,
+        )
+        raise
+
+
+@contextmanager
+def configuration_diagnostics() -> Iterator[None]:
+    """Label configuration errors raised while building the runtime.
+
+    ``validate_config`` only covers settings *parsing*. ``RIFRuntime`` then
+    validates the parsed values against the environments file and raises
+    ``ValueError`` for a name that matches no profile -- outside the diagnostic
+    path, so ``RIF_ENVIRONMENT=typo`` produced an unlabelled traceback while
+    ``RIF_POSTURE=typo`` produced a clear message. Same class of failure, so
+    the same treatment.
+    """
+    try:
+        yield
+    except ValueError:
+        logger.critical(
+            "Runtime configuration is invalid; refusing to start. "
+            "Check rif.toml, config/environments.yaml, and RIF_* "
+            "environment variables.",
             exc_info=True,
         )
         raise

@@ -47,9 +47,9 @@ The application hashes supplied and configured keys before constant-time compari
 
 `src/rif_runtime/audit.py` provides hash-chain record primitives with a genesis hash and chain verification.
 
-The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`, so editing, deleting, or reordering a row breaks every link after it. `GET /v1/audit` reports the result under `decision_chain`, and `RIFRuntime.verify_decision_chain()` returns it directly.
+The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`. Verification detects modification of a retained record, a broken predecessor link, and reordering — including a row removed from the middle, which orphans everything after it. It does **not** detect a deleted trailing suffix: every record that remains is still internally consistent, which is the same limitation as truncation below. `GET /v1/audit` reports the result under `decision_chain`, and `RIFRuntime.verify_decision_chain()` returns it directly.
 
-**Scope of that property.** Chain verification detects *modification of what is on disk*. It is not proof of completeness and not an externally anchored ledger:
+**Scope of that property.** Chain verification detects integrity failures among the records that are still present. It is not proof of completeness and not an externally anchored ledger:
 
 - an attacker with write access can truncate the log and rewrite a shorter, internally valid chain — nothing in the file commits to its own length;
 - the chain is unwitnessed, so it establishes internal consistency, not third-party attestation;

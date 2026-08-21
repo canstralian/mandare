@@ -23,7 +23,7 @@ from .replay import ReplayEngine
 from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
-from .startup import config_lifespan, validate_config
+from .startup import config_lifespan, configuration_diagnostics, validate_config
 
 # Validate before constructing the runtime: RIFRuntime() loads configuration,
 # so an invalid rif.toml raises here, at import, long before config_lifespan
@@ -31,7 +31,11 @@ from .startup import config_lifespan, validate_config
 # out of config.py rather than a message naming the configuration as the cause.
 validate_config()
 
-runtime = RIFRuntime()
+# The context manager covers the second half of configuration validation:
+# RIFRuntime checks the parsed values against environments.yaml and raises for
+# an unknown name, which validate_config() above cannot see.
+with configuration_diagnostics():
+    runtime = RIFRuntime()
 app = FastAPI(
     title="RIF Runtime",
     lifespan=config_lifespan,

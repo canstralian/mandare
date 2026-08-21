@@ -158,7 +158,7 @@ def test_api_module_validates_config_before_building_the_runtime():
 
     Asserted structurally rather than by importing under a broken config, which
     would need a subprocess and a temporary cwd. The call has to come before
-    the module-level `runtime = RIFRuntime()` or it reports nothing.
+    `runtime = RIFRuntime()` or it reports nothing.
     """
     import ast
     from pathlib import Path
@@ -167,12 +167,15 @@ def test_api_module_validates_config_before_building_the_runtime():
         Path(__file__).resolve().parent.parent / "src" / "rif_runtime" / "api.py"
     ).read_text(encoding="utf-8")
 
+    # ast.walk, not a scan of module.body: the runtime construction lives
+    # inside `with configuration_diagnostics():`, so it is no longer a
+    # top-level Assign.
     validate_line = runtime_line = None
-    for node in ast.parse(source).body:
+    for node in ast.walk(ast.parse(source)):
         if (
-            isinstance(node, ast.Expr)
-            and isinstance(node.value, ast.Call)
-            and getattr(node.value.func, "id", None) == "validate_config"
+            isinstance(node, ast.Call)
+            and getattr(node.func, "id", None) == "validate_config"
+            and validate_line is None
         ):
             validate_line = node.lineno
         if isinstance(node, ast.Assign) and any(

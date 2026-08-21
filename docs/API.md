@@ -9,11 +9,12 @@ The HTTP route definitions in `src/rif_runtime/api.py` are the source of truth. 
 | `GET` | `/` | Service/root metadata | None |
 | `GET` | `/health` | Health/status information | None |
 | `GET` | `/v1/environments` | List configured environments | None |
-| `GET` | `/v1/graph/summary` | Governance graph summary | None |
-| `GET` | `/v1/telemetry/summary` | Telemetry summary | None |
-| `GET` | `/v1/persistence/summary` | Persistence summary | None |
-| `GET` | `/v1/recovered-state` | Recovered runtime state | None |
-| `GET` | `/v1/audit` | Audit/decision view | None |
+| `GET` | `/v1/graph/summary` | Governance graph summary | `X-API-Key` when `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/telemetry/summary` | Telemetry summary | `X-API-Key` when `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/persistence/summary` | Persistence summary | `X-API-Key` when `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/recovered-state` | Recovered runtime state | `X-API-Key` when `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/audit` | Audit/decision view | `X-API-Key` when `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/policies` | List policy rules | `X-API-Key` when `RIF_REQUIRE_READ_AUTH=true` |
 
 ## Governance operations
 

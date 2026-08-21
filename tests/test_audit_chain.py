@@ -352,3 +352,52 @@ def test_tail_is_read_from_disk_not_from_a_cached_value(tmp_path):
     rows = store.read_all()
     assert rows[2][CHAIN_KEY]["previous_hash"] == rows[1][CHAIN_KEY]["current_hash"]
     assert store.verify().verified is True
+
+
+def test_record_carrying_the_reserved_chain_key_is_rejected(tmp_path):
+    """A colliding field name must not produce an unverifiable row.
+
+    The envelope is written over the payload, but the hash was computed
+    including the caller's value and verify() strips CHAIN_KEY before
+    recomputing -- so the digests could never agree and an untampered record
+    reported a broken chain, which is precisely the signal this class exists to
+    make trustworthy.
+    """
+    store = HashChainedJsonlStore(tmp_path / "log.jsonl")
+    store.append({"event": "fine"})
+
+    with pytest.raises(ValueError, match="reserved"):
+        store.append({"event": "collides", CHAIN_KEY: {"anything": 1}})
+
+    # The rejection must not corrupt the log or the chain.
+    result = store.verify()
+    assert result.verified is True
+    assert result.chained_rows == 1
+
+    store.append({"event": "still works"})
+    assert store.verify().chained_rows == 2
+
+
+def test_deleting_a_middle_row_breaks_the_chain_but_truncation_does_not(tmp_path):
+    """Pins the asymmetry SECURITY.md documents.
+
+    Removing a row from the middle orphans everything after it. Removing a
+    trailing suffix leaves every remaining record internally consistent, so
+    verification cannot see it -- that is the truncation limitation, and the
+    docs must not claim otherwise.
+    """
+    path = tmp_path / "log.jsonl"
+    store = HashChainedJsonlStore(path)
+    for index in range(5):
+        store.append({"i": index})
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+
+    path.write_text("\n".join(json.dumps(r) for r in rows[:3]) + "\n")
+    truncated = HashChainedJsonlStore(path).verify()
+    assert truncated.verified is True, "truncation is undetectable by design"
+    assert truncated.chained_rows == 3
+
+    path.write_text("\n".join(json.dumps(r) for r in rows[:2] + rows[3:]) + "\n")
+    gapped = HashChainedJsonlStore(path).verify()
+    assert gapped.verified is False
+    assert gapped.broken_at == 2

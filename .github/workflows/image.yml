@@ -13,9 +13,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Only security-scan uploads SARIF, so only it gets security-events: write.
+# At workflow level the build job would hold that scope too -- and that job
+# runs the checked-out code inside a container.
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: image-${{ github.ref }}
@@ -128,6 +130,9 @@ jobs:
 
   security-scan:
     name: filesystem scan
+    permissions:
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

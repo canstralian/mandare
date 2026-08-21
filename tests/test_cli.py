@@ -30,15 +30,38 @@ def test_serve_reload_flag_enables_it():
     assert run.call_args.kwargs["reload"] is True
 
 
-def test_serve_defaults_to_loopback():
+def test_serve_takes_host_and_port_from_settings(monkeypatch):
+    """Asserted against injected settings, not the ambient ones.
+
+    Reading the real singleton would make this depend on whatever a previous
+    test cached, and on RIF_SERVER_HOST/RIF_SERVER_PORT in the developer's
+    shell. That the *defaults* are loopback:8000 is a configuration contract,
+    tested in tests/test_config_contract.py; what belongs here is that the CLI
+    forwards whatever configuration says.
+    """
+    from rif_runtime.config import RifSettings
+
+    settings = RifSettings.model_validate(
+        {"server": {"host": "192.0.2.10", "port": 9999}}
+    )
+    monkeypatch.setattr("rif_runtime.cli.get_settings", lambda: settings)
+
     with patch("rif_runtime.cli.uvicorn.run") as run:
         runner.invoke(app, ["serve"])
 
-    assert run.call_args.kwargs["host"] == "127.0.0.1"
-    assert run.call_args.kwargs["port"] == 8000
+    assert run.call_args.kwargs["host"] == "192.0.2.10"
+    assert run.call_args.kwargs["port"] == 9999
 
 
-def test_serve_passes_host_and_port_through():
+def test_serve_flags_override_settings(monkeypatch):
+    """Explicit flags win over configuration."""
+    from rif_runtime.config import RifSettings
+
+    settings = RifSettings.model_validate(
+        {"server": {"host": "192.0.2.10", "port": 9999}}
+    )
+    monkeypatch.setattr("rif_runtime.cli.get_settings", lambda: settings)
+
     with patch("rif_runtime.cli.uvicorn.run") as run:
         runner.invoke(app, ["serve", "--host", "0.0.0.0", "--port", "9001"])
 

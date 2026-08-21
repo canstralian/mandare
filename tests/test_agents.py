@@ -146,17 +146,36 @@ def test_execution_state_is_not_used_by_the_runtime():
     import ast
 
     root = Path(__file__).resolve().parent.parent / "src" / "rif_runtime"
+
+    def imports_execution_state(node: ast.AST) -> bool:
+        """Every spelling of the import, absolute and relative.
+
+        `ast` puts the leading dots of a relative import in `node.level`, not in
+        `node.module` -- so `from .state import X` is module="state", level=1,
+        and matching on the literal ".state" never fires. The first version of
+        this guard did exactly that and could not detect any relative form.
+        """
+        if isinstance(node, ast.Import):
+            return any(a.name == "rif_runtime.execution.state" for a in node.names)
+        if not isinstance(node, ast.ImportFrom):
+            return False
+        module = node.module or ""
+        names = {alias.name for alias in node.names}
+        # from [rif_runtime.]execution.state import X  /  from .state import X
+        if module.endswith("execution.state") or (node.level and module == "state"):
+            return True
+        # from [rif_runtime.]execution import state  /  from . import state
+        return "state" in names and (
+            module.endswith("execution") or (node.level and not module)
+        )
+
     importers = []
     for path in root.rglob("*.py"):
         if path.name == "state.py" and path.parent.name == "execution":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and "execution.state" in (
-                node.module or ""
-            ):
-                importers.append(str(path.relative_to(root)))
-            elif isinstance(node, ast.ImportFrom) and node.module == ".state":
+            if imports_execution_state(node):
                 importers.append(str(path.relative_to(root)))
 
     assert not importers, (
