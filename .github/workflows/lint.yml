@@ -54,8 +54,9 @@ jobs:
 
       - name: Security check with Bandit
         run: |
-          bandit -r src/ -ll -f json -o bandit-report.json
+          bandit -r src/ -ll -f json -o bandit-report.json; BANDIT_EXIT=$?
           python -m json.tool bandit-report.json
+          exit $BANDIT_EXIT
 
       # Dependency auditing moved to the `dependency-security` job in
       # merge-gate.yml, where it runs against the hash-pinned locks and is
