@@ -511,3 +511,90 @@ def test_env_example_documents_the_auth_and_supabase_variables():
         "SUPABASE_SERVICE_ROLE_KEY",
     ):
         assert name in documented, f".env.example does not document {name}"
+
+
+# --- serverless / missing-config cold start ----------------------------------
+#
+# The Vercel entrypoint (api/index.py) imports rif_runtime.api from a CWD that
+# may not contain config/environments.yaml, with RIF_ENVIRONMENT set. Raising on
+# an unknown environment name is right when the file exists and omits it; it is
+# wrong when there is no file at all, because the fallback config invents its
+# own name and the mismatch is an artefact rather than a misconfiguration.
+
+
+def test_missing_environments_file_adopts_the_configured_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path))  # no environments.yaml
+    monkeypatch.setenv("RIF_ENVIRONMENT", "RIF_Runtime")
+    reset_settings()
+    from rif_runtime.config import load_config
+
+    config = load_config()
+
+    assert config.default_environment == "RIF_Runtime"
+    assert "RIF_Runtime" in config.environments
+    assert config.environments["RIF_Runtime"].networking_type == "limited", (
+        "the fallback profile must stay restrictive"
+    )
+
+
+def test_runtime_starts_with_no_environments_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cold-start path: RIF_ENVIRONMENT set, config/ absent."""
+    monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path / "absent"))
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RIF_ENVIRONMENT", "RIF_Runtime")
+    reset_settings()
+    from rif_runtime.runtime import RIFRuntime
+
+    runtime = RIFRuntime()
+
+    assert runtime.environment_name == "RIF_Runtime"
+    assert runtime.profile.networking_type == "limited"
+
+
+def test_unknown_environment_still_raises_when_the_file_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The safety property is unchanged where it actually applies."""
+    (tmp_path / "environments.yaml").write_text(
+        textwrap.dedent(
+            """\
+            default_environment: OnlyHere
+            environments:
+              OnlyHere:
+                networking_type: open
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RIF_ENVIRONMENT", "NotInThatFile")
+    reset_settings()
+    from rif_runtime.runtime import RIFRuntime
+
+    with pytest.raises(ValueError, match="NotInThatFile"):
+        RIFRuntime()
+
+
+def test_vercel_config_ships_the_environments_file() -> None:
+    """includeFiles must carry config/, or the deployment runs on the fallback."""
+    import json
+
+    vercel = json.loads((REPO_ROOT / "vercel.json").read_text(encoding="utf-8"))
+    included = vercel["builds"][0].get("config", {}).get("includeFiles", [])
+
+    assert any(entry.startswith("config/") for entry in included), (
+        "vercel.json does not include config/, so environments.yaml is absent "
+        "at runtime and the deployment silently uses the fallback profile"
+    )
+    # And the name it sets must be one that environments.yaml actually defines.
+    import yaml
+
+    environments = yaml.safe_load(
+        (REPO_ROOT / "config" / "environments.yaml").read_text(encoding="utf-8")
+    )["environments"]
+    assert vercel["env"]["RIF_ENVIRONMENT"] in environments

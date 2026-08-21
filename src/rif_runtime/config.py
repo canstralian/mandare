@@ -260,12 +260,27 @@ def load_config(path: str | Path | None = None) -> RuntimeConfig:
         path = Path(path)
 
     if not path.is_file():
-        # Provide sensible defaults when environments file is absent
+        # No environments file: fall back to a single restrictive profile
+        # (EnvironmentProfile() defaults to networking_type="limited").
+        #
+        # The fallback adopts the *configured* environment name rather than a
+        # fixed "production". Otherwise the same RIF_ENVIRONMENT value is valid
+        # or invalid depending only on whether a file happened to be found --
+        # and RIFRuntime, which raises on an unknown name, would refuse to start
+        # anywhere the file is not on disk. That is not hypothetical: the Vercel
+        # entrypoint sets RIF_ENVIRONMENT=RIF_Runtime and runs from a CWD where
+        # config/ may not be present, so cold start crashed with
+        # "RIF_Runtime is not defined in environments.yaml (known: production)".
+        #
+        # Naming the fallback after the request is not a silent profile swap:
+        # there is no other profile to serve, and the one served is the
+        # restrictive default rather than something the operator did not choose.
         from .schemas import EnvironmentProfile
 
+        name = get_settings().runtime.environment or "production"
         return RuntimeConfig(
-            default_environment="production",
-            environments={"production": EnvironmentProfile()},
+            default_environment=name,
+            environments={name: EnvironmentProfile()},
         )
 
     return RuntimeConfig.model_validate(yaml.safe_load(path.read_text()))

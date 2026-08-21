@@ -6,6 +6,16 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ### Fixed
 
+- **A missing `environments.yaml` no longer refuses to start.** Raising on an
+  unknown environment name is right when the file exists and omits it; it was
+  wrong when there is no file at all, because the fallback config invented its
+  own `production` name and the mismatch was an artefact. That crashed the
+  Vercel cold start, which sets `RIF_ENVIRONMENT=RIF_Runtime` from a CWD
+  without `config/`. The fallback now adopts the configured name and keeps the
+  restrictive `limited` profile; an unknown name in a file that *does* exist
+  still raises. `vercel.json` also ships `config/` so the deployment uses the
+  real profiles rather than the fallback.
+
 - **`GET /v1/audit` reads the decision log once instead of five times.** It is
   unauthenticated unless `RIF_REQUIRE_READ_AUTH` is set, and re-read and
   re-hashed the whole log per call. Also a correctness fix: five separate reads
