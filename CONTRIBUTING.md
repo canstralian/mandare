@@ -1,295 +1,136 @@
 # Contributing to RIF Runtime
 
-Thank you for your interest in RIF Runtime! This document outlines our contribution guidelines and development workflow.
+RIF is intentionally a small project with a sharp boundary: intelligent systems may propose actions, but governance decides what the runtime will accept. Contributions are welcome when they make that boundary clearer, safer, easier to test, or easier to use.
 
-## Code of Conduct
+## Before you start
 
-We are committed to providing a welcoming and inclusive environment. Please read `CODE_OF_CONDUCT.md` and follow its principles in all interactions.
+Read [`README.md`](README.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SECURITY.md`](SECURITY.md), and [`docs/README.md`](docs/README.md).
 
-## Development Workflow
+For cross-domain contract changes, check `spec/README.md` for open specification reviews before implementing a competing contract.
 
-### 1. Setup
+## Local setup
 
 ```bash
 git clone https://github.com/canstralian/rif-runtime.git
 cd rif-runtime
-make setup
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+python -m pip install -r requirements-dev.txt
 ```
 
-### 2. Create a Branch
+To reproduce the locked CI dependency environment:
 
 ```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/your-fix-name
-# or
-git checkout -b docs/your-docs-update
+python -m pip install --require-hashes -r requirements/dev.txt
+python -m pip install -e . --no-deps
 ```
 
-Branch naming conventions:
-- `feature/` — New features
-- `fix/` — Bug fixes
-- `docs/` — Documentation updates
-- `refactor/` — Code refactoring (no behavior change)
-- `test/` — Test improvements
-- `security/` — Security fixes
+## Make a focused change
 
-### 3. Make Changes
+Prefer a small branch and a small diff. Useful branch prefixes include `feature/`, `fix/`, `docs/`, `refactor/`, `test/`, and `security/`.
 
-Follow these practices:
+For behavioural changes, consider authority, persistence/replay, security, compatibility, migration/rollback, and documentation impact.
 
-#### Code Quality
+## Validation
 
-- **Write tests first** — Use TDD when possible
-- **Run linting**: `make lint` — Must pass before PR
-- **Type hints** — All functions and methods must have type hints
-- **Docstrings** — Public functions require docstrings
-- **Comments** — Complex logic needs inline comments
-
-#### Example: Adding a Capability
-
-```python
-# src/rif_runtime/capabilities/email_capability.py
-from typing import Dict, Any
-from rif_runtime.capabilities.base import Capability
-
-class EmailCapability(Capability):
-    """Send emails with policy evaluation."""
-    
-    def __init__(self):
-        super().__init__(name="email", timeout_seconds=30)
-    
-    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute email capability.
-        
-        Args:
-            params: {to, subject, body, reply_to}
-        
-        Returns:
-            {message_id, status, timestamp}
-        
-        Raises:
-            ValueError: Invalid email parameters
-        """
-        # Implementation...
-        pass
-```
-
-#### Testing
-
-```python
-# tests/unit/test_email_capability.py
-import pytest
-from rif_runtime.capabilities.email_capability import EmailCapability
-
-@pytest.fixture
-def email_cap():
-    return EmailCapability()
-
-@pytest.mark.asyncio
-async def test_send_email_success(email_cap):
-    """Test successful email sending."""
-    result = await email_cap.execute({
-        "to": "test@example.com",
-        "subject": "Test",
-        "body": "Hello"
-    })
-    assert result["status"] == "sent"
-    assert "message_id" in result
-
-@pytest.mark.asyncio
-async def test_invalid_email_address(email_cap):
-    """Test rejection of invalid email."""
-    with pytest.raises(ValueError, match="invalid email"):
-        await email_cap.execute({"to": "not-an-email"})
-```
-
-### 4. Testing Locally
+Useful local checks are:
 
 ```bash
-# Run affected tests
-make test
-
-# With coverage
-make coverage
-
-# Only unit tests
-make test-unit
-
-# Watch mode (auto-rerun on changes)
-make watch
+ruff check src tests
+ruff format --check src tests
+mypy src/rif_runtime --ignore-missing-imports
+pytest -q
+pip-audit --requirement requirements/runtime.txt --disable-pip
+pip-audit --requirement requirements/dev.txt --disable-pip
 ```
 
-### 5. Code Quality Checks
+For dependency changes, regenerate the locks rather than editing them manually:
 
 ```bash
-# All checks
-make lint
-
-# Individual checks
-make lint-ruff        # Linting
-make type-check       # Type checking
-make format           # Auto-format
-make security         # Security scanning
+make lock
 ```
 
-### 6. Commit
+The repository merge gate also checks lock synchronisation and runs an unconstrained clean-clone test in addition to the locked validation path.
 
-Write clear, descriptive commit messages:
+## Tests are part of the design
 
-```
-feature: add email capability with policy evaluation
+When you change a security or governance property, add a regression test that demonstrates the property directly. Prefer behavioural tests over assertions tied to incidental implementation details.
 
-- Implement EmailCapability.execute() with async support
-- Add SMTP configuration in rif.toml
-- Add 100% test coverage for email capability
-- Update docs/CAPABILITIES.md with usage examples
+Useful examples include denial under a stated policy condition, control-plane authentication failures, posture persistence/recovery, replay reconstruction, secret redaction, and capability-boundary enforcement.
 
-Closes #123
-```
+## Pull requests
 
-Guidelines:
-- Use present tense ("add" not "added")
-- Be specific about what changed and why
-- Reference issues: `Closes #123` or `Fixes #456`
-- Limit first line to 72 characters
+A useful PR should contain:
 
-### 7. Push and Create Pull Request
+1. **Problem** — what is wrong or missing?
+2. **Decision** — what changed and why?
+3. **Evidence** — how was it tested?
+4. **Risk** — what could regress?
+5. **Documentation** — what contract or user-facing text changed?
 
-```bash
-git push origin feature/your-feature-name
-```
+Suggested checklist:
 
-Then open a PR on GitHub with:
-
-- **Title**: Brief description (same as commit message first line)
-- **Description**: Explain the change, why it matters, and any tradeoffs
-- **Checklist**:
-  - [ ] Tests added/updated
-  - [ ] Linting passes (`make lint`)
-  - [ ] Coverage maintained or improved
-  - [ ] Docs updated if applicable
-  - [ ] No breaking changes (or documented in PR)
-
-#### PR Template
-
-```markdown
-## Description
-What does this PR do?
-
-## Related Issues
-Closes #123
-
-## Type of Change
-- [ ] Feature
-- [ ] Bug fix
-- [ ] Documentation
-- [ ] Refactoring
-- [ ] Security
-
-## Testing
-How did you test this?
-
-## Checklist
-- [ ] Tests added/updated
-- [ ] Linting passes
-- [ ] Coverage maintained (>80%)
-- [ ] Docs updated
-- [ ] No breaking changes
-
-## Screenshots (if applicable)
+```text
+- [ ] Scope is focused
+- [ ] Tests added or updated
+- [ ] Ruff passes
+- [ ] Type checking passes where applicable
+- [ ] Security implications reviewed
+- [ ] Persistence/replay implications considered
+- [ ] Documentation updated
+- [ ] No unsupported claims introduced
+- [ ] Breaking changes are explicit
 ```
 
-### 8. Review Process
+`CODEOWNERS` currently assigns repository ownership to `@canstralian`. Review and merge requirements should be described by the actual GitHub branch-protection configuration rather than assumed from this document.
 
-- At least one maintainer review required
-- CI must pass (tests, lint, security scans)
-- Coverage must not decrease
-- All feedback must be addressed
-- Maintainer merges when ready
+## Documentation standard
 
-## Areas for Contribution
+Documentation is part of the product. Keep these distinctions explicit:
 
-### Good First Issues
+- **Implemented** — demonstrable in current code/tests/workflows;
+- **Configured** — present in repository configuration, but a passing run must be verified separately;
+- **Specification** — a defined contract or design under review;
+- **Planned** — intended future work;
+- **Unverified** — insufficient evidence for a stronger claim.
 
-Look for:
-- `good-first-issue` label on GitHub
-- Documentation improvements
-- Test coverage for uncovered code
-- Bug fixes with clear reproduction steps
+Never use performance numbers, compliance claims, coverage percentages, availability targets, security guarantees, or "production-ready" language unless current repository evidence supports the claim.
 
-### High-Priority Areas
+When an API or CLI changes, update the corresponding reference documentation in the same change.
 
-1. **Capabilities** — Implement missing integrations (Slack, GitHub, etc.)
-2. **Policy Engine** — Optimization and new rule types
-3. **Storage Backends** — PostgreSQL, MongoDB support
-4. **Kubernetes** — K8s deployment improvements
-5. **Documentation** — API docs, tutorials, examples
-6. **Performance** — Latency reduction, throughput improvements
-7. **Security** — Hardening, fuzzing, cryptographic improvements
+## Commit messages
 
-## Documentation Guidelines
+Use a concise imperative subject, preferably in a conventional form such as:
 
-### Files to Update
-
-- **Feature**: Update relevant `.md` file or create new one
-- **API Endpoint**: Update `spec/openapi.yaml` and docstrings
-- **CLI Command**: Update `cli-reference.md`
-- **Architecture Change**: Update `ARCHITECTURE.md`
-- **Security**: Update `SECURITY.md`
-
-### Documentation Standards
-
-- Clear, concise language
-- Code examples where applicable
-- Link to related documentation
-- Keep in sync with code
-
-## Security Reporting
-
-**Do not** open a public issue for security vulnerabilities. Instead:
-
-1. Email `security@example.com`
-2. Include details and reproduction steps
-3. Allow 7 days for response
-4. Embargo until patch is released
-
-## Performance Considerations
-
-When contributing:
-
-- **Policy Engine**: Target <50ms latency
-- **Storage**: Append-only design; no blocking writes
-- **Network**: Minimize external API calls
-- **Memory**: Keep per-execution overhead <10MB
-
-Profile before/after:
-
-```bash
-python -m cProfile -s cumulative -m rif execute --intent "test"
+```text
+docs: clarify replay limitations
+fix(policy): preserve deny precedence
+feat(mcp): add governed capability evaluation
 ```
 
-## Versioning
+## Security reporting
 
-We follow semantic versioning (MAJOR.MINOR.PATCH):
+Please do not disclose vulnerabilities in public issues.
 
-- **MAJOR**: Breaking changes (rare; discussed in issue first)
-- **MINOR**: New features (backward-compatible)
-- **PATCH**: Bug fixes
+[Click here to report a security vulnerability](mailto:distortedprojection@gmail.com)
 
-See `release-engineering-guide.md` for release process.
+See [`SECURITY.md`](SECURITY.md) for reporting expectations.
 
-## Questions?
+## Good places to contribute
 
-- **Usage**: Check `README.md` and `docs/`
-- **Development**: See `DEVELOPMENT.md`
-- **Architecture**: Read `ARCHITECTURE.md`
-- **Security**: Review `SECURITY.md`
-- **Discussions**: GitHub Discussions
-- **Issues**: GitHub Issues
+RIF has particularly useful work at the seams between implementation and specification:
+
+- executable policy semantics;
+- replay and evidence contracts;
+- provider egress governance;
+- security regression tests;
+- API/CLI documentation derived from actual behaviour;
+- reproducible development tooling;
+- reducing drift between `spec/`, `docs/`, and `src/`.
+
+If you are unsure whether a change belongs in implementation or specification review, document the ambiguity first. A precise question is often more valuable than a premature abstraction.
 
 ## License
 
-All contributions are under MIT License. By contributing, you agree to this license.
-
-Thank you for contributing to RIF Runtime! ✨
+By contributing, you agree that your contributions are provided under the repository's MIT license, subject to its terms.
