@@ -19,6 +19,14 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **Startup configuration validation moved to a lifespan handler.** Beyond
+  clearing the `on_event` deprecation, the old hook gave the failure path no
+  usable semantics: a `SystemExit` raised inside it was swallowed by anyio's
+  task group and reached callers as `CancelledError`, so invalid configuration
+  was indistinguishable from a cancelled startup. `ConfigError` now propagates.
+  `startup.py` went from 53% coverage with an untested failure branch to full
+  cover, and an AST-based test fails if `on_event` is reintroduced.
+
 - **The OpenAPI document reports the real package version.** `api.py`
   hardcoded `version="0.3.0"` while the package was `0.3.0rc2`, so
   `/openapi.json` advertised a release the installed distribution was not. It

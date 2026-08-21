@@ -23,11 +23,12 @@ from .replay import ReplayEngine
 from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
-from .startup import register_config_startup
+from .startup import config_lifespan
 
 runtime = RIFRuntime()
 app = FastAPI(
     title="RIF Runtime",
+    lifespan=config_lifespan,
     # Resolved from package metadata (falling back to pyproject.toml in a
     # source checkout), not written out here. The literal was "0.3.0" against
     # a package version of 0.3.0rc2, so /openapi.json advertised a release the
@@ -50,8 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-register_config_startup(app)
 
 _bearer = HTTPBearer(auto_error=False)
 _BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
