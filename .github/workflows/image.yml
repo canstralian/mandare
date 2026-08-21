@@ -28,6 +28,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Do not leave the job's GITHUB_TOKEN in .git/config. This job builds
+          # and then *runs* the checked-out code inside a container; a persisted
+          # credential is reachable from anything that executes here. Nothing
+          # after checkout talks to git.
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@v3
 
@@ -126,6 +132,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Do not leave the job's GITHUB_TOKEN in .git/config. This job builds
+          # and then *runs* the checked-out code inside a container; a persisted
+          # credential is reachable from anything that executes here. Nothing
+          # after checkout talks to git.
+          persist-credentials: false
 
       - name: Run Trivy
         # Tags on this action are v-prefixed; "0.28.0" does not exist and the
