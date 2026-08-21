@@ -2,82 +2,112 @@
 
 ## North star
 
-RIF Runtime is a governed execution substrate for agents and tools. Natural-language intent becomes a visible, policy-evaluated command object before any capability is invoked. Every decision should be explainable through evidence, posture, policy precedence, and execution outcome.
+RIF Runtime aims to make the boundary between **intent** and **authority** explicit, testable, and reviewable.
 
-RIF is not an autonomous agent framework; it is a governance and execution substrate for agents.
+The model may propose. The runtime evaluates. A governed system records what decision was made and why.
 
-## Status
+This is a roadmap, not a statement that every item below exists today.
 
-| Area | Status |
-| --- | --- |
-| Policy Engine | In Progress |
-| Explainability | In Progress |
-| Evidence Layer | Planned |
-| Reflexive Healing | Planned |
-| Controlled Evolution | Planned |
-| HF Space | Planned |
+## Current state
 
-## Current foundation
+| Area | Current status |
+|---|---|
+| Policy evaluation | Implemented, still evolving |
+| Runtime posture | Implemented |
+| Graph and telemetry views | Implemented |
+| Local decision/posture persistence | Implemented |
+| Replay/recovery of local runtime state | Implemented |
+| Audit hash-chain primitives | Implemented as a library surface |
+| MCP governance surfaces | Implemented in current scope |
+| Remote provider authorization seam | Specification work / gated |
+| Unified EvidenceRecord contract | Specification/design |
+| Reflexive repair | Planned |
+| Controlled evolution | Planned |
+| Distributed evidence / enterprise storage | Planned |
+| SBOM / signed releases / reproducible builds | Planned |
 
-- governance runtime and reflexive loop;
-- persistence primitives and durable decision history;
-- MCP interception boundary;
-- policy, posture, graph, telemetry, and audit surfaces;
-- explainability regression tests;
-- CI, release, secret scanning, dependency review, code-quality, and security-scanning workflows.
+## Near-term engineering priorities
 
-## Milestone 1 — Deterministic governance core
+### 1. Specification integrity
 
-**Goal:** make every runtime decision reconstructable.
+Keep implementation and contract work synchronized without allowing parallel interpretations of the same boundary.
 
-- Stabilize the causal-path/explainability contract.
-- Define policy precedence and frozen environment snapshots.
-- Settle capability-snapshot authority — what external capability observation a
-  decision is authorized against, and what governs its replacement. Held at
-  specification review: `docs/spec-review-capability-snapshot-authority.md`.
-- Normalize audit, posture, and decision records.
-- Add regression coverage for deny-by-default, fallback, and policy-conflict behavior.
+- close or update open specification reviews;
+- inventory fixtures before schema changes;
+- keep identity, capability, evidence, and replay contracts explicit;
+- make contract tests executable where practical.
 
-## Milestone 2 — Evidence and retrieval
+### 2. Governed provider egress
 
-**Goal:** attach relevant history and policy context without making retrieval authoritative.
+The next provider-inference seam is a **Specification Review**, not an implementation shortcut.
 
-- Introduce an EvidenceRecord schema.
-- Add pluggable embedding and reranking adapters.
-- Build cited retrieval with source metadata.
-- Keep retrieval read-only in the initial runtime.
+The intended architecture is:
 
-## Milestone 3 — Reflexive healing
+```text
+Decision
+   |
+   v
+Egress authorization
+   |
+   v
+Redaction
+   |
+   v
+Inference adapter
+   |
+   v
+Advisory output
+   |
+   v
+Evidence
+```
 
-**Goal:** diagnose and test bounded repairs.
+Provider credentials must never become implicit authority. This work is subject to the repository's existing Track-B governance and must not bypass an open cross-domain review.
 
-- Define `FailureEvent`, `Diagnosis`, `RepairProposal`, and `VerificationResult` schemas.
-- Add scanner/SARIF and GitHub Actions adapters.
-- Add sandbox execution contracts and rollback semantics.
-- Implement L0-L3 autonomy only: observe, diagnose, propose, sandbox-test.
+### 3. Evidence contract
 
-## Milestone 4 — Controlled evolution
+Define what an EvidenceRecord means, which events are authoritative, how provenance is represented, and what replay can and cannot prove.
 
-**Goal:** make architecture and policy changes reviewable promotions, not silent drift.
+The goal is stronger than "we wrote a log": evidence should have a clear owner, schema, retention model, integrity story, and verification procedure.
 
-- Define `EvolutionProposal` and promotion criteria.
-- Require threat model, evaluation, rollback plan, and approval metadata.
-- Track post-deployment observation windows.
-- Keep merge and policy mutation human-approved.
+### 4. Enterprise release assurance
 
-## Milestone 5 — Reference Space
+Future release hardening should add, in a deliberate sequence:
 
-**Goal:** publish a reproducible demonstration of RIF's governance thesis.
+- SBOM generation;
+- signed artefacts and/or provenance attestations;
+- reproducible-build verification;
+- release verification documentation;
+- tested upgrade and rollback procedures.
 
-- Deploy a Hugging Face Space with a Gradio interface.
-- Demonstrate intent evaluation, explainability, Diagnosis, RepairProposal, and EvidenceRecord visualization.
-- Run without production credentials or privileged write tools.
-- Treat the Space as a demo boundary, not a production control plane.
+These are not current guarantees.
 
-## Non-goals for the MVP
+## Longer-term directions
 
-- autonomous protected-branch merges;
-- automatic policy changes based on model output;
-- unrestricted shell, GitHub, or MCP execution;
-- credential storage in public demo infrastructure;
-- treating model confidence as approval.
+### Bounded reflexive repair
+
+Introduce explicit schemas for failure observation, diagnosis, repair proposal, and verification. Keep model-generated diagnosis and proposals subordinate to deterministic policy and human-controlled promotion.
+
+### Controlled evolution
+
+Architecture and policy changes should be promoted through reviewable proposals with threat models, evaluation evidence, rollback plans, and observation windows.
+
+### Reference demonstration
+
+A public demonstration can show the governance thesis without becoming a production control plane. Demo infrastructure should use no privileged production credentials and should not imply production assurance.
+
+## Non-goals
+
+The roadmap does not seek to make RIF:
+
+- an autonomous agent framework;
+- an implicit approval layer for model output;
+- an unrestricted shell/MCP execution broker;
+- a credential vault;
+- a compliance certification;
+- a tamper-proof distributed ledger by assertion;
+- a replacement for enterprise identity, network, or incident-response systems.
+
+## Planning rule
+
+A roadmap item moves into implementation only when its authority boundary, contract, fixtures/tests, and rollback implications are sufficiently specified.
