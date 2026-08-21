@@ -19,6 +19,14 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **`.env.example` no longer documents configuration that does not exist.**
+  It listed 58 variables, of which the runtime read 3. The 55 inert names
+  included `RIF_SECURITY_SANDBOX_ENABLED`, `RIF_SECURITY_NETWORK_ISOLATION`,
+  `RIF_SECURITY_CAPABILITY_DROP`, `RIF_AUTH_ENABLED` and `RIF_AUDIT_ENABLED` —
+  settings that read as security controls while doing nothing — and it omitted
+  the real `RIF_DATA_DIR`. The file now documents exactly what the code reads,
+  and a test fails on any name nothing in `src/` references.
+
 - **Security: governance-state read endpoints can now require authentication.**
   `/v1/audit`, `/v1/policies` (GET), `/v1/recovered-state`,
   `/v1/persistence/summary`, `/v1/telemetry/summary` and `/v1/graph/summary`

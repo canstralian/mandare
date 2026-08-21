@@ -261,3 +261,69 @@ class TestSafeSummary:
         settings = load_settings(toml_file)
         summary = settings.safe_summary()
         assert summary["provider"]["endpoint"] == ""
+
+
+# --- .env.example fidelity ---------------------------------------------------
+#
+# .env.example once documented 58 variables of which the runtime read 3. The
+# 55 dead names included RIF_SECURITY_SANDBOX_ENABLED, RIF_AUTH_ENABLED and
+# RIF_SECURITY_NETWORK_ISOLATION -- inert strings that read as security
+# controls. Documented-but-inert configuration is worse than undocumented
+# configuration, so this is enforced rather than left to review.
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ENV_EXAMPLE = REPO_ROOT / ".env.example"
+
+
+def _documented_env_vars() -> set[str]:
+    names = set()
+    for line in ENV_EXAMPLE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        names.add(line.split("=", 1)[0].strip())
+    return names
+
+
+def _source_text() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src").rglob("*.py")
+    )
+
+
+def test_env_example_documents_only_variables_the_code_reads():
+    source = _source_text()
+    inert = sorted(name for name in _documented_env_vars() if name not in source)
+
+    assert not inert, (
+        f".env.example documents {len(inert)} variable(s) that nothing in src/ "
+        f"reads: {inert}. Remove them, or implement them. A setting that looks "
+        "like a control but does nothing is a false assurance."
+    )
+
+
+def test_env_example_documents_every_mapped_setting():
+    """Every RIF_* name in config._ENV_MAP is discoverable in .env.example."""
+    from rif_runtime.config import _ENV_MAP
+
+    documented = _documented_env_vars()
+    missing = sorted(name for name in _ENV_MAP if name not in documented)
+
+    assert not missing, f".env.example is missing mapped setting(s): {missing}"
+
+
+def test_env_example_documents_the_auth_and_supabase_variables():
+    """Names read directly via os.environ rather than through _ENV_MAP."""
+    documented = _documented_env_vars()
+
+    for name in (
+        "RIF_CONTROL_PLANE_API_KEYS",
+        "RIF_REQUIRE_READ_AUTH",
+        "RIF_CORS_ORIGINS",
+        "RIF_PBKDF2_ITERATIONS",
+        "RIF_MSF_BROKER_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+    ):
+        assert name in documented, f".env.example does not document {name}"
