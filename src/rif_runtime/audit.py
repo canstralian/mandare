@@ -19,15 +19,25 @@ class AuditRecord:
     current_hash: str = field(init=False)
 
     def __post_init__(self) -> None:
+        """Compute and store the record's hash after initialization."""
         object.__setattr__(self, "current_hash", calculate_hash(self))
 
     @staticmethod
     def new_event_id() -> str:
-        """Fresh identifier for a record about to be appended to a chain."""
+        """Generate a fresh UUID string for an audit record event identifier.
+        
+        Returns:
+            str: A newly generated UUID string.
+        """
         return str(uuid4())
 
 
 def utc_now_iso() -> str:
+    """Return the current UTC time in ISO 8601 format.
+    
+    Returns:
+        str: The current UTC timestamp.
+    """
     return datetime.now(UTC).isoformat()
 
 

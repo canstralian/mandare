@@ -81,6 +81,18 @@ def run_session(
     runtime: RIFRuntime | None = None,
     actor: str | None = None,
 ) -> dict:
+    """
+    Run a governed code-refinement session and record verification outcomes.
+    
+    Parameters:
+    	task (dict): Task definition containing the prompt, entry point, refinement turns, and tests.
+    	agent (CodeAgent): Agent that generates and refines candidate code.
+    	runtime (RIFRuntime | None): Runtime used for policy evaluation and verification decisions.
+    	actor (str | None): Identity recorded for policy decisions; defaults to an identity derived from the agent.
+    
+    Returns:
+    	dict: Session metadata, posture information, refinement events, and scored turn results.
+    """
     runtime = runtime or RIFRuntime()
     actor_name = actor or f"agent:eval:{agent.name}"
     task_id = task["task_id"]
@@ -256,6 +268,15 @@ def _load_agent(spec: str) -> CodeAgent:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """
+    Run a governed code refinement session for a task and persist its results.
+    
+    Parameters:
+        argv (list[str] | None): Optional command-line arguments. When omitted, arguments are read from the command line.
+    
+    Returns:
+        int: `1` if every refinement turn was blocked by policy, `0` otherwise.
+    """
     parser = argparse.ArgumentParser(
         description="Run an MST-RIF governed code refinement session."
     )

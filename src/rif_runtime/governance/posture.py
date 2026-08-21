@@ -32,11 +32,15 @@ def at_least_posture(current: Posture, floor: Posture) -> Posture:
 
 
 def posture_for_denials(denials: int) -> Posture:
-    """Map a denial count to the minimum posture those denials imply.
-
-    Used by reflexive escalation and by decision-log restore fallback.
-    Absolute mapping (no current posture): below the elevated threshold this
-    returns ``normal``.
+    """
+    Map a denial count to the minimum posture it implies.
+    
+    Parameters:
+    	denials (int): The number of denials.
+    
+    Returns:
+    	Posture: `normal` for fewer than 3 denials, `elevated` for 3–9,
+    		`restricted` for 10–19, or `locked` for 20 or more.
     """
 
     if denials >= 20:

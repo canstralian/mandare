@@ -45,10 +45,18 @@ def _digest(value: str) -> bytes:
 def require_api_key(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> str:
-    """FastAPI dependency that authenticates mutable control-plane requests.
-
-    Fails closed: if no keys are configured via ``RIF_CONTROL_PLANE_API_KEYS``,
-    every guarded request is rejected rather than silently allowed through.
+    """
+    Authenticate a mutable control-plane request using a configured API key.
+    
+    Parameters:
+    	x_api_key (str | None): API key supplied in the ``X-API-Key`` header.
+    
+    Returns:
+    	str: The supplied API key when authentication succeeds.
+    
+    Raises:
+    	HTTPException: With status 503 if no API keys are configured, or status 401
+    		if the key is missing or invalid.
     """
     configured = _configured_keys()
     if not configured:
@@ -71,19 +79,26 @@ def require_api_key(
 
 
 def read_auth_required() -> bool:
-    """Whether read endpoints are guarded, per ``RIF_REQUIRE_READ_AUTH``."""
+    """
+    Determines whether authentication is required for read operations.
+    
+    Returns:
+    	bool: `true` if `RIF_REQUIRE_READ_AUTH` is set to a recognized truthy value, `false` otherwise.
+    """
     return os.getenv(READ_AUTH_ENV_VAR, "").strip().lower() in _TRUTHY
 
 
 def require_read_api_key(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> str | None:
-    """FastAPI dependency for governance-state read endpoints.
-
-    A no-op unless ``RIF_REQUIRE_READ_AUTH`` is set, in which case it applies
-    exactly the same check as ``require_api_key``. The flag exists so this can
-    ship without breaking read clients that predate it; the intent is for it to
-    become the default in a later release.
+    """
+    Authenticate read requests when read authentication is enabled.
+    
+    Parameters:
+        x_api_key (str | None): API key supplied in the ``X-API-Key`` header.
+    
+    Returns:
+        str | None: The supplied API key when authentication is enabled and succeeds; ``None`` when read authentication is disabled.
     """
     if not read_auth_required():
         return None

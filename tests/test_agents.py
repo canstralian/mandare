@@ -24,6 +24,14 @@ SCHEMA_PATH = (
 
 
 def _decision(decision: Decision) -> PolicyDecision:
+    """Create a policy decision fixture with fixed test context and the specified decision.
+    
+    Parameters:
+    	decision (Decision): The policy decision outcome to include.
+    
+    Returns:
+    	PolicyDecision: A policy decision populated with the standard test actor, request, target, environment, posture, reason, and matched rule.
+    """
     return PolicyDecision(
         decision=decision,
         actor="agent:test",
@@ -40,12 +48,7 @@ def _decision(decision: Decision) -> PolicyDecision:
 
 
 def test_agent_manifest_matches_the_declared_schema():
-    """AgentManifest is the binding for .rif/agents/manifest.schema.yaml.
-
-    Without this the dataclass and the schema can drift silently, which is
-    exactly the "two individually plausible implementations that disagree at
-    the seam" that spec/README.md exists to prevent.
-    """
+    """Verify that AgentManifest fields match the declared manifest schema and include all required properties."""
     schema = yaml.safe_load(SCHEMA_PATH.read_text(encoding="utf-8"))
     fields = {f.name for f in dataclasses.fields(AgentManifest)}
 
@@ -81,7 +84,9 @@ def test_agent_manifest_is_immutable():
 
 
 def test_deputy_flags_a_denial():
-    """Branches on a StrEnum via string comparison; this pins that it works."""
+    """
+    Verify that the Deputy agent reports denied policy decisions with the matched rule.
+    """
     review = DeputyAgent().review(_decision(Decision.deny))
 
     assert review["agent"] == "agent:deputy"

@@ -287,6 +287,7 @@ def _documented_env_vars() -> set[str]:
 
 
 def _source_text() -> str:
+    """Return the combined text of all Python source files under the source directory."""
     return "\n".join(
         path.read_text(encoding="utf-8") for path in (REPO_ROOT / "src").rglob("*.py")
     )

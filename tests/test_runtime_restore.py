@@ -68,9 +68,17 @@ def test_data_dir_owns_every_store(tmp_path):
 
 @pytest.fixture()
 def configured_posture(monkeypatch: pytest.MonkeyPatch):
-    """Set RIF_POSTURE and rebuild the cached settings singleton."""
+    """
+    Configure the runtime posture for a test and restore the default settings afterward.
+    
+    The yielded callable sets `RIF_POSTURE` to the specified value and refreshes cached settings. Cleanup removes the environment variable and refreshes cached settings again.
+    
+    Parameters:
+        monkeypatch (pytest.MonkeyPatch): Pytest fixture used to manage the environment variable.
+    """
 
     def _set(value: str) -> None:
+        """Set the configured runtime posture and clear cached settings."""
         monkeypatch.setenv("RIF_POSTURE", value)
         reset_settings()
 

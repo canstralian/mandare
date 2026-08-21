@@ -25,16 +25,13 @@ def serve(
         help="Restart the server when source files change (development only).",
     ),
 ) -> None:
-    """Run the HTTP API.
-
-    Host and port come from configuration (``RIF_SERVER_HOST`` /
-    ``RIF_SERVER_PORT``, or ``[server]`` in rif.toml) unless overridden on the
-    command line. They were previously hardcoded here, so both settings were
-    documented, parsed, validated -- and then ignored.
-
-    Auto-reload is off by default. It used to be unconditional, which meant
-    the start command the README documents spawned uvicorn's file-watching
-    reloader in production.
+    """
+    Run the HTTP API server using configured or command-line host and port values.
+    
+    Parameters:
+        host (str | None): Interface to bind, or the configured server host when omitted.
+        port (int | None): Port to bind, or the configured server port when omitted.
+        reload (bool): Whether to restart the server when source files change.
     """
     server = get_settings().server
     uvicorn.run(

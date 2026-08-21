@@ -37,12 +37,14 @@ logger = logging.getLogger(__name__)
 
 
 def validate_config() -> RifSettings:
-    """Load and validate settings, logging a clear diagnostic on failure.
-
-    Fails fast: invalid configuration must stop the process rather than boot a
-    half-configured runtime that would decide policy against defaults nobody
-    chose. ``ConfigError`` is re-raised unchanged so the caller -- import
-    machinery or lifespan -- surfaces it in its own idiom.
+    """
+    Load and validate application settings.
+    
+    Returns:
+        RifSettings: The validated application settings.
+    
+    Raises:
+        ConfigError: If the configuration is invalid.
     """
     try:
         return get_settings()
@@ -57,7 +59,7 @@ def validate_config() -> RifSettings:
 
 @asynccontextmanager
 async def config_lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Validate configuration, cache it on ``app.state``, then serve."""
+    """Validate application configuration and make the resulting settings available during the application lifespan."""
     settings = validate_config()
 
     # Stored on app.state so route handlers can reach it without re-loading.

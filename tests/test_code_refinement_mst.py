@@ -7,12 +7,14 @@ from rif_runtime.runtime import RIFRuntime
 
 
 def refinement_runtime(tmp_path) -> RIFRuntime:
-    """A runtime that permits the harness's own `code.refine` action.
-
-    The default policy denies by default, so a governed consumer has to
-    declare the capability it needs -- the harness is no exception. Without
-    this rule every turn is blocked, `tests_passed` is None for all of them,
-    and the session scores as if nothing regressed (see `score_session`).
+    """
+    Create a runtime that permits the harness's `code.refine` action.
+    
+    Parameters:
+        tmp_path: Directory used for runtime data.
+    
+    Returns:
+        RIFRuntime: A runtime configured with permission for `code.refine`.
     """
     runtime = RIFRuntime(data_dir=tmp_path)
     runtime.policy_store.upsert(
