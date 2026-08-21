@@ -52,10 +52,13 @@ Try a health check:
 curl http://127.0.0.1:8000/health
 ```
 
-Evaluate a policy request:
+Evaluate and record a policy request. Control-plane authentication is required:
 
 ```bash
+export RIF_CONTROL_PLANE_API_KEYS='replace-with-a-secret-key'
+
 curl -X POST http://127.0.0.1:8000/v1/policy/evaluate \
+  -H 'X-API-Key: replace-with-a-secret-key' \
   -H 'content-type: application/json' \
   -d '{"actor":"agent:orchestrator","action":"http.request","target":"https://api.example.com/resource"}'
 ```
