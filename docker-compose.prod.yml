@@ -22,8 +22,12 @@ services:
       RIF_CONTROL_PLANE_API_KEYS: "${RIF_CONTROL_PLANE_API_KEYS:?set a control-plane key}"
       # Governance-state reads require the same key in production.
       RIF_REQUIRE_READ_AUTH: "true"
-      # Keep Metasploit capability tokens valid across restarts.
-      RIF_MSF_BROKER_KEY: "${RIF_MSF_BROKER_KEY:-}"
+      # HMAC key for Metasploit capability tokens. Required, not defaulted:
+      # ${VAR:-} passes an empty string when unset, and MetasploitGovernor
+      # treats empty as absent and generates a fresh random key per process --
+      # so with `restart: always` every restart silently invalidates every
+      # outstanding token. Failing to start is the honest outcome.
+      RIF_MSF_BROKER_KEY: "${RIF_MSF_BROKER_KEY:?set a stable Metasploit signing key}"
     ports:
       - "8000:8000"
     volumes:

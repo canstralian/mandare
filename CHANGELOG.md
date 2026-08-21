@@ -6,6 +6,22 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ### Fixed
 
+- **`GET /v1/audit` reads the decision log once instead of five times.** It is
+  unauthenticated unless `RIF_REQUIRE_READ_AUTH` is set, and re-read and
+  re-hashed the whole log per call. Also a correctness fix: five separate reads
+  of a log being appended to can disagree, so the "summary" described no single
+  state of the file.
+- **The MST harness reports blocked turns.** `score_session` counts a blocked
+  turn's `null` as "not a regression", so a session the policy gated shut
+  scored a *perfect* MST while verifying nothing. The result now carries
+  `turns_blocked` and `score_is_meaningful`, and the CLI warns and exits
+  non-zero rather than printing `mst_score=4`.
+- **`docker-compose.prod.yml` no longer defaults the Metasploit signing key.**
+  `${RIF_MSF_BROKER_KEY:-}` passes an empty string, which the governor treats
+  as absent and replaces with a fresh random key per process — so with
+  `restart: always` every restart silently invalidated every outstanding
+  capability token, while the comment claimed the opposite.
+
 - **Concurrent writers no longer fork the decision chain.** The tail hash was
   cached for a store object's lifetime, so a `rif check` run against a live
   `rif serve` — both building a `RIFRuntime` over the same `RIF_DATA_DIR` —

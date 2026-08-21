@@ -35,12 +35,21 @@ class JsonlStore:
                 rows.append(json.loads(line))
         return rows
 
-    def count(self) -> int:
-        return len(self.read_all())
+    def count(self, rows: list[dict[str, Any]] | None = None) -> int:
+        return len(self.read_all() if rows is None else rows)
 
-    def count_by(self, field: str) -> dict[str, int]:
+    def count_by(
+        self, field: str, rows: list[dict[str, Any]] | None = None
+    ) -> dict[str, int]:
+        """Tally ``field`` across the log, or across an already-read snapshot.
+
+        Passing ``rows`` lets a caller that needs several summaries derive them
+        all from one read. Separate reads of an append-only log that is being
+        written concurrently can disagree with each other, so a summary built
+        from several of them is not a snapshot of anything.
+        """
         out: dict[str, int] = {}
-        for row in self.read_all():
+        for row in self.read_all() if rows is None else rows:
             key = row.get(field, "unknown")
             out[key] = out.get(key, 0) + 1
         return out
@@ -113,7 +122,15 @@ class HashChainedJsonlStore(JsonlStore):
 
     @contextmanager
     def _locked(self) -> Iterator[IO[str]]:
-        """Open for append with an exclusive advisory lock held throughout."""
+        """Open for append with an exclusive advisory lock held throughout.
+
+        The flush before unlocking is load-bearing, not tidiness. Python buffers
+        the write, and closing the handle is what flushes it -- which happens
+        *after* the lock is released. The next process would then take the lock
+        and read a tail that does not yet include the row just written, forking
+        the chain exactly as the lifetime cache did. Holding the lock until the
+        bytes are in the page cache is what makes the serialisation real.
+        """
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a+", encoding="utf-8") as handle:
             if fcntl is not None:
@@ -121,6 +138,11 @@ class HashChainedJsonlStore(JsonlStore):
             try:
                 yield handle
             finally:
+                # Not fsync: the page cache is enough for another *process* to
+                # read what was written. Surviving a machine crash is a
+                # different (and much more expensive) guarantee, and the log
+                # does not claim it.
+                handle.flush()
                 if fcntl is not None:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
@@ -169,9 +191,12 @@ class HashChainedJsonlStore(JsonlStore):
             handle.seek(0, os.SEEK_END)
             handle.write(json.dumps(row) + "\n")
 
-    def verify(self) -> ChainVerification:
-        """Recompute every link and report where, if anywhere, it breaks."""
-        rows = self.read_all()
+    def verify(self, rows: list[dict[str, Any]] | None = None) -> ChainVerification:
+        """Recompute every link and report where, if anywhere, it breaks.
+
+        Accepts an already-read snapshot for the same reason ``count_by`` does.
+        """
+        rows = self.read_all() if rows is None else rows
         previous_hash = GENESIS_HASH
         chained = 0
         unchained_leading = 0

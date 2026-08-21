@@ -129,7 +129,27 @@ def test_run_session_blocks_every_turn_without_a_permitting_rule(tmp_path):
     )
     session = run_session(ADD_ONE_TASK, agent, runtime=RIFRuntime(data_dir=tmp_path))
 
-    events = session["result"]["events"]
+    result = session["result"]
+    events = result["events"]
     assert [event["verification_status"] for event in events] == ["blocked"] * 4
     assert all(event["policy_decision"] == "deny" for event in events)
     assert all(event["tests_passed"] is None for event in events)
+
+    # score_session counts a null as "not a regression", so a fully blocked
+    # session still scores a perfect MST. The result has to say so, or a CI
+    # job reads 4/4 and concludes the agent never regressed.
+    assert result["mst_score"] == 4
+    assert result["turns_blocked"] == 4
+    assert result["score_is_meaningful"] is False
+
+
+def test_a_verified_session_is_marked_meaningful(tmp_path):
+    agent = ScriptedAgent(
+        name="static-correct",
+        states=[CORRECT_V1, CORRECT_V2, CORRECT_V2, CORRECT_V2, CORRECT_V2],
+    )
+    session = run_session(ADD_ONE_TASK, agent, runtime=refinement_runtime(tmp_path))
+
+    result = session["result"]
+    assert result["turns_blocked"] == 0
+    assert result["score_is_meaningful"] is True

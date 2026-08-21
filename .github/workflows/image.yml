@@ -46,8 +46,14 @@ jobs:
       - name: Smoke test the running container
         run: |
           set -euo pipefail
+          # Generated per run, not a literal: a checked-in key -- even a
+          # throwaway one -- is indistinguishable from a real leaked credential
+          # to a secret scanner, and trains reviewers to ignore the finding.
+          key="$(openssl rand -hex 16)"
+          echo "::add-mask::${key}"
+          echo "SMOKE_KEY=${key}" >> "$GITHUB_ENV"
           docker run -d --name rif-smoke -p 8000:8000 \
-            -e RIF_CONTROL_PLANE_API_KEYS=smoke-test-key \
+            -e RIF_CONTROL_PLANE_API_KEYS="${key}" \
             rif-runtime:ci
           # Poll rather than sleep a fixed interval: the start-up cost of the
           # image is not a constant worth guessing at.
@@ -77,7 +83,7 @@ jobs:
           status=$(curl -sS -o response.json -w '%{http_code}' \
             -X POST http://127.0.0.1:8000/v1/policy/evaluate \
             -H 'content-type: application/json' \
-            -H 'X-API-Key: smoke-test-key' \
+            -H "X-API-Key: ${SMOKE_KEY}" \
             -d '{"actor":"agent:smoke","action":"http.request","target":"https://api.anthropic.com/v1"}')
           echo "HTTP ${status}"; cat response.json; echo
           if [ "$status" != "200" ]; then

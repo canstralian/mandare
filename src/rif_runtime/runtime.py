@@ -228,24 +228,36 @@ class RIFRuntime:
             "event_count": len(self.reflexive.telemetry.events),
         }
 
-    def persisted_summary(self) -> dict[str, Any]:
+    def persisted_summary(
+        self, decisions: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
+        # One read feeds all three decision figures. Four separate reads of a
+        # log being appended to concurrently can disagree, so the "summary"
+        # would describe no single state of the file.
+        rows = self.decisions_store.read_all() if decisions is None else decisions
         return {
-            "decisions_total": self.decisions_store.count(),
+            "decisions_total": self.decisions_store.count(rows),
             "posture_transitions_total": self.posture_store.count(),
-            "decisions_by_result": self.decisions_store.count_by("decision"),
-            "decisions_by_rule": self.decisions_store.count_by("matched_rule"),
+            "decisions_by_result": self.decisions_store.count_by("decision", rows),
+            "decisions_by_rule": self.decisions_store.count_by("matched_rule", rows),
         }
 
-    def verify_decision_chain(self) -> dict[str, Any]:
+    def verify_decision_chain(
+        self, decisions: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
         """Recompute the decision log's hash chain.
 
         Reports integrity of what is on disk. It does not prove that the log
         records every decision the runtime made -- an attacker who can truncate
         the file can rewrite a shorter valid chain.
         """
-        return self.decisions_store.verify().as_dict()
+        return self.decisions_store.verify(decisions).as_dict()
 
     def audit_summary(self) -> dict[str, Any]:
+        # GET /v1/audit previously re-read and re-hashed decisions.jsonl five
+        # times per call, on a route that is unauthenticated unless
+        # RIF_REQUIRE_READ_AUTH is set. Read once, derive everything from it.
+        decisions = self.decisions_store.read_all()
         return {
             "environment": self.environment_name,
             "posture": self.posture.value
@@ -255,6 +267,6 @@ class RIFRuntime:
                 "graph": self.graph_summary(),
                 "telemetry": self.telemetry_summary(),
             },
-            "persisted": self.persisted_summary(),
-            "decision_chain": self.verify_decision_chain(),
+            "persisted": self.persisted_summary(decisions),
+            "decision_chain": self.verify_decision_chain(decisions),
         }

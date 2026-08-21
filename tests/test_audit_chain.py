@@ -315,7 +315,7 @@ def test_separate_processes_appending_concurrently_keep_one_chain(tmp_path):
         "sys.path.insert(0, sys.argv[3])\n"
         "from rif_runtime.storage.jsonl import HashChainedJsonlStore\n"
         "store = HashChainedJsonlStore(sys.argv[1])\n"
-        "for i in range(25):\n"
+        "for i in range(40):\n"
         "    store.append({'writer': sys.argv[2], 'i': i})\n",
         encoding="utf-8",
     )
@@ -337,7 +337,7 @@ def test_separate_processes_appending_concurrently_keep_one_chain(tmp_path):
     assert result.verified is True, (
         f"chain broke at row {result.broken_at} under concurrent writers"
     )
-    assert result.chained_rows == 75
+    assert result.chained_rows == 120
 
 
 def test_tail_is_read_from_disk_not_from_a_cached_value(tmp_path):
