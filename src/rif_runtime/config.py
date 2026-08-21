@@ -15,6 +15,9 @@ Env-var mapping (section flattened with underscore, uppercased):
   [provider] endpoint      -> RIF_PROVIDER_ENDPOINT
   [paths]   data_dir       -> RIF_DATA_DIR
   [paths]   config_dir     -> RIF_CONFIG_DIR
+  [governance] posture_elevated_at   -> RIF_GOVERNANCE_ELEVATED_AT
+  [governance] posture_restricted_at -> RIF_GOVERNANCE_RESTRICTED_AT
+  [governance] posture_locked_at     -> RIF_GOVERNANCE_LOCKED_AT
 """
 
 from __future__ import annotations
@@ -106,6 +109,27 @@ class PathsSection(BaseModel):
     config_dir: str = "config"
 
 
+class GovernanceSection(BaseModel):
+    """Governance posture threshold configuration.
+
+    Controls when the posture escalates based on denial counts within
+    the observation window. Defaults match the original hardcoded values.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    posture_elevated_at: int = 3
+    posture_restricted_at: int = 10
+    posture_locked_at: int = 20
+
+    @field_validator("posture_elevated_at", "posture_restricted_at", "posture_locked_at")
+    @classmethod
+    def _positive_threshold(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("threshold must be >= 1")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Top-level settings
 # ---------------------------------------------------------------------------
@@ -123,6 +147,7 @@ class RifSettings(BaseModel):
     server: ServerSection = ServerSection()
     provider: ProviderSection = ProviderSection()
     paths: PathsSection = PathsSection()
+    governance: GovernanceSection = GovernanceSection()
 
     def safe_summary(self) -> dict[str, Any]:
         """Return a secret-safe dict suitable for logging at startup.
@@ -153,6 +178,9 @@ _ENV_MAP: dict[str, tuple[str, str]] = {
     "RIF_PROVIDER_ENDPOINT": ("provider", "endpoint"),
     "RIF_DATA_DIR": ("paths", "data_dir"),
     "RIF_CONFIG_DIR": ("paths", "config_dir"),
+    "RIF_GOVERNANCE_ELEVATED_AT": ("governance", "posture_elevated_at"),
+    "RIF_GOVERNANCE_RESTRICTED_AT": ("governance", "posture_restricted_at"),
+    "RIF_GOVERNANCE_LOCKED_AT": ("governance", "posture_locked_at"),
 }
 
 
@@ -172,7 +200,7 @@ def _coerce_env_value(raw: str, section: str, key: str) -> str | int | bool:
     if key == "cloud_egress":
         return raw.lower() in ("1", "true", "yes")
     # Integer fields
-    if key == "port":
+    if key in ("port", "posture_elevated_at", "posture_restricted_at", "posture_locked_at"):
         return int(raw)
     return raw
 
