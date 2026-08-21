@@ -1,22 +1,35 @@
-### Building and running your application
+# Docker
 
-When you're ready, start your application by running:
-`docker compose up --build`.
+This file supplements the main project documentation. For deployment/security decisions, see [`DEPLOYMENT.md`](DEPLOYMENT.md) and [`SECURITY.md`](SECURITY.md).
 
-Your application will be available at http://localhost:8000.
+## Local development
 
-### Deploying your application to the cloud
+```bash
+docker compose up --build
+```
 
-First, build your image, e.g.: `docker build -t myapp .`.
-If your cloud uses a different CPU architecture than your development
-machine (e.g., you are on a Mac M1 and your cloud provider is amd64),
-you'll want to build the image for that platform, e.g.:
-`docker build --platform=linux/amd64 -t myapp .`.
+The repository's Compose development configuration is `compose.yaml`.
 
-Then, push it to your registry, e.g. `docker push myregistry.com/myapp`.
+The API is exposed on port `8000` by the supplied configuration.
 
-Consult Docker's [getting started](https://docs.docker.com/go/get-started-sharing/)
-docs for more detail on building and pushing.
+## Build the image
 
-### References
-* [Docker's Python guide](https://docs.docker.com/language/python/)
+```bash
+docker build -t rif-runtime:local .
+```
+
+The supplied Dockerfile runs the application as a non-root user. That is a useful baseline, not a complete container security profile.
+
+## Production-oriented Compose
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Review the production Compose file and configure secrets, TLS, persistence, network boundaries, logging, and resource controls for the target environment before exposing the service.
+
+## Important dependency note
+
+The Dockerfile currently installs from the root-level `requirements.txt`, which is intentionally the unconstrained consumer dependency path. This differs from the hash-pinned dependency path used by locked CI jobs.
+
+That distinction should be preserved in documentation: a successful Docker build is not equivalent to a reproducibly locked build.
