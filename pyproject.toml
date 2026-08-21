@@ -66,6 +66,9 @@ dev = [
     # 0.16.x, which re-sorts imports and enables new lints — turning main red
     # with no code change. The lock pins the exact patch.
     "ruff>=0.15,<0.16",
+    # Unused-import check in the lint workflow; kept in the lock rather than
+    # bare-installed in CI so its version cannot drift.
+    "autoflake>=2.3,<3.0",
     # Required by tests/test_rif_familiar_contracts.py. Without these the
     # `pip install -e ".[dev]"` path collects an ImportError.
     "jsonschema[format]>=4.25,<5.0",

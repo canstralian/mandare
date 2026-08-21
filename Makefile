@@ -45,7 +45,7 @@ dev:
 
 # Development targets
 serve:
-	uvicorn 'src.rif_runtime.api:app' --host=0.0.0.0 --port=8000 --reload
+	uvicorn 'rif_runtime.api:app' --host=0.0.0.0 --port=8000 --reload
 
 test:
 	pytest -v
@@ -114,7 +114,7 @@ docker-prod-logs:
 
 # CLI targets
 cli-execute:
-	rif execute --intent "test execution"
+	rif check agent:demo read demo:target
 
 cli-health:
 	curl -s http://localhost:8000/health | python -m json.tool
@@ -170,7 +170,7 @@ watch:
 
 # Performance profiling
 profile:
-	python -m cProfile -s cumulative -m rif execute --intent "test" > profile.txt
+	python -m cProfile -s cumulative -m rif_runtime.cli check agent:demo read demo:target > profile.txt
 	@echo "Profile saved to profile.txt"
 
 # Database targets (if using PostgreSQL)

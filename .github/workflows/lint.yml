@@ -63,7 +63,6 @@ jobs:
 
       - name: Check for unused imports
         run: |
-          pip install autoflake
           autoflake --recursive --check src/ tests/
 
       - name: Check docstring coverage
