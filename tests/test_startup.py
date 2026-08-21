@@ -118,3 +118,71 @@ def test_no_module_calls_the_deprecated_on_event_hook():
                 offenders.append(f"{path.relative_to(root)}:{node.lineno}")
 
     assert not offenders, f"deprecated on_event hook called at: {offenders}"
+
+
+# --- import-time validation --------------------------------------------------
+#
+# The tests above exercise a bare FastAPI app or a monkeypatched get_settings.
+# Neither covers the path that actually runs in production: api.py builds a
+# module-level RIFRuntime(), which loads configuration, so an invalid rif.toml
+# raises during *import* and no lifespan handler ever runs.
+
+
+def test_validate_config_returns_settings_when_valid():
+    from rif_runtime.startup import validate_config
+
+    assert isinstance(validate_config(), RifSettings)
+
+
+def test_validate_config_logs_critical_and_reraises(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    from rif_runtime.startup import validate_config
+
+    def _raise() -> RifSettings:
+        raise ConfigError("unknown key: rif_totally_made_up")
+
+    monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)
+
+    with caplog.at_level("CRITICAL", logger="rif_runtime.startup"):
+        with pytest.raises(ConfigError):
+            validate_config()
+
+    assert any("refusing to start" in record.message for record in caplog.records), (
+        "the diagnostic must name configuration as the cause"
+    )
+
+
+def test_api_module_validates_config_before_building_the_runtime():
+    """Order matters: RIFRuntime() loads config, so validation must precede it.
+
+    Asserted structurally rather than by importing under a broken config, which
+    would need a subprocess and a temporary cwd. The call has to come before
+    the module-level `runtime = RIFRuntime()` or it reports nothing.
+    """
+    import ast
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parent.parent / "src" / "rif_runtime" / "api.py"
+    ).read_text(encoding="utf-8")
+
+    validate_line = runtime_line = None
+    for node in ast.parse(source).body:
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and getattr(node.value.func, "id", None) == "validate_config"
+        ):
+            validate_line = node.lineno
+        if isinstance(node, ast.Assign) and any(
+            getattr(t, "id", None) == "runtime" for t in node.targets
+        ):
+            runtime_line = node.lineno
+
+    assert validate_line is not None, "api.py does not call validate_config() at import"
+    assert runtime_line is not None, "api.py no longer builds a module-level runtime"
+    assert validate_line < runtime_line, (
+        "validate_config() must run before RIFRuntime() is constructed, "
+        "otherwise config errors surface as a bare traceback from config.py"
+    )

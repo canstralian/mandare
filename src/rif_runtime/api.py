@@ -23,7 +23,13 @@ from .replay import ReplayEngine
 from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
-from .startup import config_lifespan
+from .startup import config_lifespan, validate_config
+
+# Validate before constructing the runtime: RIFRuntime() loads configuration,
+# so an invalid rif.toml raises here, at import, long before config_lifespan
+# could report it. Without this the operator gets a bare ConfigError traceback
+# out of config.py rather than a message naming the configuration as the cause.
+validate_config()
 
 runtime = RIFRuntime()
 app = FastAPI(
