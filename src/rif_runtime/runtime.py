@@ -2,7 +2,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from .config import RuntimeSection, get_settings, load_config
+from .config import get_settings, load_config
 from .configuration.policies import PolicyStore
 from .governance.posture import at_least_posture, escalate_posture
 from .governance.reflexive import ReflexiveLoop
@@ -98,17 +98,19 @@ class RIFRuntime:
         An unknown name raises rather than falling back: environments carry the
         egress constraints, so quietly serving a different profile than the one
         configured is the kind of silent downgrade this runtime exists to
-        prevent.
+        prevent. Only an unset value (``None``) falls back to the profile
+        default -- an explicit name that happens to match no profile still
+        raises, so it cannot be mistaken for "unconfigured".
         """
         configured = get_settings().runtime.environment
+        if configured is None:
+            return self.config.default_environment
         if configured in self.config.environments:
             return configured
-        if configured != RuntimeSection.model_fields["environment"].default:
-            raise ValueError(
-                f"configured environment {configured!r} is not defined in "
-                f"environments.yaml (known: {sorted(self.config.environments)})"
-            )
-        return self.config.default_environment
+        raise ValueError(
+            f"configured environment {configured!r} is not defined in "
+            f"environments.yaml (known: {sorted(self.config.environments)})"
+        )
 
     @property
     def profile(self) -> EnvironmentProfile:

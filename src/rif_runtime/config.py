@@ -64,7 +64,7 @@ class RuntimeSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     posture: PostureLevel = PostureLevel.normal
-    environment: str = "production"
+    environment: str | None = None
     cloud_egress: bool = False
 
 
