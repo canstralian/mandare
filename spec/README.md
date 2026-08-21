@@ -1,48 +1,49 @@
-# spec/
+# Specification and Contract Tree
 
-Versioned contracts for AgentOS/RIF. Everything here defines a boundary that any
-runtime (this Python implementation, or a future Rust/Go/.NET one) must conform to.
-The runtime under `src/rif_runtime/` implements these contracts; it does not define
-them — schema and contract changes land here first, then flow into the
-implementation.
+`spec/` contains versioned contract material for RIF/AgentOS. Specifications are **not automatically implementation guarantees**. A schema may be seeded, drafted, placeholder, approved, or implemented only in part.
 
-Per ADR-0008 (`docs/adr-0008-agentos-rif-v1-architecture.md`), the six contract
-domains are:
+The Python runtime under `src/rif_runtime/` is the source of truth for shipped behaviour. A specification becomes an implementation contract only when its status, tests, and integration path make that relationship explicit.
 
-| Domain | Status | Contents |
-| --- | --- | --- |
-| `capability/` | seeded | Capability manifest schema (migrated from `contracts/rif_familiar/`) |
-| `governance/` | seeded | Posture decision schema (migrated from `contracts/rif_familiar/`) |
-| `evidence/` | seeded | Observation event schema (migrated from `contracts/rif_familiar/`) |
-| `replay/` | placeholder | Replay contract not yet extracted from `src/rif_runtime/replay.py` |
-| `skill/` | placeholder | Skill package format (`SKILL.md` + `skill.yaml` + tests) not yet formalized |
-| `state/` | placeholder | Structured runtime state contract not yet extracted from `runtime_state.json` |
+## Contract domains
 
-Beyond the six original domains, governed-integration contracts also live here:
+| Domain | Current status | Meaning |
+|---|---|---|
+| `capability/` | Seeded | Capability contract material; verify implementation coverage before relying on it |
+| `governance/` | Seeded | Governance/posture contract material |
+| `evidence/` | Seeded | Evidence/observation contract material |
+| `replay/` | Placeholder | Replay contract not yet fully extracted as a normative schema |
+| `skill/` | Placeholder | Skill package format not yet formalized |
+| `state/` | Placeholder | Structured runtime-state contract not yet formalized |
+| `mcp/` | Drafted | MCP governance contract material |
 
-| Domain | Status | Contents |
-| --- | --- | --- |
-| `mcp/` | drafted | MCP server framework governance contract (`SPEC.md`): authority tiers, ordered decision procedure, destructive-action hard gate, evaluation scorecard — generalizes `src/rif_runtime/mcp/metasploit.py` |
+## Specification-review rule
 
-`contracts/rif_familiar/` is left in place unchanged for this slice — it is the
-device-facing (RIF Familiar / Field Observer) contract set and is the origin of the
-schemas seeded into `capability/`, `governance/`, and `evidence/` above. A later
-slice should decide whether `contracts/rif_familiar/` re-exports from `spec/` or is
-retired in favor of it; that decision is out of scope here.
+Cross-domain contract changes should be reviewed before implementation when they affect authority, identity, capability scope, evidence, replay, provider egress, or another shared boundary.
 
-## Specification reviews in flight
+The purpose is to avoid two individually plausible implementations that disagree at the seam.
 
-Contract changes that cross more than one domain are worked as specification
-reviews under `docs/` before landing as schemas here. Builder work on a domain is
-held while a review governing it is open.
+## Open reviews
 
 | Review | Governs | Status |
-| --- | --- | --- |
-| `docs/spec-review-identity-spine-migration.md` | Identity hierarchy, `Run` as aggregate root | Approved Pending Governance Completion |
-| `docs/spec-review-capability-snapshot-authority.md` | `capability/`, `replay/`, `mcp/` — what capability observation authorizes a unit of work | Draft |
+|---|---|---|
+| `docs/spec-review-identity-spine-migration.md` | Identity hierarchy and run/aggregate semantics | Check document for current approval state |
+| `docs/spec-review-capability-snapshot-authority.md` | Capability observation, replay, MCP authority | Draft / review required before conflicting implementation |
 
-## Next slices
-- Extract a `replay/` contract from `src/rif_runtime/replay.py`, including the
-  replay-is-not-recovery constraint stated in the capability-snapshot review §6.
-- Extract a `state/` contract from the current `runtime_state.json` shape.
-- Define the `skill/` package format contract (`SKILL.md` + `skill.yaml` schema).
+The review documents themselves are authoritative for their review status; this index should not be treated as a substitute for reading them.
+
+## Contract-change checklist
+
+Before changing a contract:
+
+- identify all current consumers;
+- inventory fixtures and persisted examples;
+- define compatibility and migration semantics;
+- define replay/recovery impact;
+- define security/authority impact;
+- update tests;
+- update implementation-backed documentation;
+- close or supersede conflicting specification reviews.
+
+## Vocabulary discipline
+
+Use **specification** for an intended contract, **implementation** for shipped code, and **evidence** for a verified observation. Do not use one as a synonym for another.
