@@ -1,3 +1,4 @@
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -23,7 +24,24 @@ from .storage.jsonl import JsonlStore
 class RIFRuntime:
     def __init__(self, data_dir: str | Path | None = None) -> None:
         self.config = load_config()
-        self.environment_name = self.config.default_environment
+        _settings_env = get_settings().runtime.environment
+        # An explicit RIF_ENVIRONMENT typo must not silently fall back to the
+        # default profile (that made vercel.json's RIF_ENVIRONMENT a no-op when
+        # only the bare production fallback was loaded). The settings default
+        # ("production") is allowed to miss the map when the env var is unset.
+        if (
+            "RIF_ENVIRONMENT" in os.environ
+            and _settings_env not in self.config.environments
+        ):
+            raise ValueError(
+                f"unknown environment from RIF_ENVIRONMENT={_settings_env!r}; "
+                f"known: {sorted(self.config.environments)}"
+            )
+        self.environment_name = (
+            _settings_env
+            if _settings_env in self.config.environments
+            else self.config.default_environment
+        )
         # One configured directory owns every piece of persistent state —
         # policies, decisions, posture history, evidence — so RIF_DATA_DIR
         # (equivalently [paths] data_dir in rif.toml) relocates all of them

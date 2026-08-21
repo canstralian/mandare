@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "installCommand": "pip install .",
+  "env": {
+    "RIF_DATA_DIR": "/tmp/rif-data",
+    "RIF_ENVIRONMENT": "RIF_Runtime"
+  }
+}
