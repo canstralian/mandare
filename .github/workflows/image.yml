@@ -1,0 +1,101 @@
+# Container image: build, smoke, and filesystem vulnerability scan.
+#
+# The build is not decorative. The image installs the hash-pinned runtime lock
+# and declares a HEALTHCHECK, and neither is exercised by the Python jobs — a
+# broken Dockerfile is invisible to ruff, mypy and pytest alike. The smoke step
+# therefore starts the container and asks it the one question that matters:
+# does /health answer.
+name: Image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # load, not just build: the smoke step needs the image in the local
+          # daemon. A cache-only build would leave nothing to run.
+          load: true
+          tags: rif-runtime:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the running container
+        run: |
+          set -euo pipefail
+          docker run -d --name rif-smoke -p 8000:8000 rif-runtime:ci
+          # Poll rather than sleep a fixed interval: the start-up cost of the
+          # image is not a constant worth guessing at.
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health > health.json; then
+              echo "healthy after ${attempt} attempt(s)"
+              cat health.json
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "::error::container never became healthy"
+              docker logs rif-smoke
+              exit 1
+            fi
+            sleep 2
+          done
+          python -c "import json;d=json.load(open('health.json'));assert d['status']=='ok',d;print('status ok')"
+
+      - name: Assert the image declares a healthcheck
+        run: |
+          set -euo pipefail
+          # Guards the HEALTHCHECK added alongside the pinned install: an
+          # orchestrator with no health signal only knows the process is up.
+          test "$(docker inspect --format '{{if .Config.Healthcheck}}yes{{else}}no{{end}}' rif-runtime:ci)" = "yes" \
+            || { echo "::error::image declares no HEALTHCHECK"; exit 1; }
+
+      - name: Container logs
+        if: always()
+        run: docker logs rif-smoke || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f rif-smoke || true
+
+  security-scan:
+    name: filesystem scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

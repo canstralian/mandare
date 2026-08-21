@@ -19,6 +19,7 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+
 - **Resolved the zero-coverage modules.** `graph/relationships.py` had no
   caller, contract, documentation or test and was removed. The rest turned out
   to be seams rather than accidents and are now covered instead:
@@ -101,6 +102,26 @@ This changelog records user- and contributor-relevant changes. It does not repla
   running process, but the floor is re-applied on restart. Defaults are
   unchanged (`normal` is a no-op floor). `config.PostureLevel` is now
   `schemas.Posture` rather than a second identical enum.
+
+### CI
+
+- **Consolidated four overlapping workflows into a clear division of labour.**
+  `ci.yml`, `quality.yml` and `lint.yml` all re-ran ruff/mypy/pytest at
+  inconsistent Python versions (3.12 vs 3.13 vs a matrix), inconsistent lint
+  scopes (`src tests` vs `.`) and inconsistent action versions
+  (`setup-python@v4` and `codecov-action@v3` alongside `@v5`/`@v6`). All three
+  are removed: `merge-gate.yml`'s `verify` matrix already ran exactly that work
+  on both interpreters, and remains the single required check.
+  - New `Coverage` workflow: the one thing the gate did not measure. Threshold
+    raised from the old 80% to 90% (currently 95%).
+  - New `Image` workflow: builds the container, **starts it and polls
+    `/health`**, and asserts the image declares a `HEALTHCHECK`. Nothing
+    previously executed the image, so a broken Dockerfile was invisible to
+    every Python job.
+
+  **Operator action required:** if branch protection still requires checks from
+  the removed workflows, they will never report again and `main` cannot be
+  merged. Require `gate` instead — see `docs/BRANCH_CLEANUP.md`.
 
 ### Documentation and governance
 
