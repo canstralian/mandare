@@ -22,6 +22,12 @@ from .storage.jsonl import HashChainedJsonlStore, JsonlStore
 
 class RIFRuntime:
     def __init__(self, data_dir: str | Path | None = None) -> None:
+        """
+        Initialize the runtime with configuration, governance components, persistent stores, and the restored posture.
+        
+        Parameters:
+        	data_dir (str | Path | None): Directory for persistent runtime state. When omitted, uses the configured data directory.
+        """
         self.config = load_config()
         self.environment_name = self._configured_environment()
         # One configured directory owns every piece of persistent state —
@@ -50,32 +56,22 @@ class RIFRuntime:
         self.posture = self._restore_posture()
 
     def _restore_posture(self) -> Posture:
-        """Derive the posture this process must start in.
-
-        ``posture_history.jsonl`` is authoritative when it has rows: it records
-        every transition, including an operator's explicit set or reset, so its
-        last entry is the posture the runtime was left in. Falling back to
-        replaying ``decisions.jsonl`` covers a first boot after decisions were
-        recorded without any transition (no escalation yet, hence ``normal``
-        unless the denial thresholds say otherwise).
-
-        Without this a restart silently dropped a ``locked`` runtime back to
-        ``normal``, re-opening everything ``PolicyEngine.evaluate()``'s
-        ``posture.locked`` check had shut down.
-
-        The configured posture (``RIF_POSTURE`` / ``[runtime] posture``) is
-        then applied as a *floor*, not an assignment. It was previously parsed,
-        validated, and never read, so ``RIF_POSTURE=locked`` started a runtime
-        that allowed everything. A floor is the safe reading of that setting:
-        an operator who configures ``locked`` cannot have it quietly lowered by
-        a stale ``normal`` in the history, while a runtime that escalated to
-        ``restricted`` at runtime does not get relaxed back down to a
-        configured ``normal`` either.
+        """
+        Restore the runtime posture while enforcing the configured posture as a minimum floor.
+        
+        Returns:
+            Posture: The posture restored from persisted state or decision history, raised to
+            the configured posture when necessary.
         """
         return at_least_posture(self._restored_posture(), self._configured_posture())
 
     def _restored_posture(self) -> Posture:
-        """Last persisted posture, or the one replay derives from decisions."""
+        """
+        Restore the latest valid persisted posture, or derive the posture by replaying recorded decisions.
+        
+        Returns:
+            Posture: The restored or replayed posture.
+        """
         for row in reversed(self.posture_store.read_all()):
             try:
                 return Posture(row["new_posture"])
@@ -88,19 +84,13 @@ class RIFRuntime:
         return Posture(get_settings().runtime.posture)
 
     def _configured_environment(self) -> str:
-        """Environment named by configuration, else the profile default.
-
-        ``RIF_ENVIRONMENT`` / ``[runtime] environment`` was parsed and
-        validated and then never read -- the runtime always took
-        ``default_environment`` from environments.yaml, so selecting an
-        environment by configuration silently did nothing.
-
-        An unknown name raises rather than falling back: environments carry the
-        egress constraints, so quietly serving a different profile than the one
-        configured is the kind of silent downgrade this runtime exists to
-        prevent. Only an unset value (``None``) falls back to the profile
-        default -- an explicit name that happens to match no profile still
-        raises, so it cannot be mistaken for "unconfigured".
+        """Determine the active environment from runtime configuration.
+        
+        Returns:
+        	str: The configured environment, or the default environment when none is configured.
+        
+        Raises:
+        	ValueError: If an explicitly configured environment is unknown.
         """
         configured = get_settings().runtime.environment
         if configured is None:
@@ -114,6 +104,11 @@ class RIFRuntime:
 
     @property
     def profile(self) -> EnvironmentProfile:
+        """Provide the profile for the active environment.
+        
+        Returns:
+            EnvironmentProfile: The profile associated with the active environment.
+        """
         return self.config.environments[self.environment_name]
 
     def set_posture(self, posture: Posture) -> Posture:
@@ -225,6 +220,11 @@ class RIFRuntime:
         return self.governance_graph.summary()
 
     def telemetry_summary(self) -> dict[str, Any]:
+        """Summarize recent denials and total recorded telemetry events.
+        
+        Returns:
+            dict[str, Any]: A summary containing denial count from the previous 60 minutes and total event count.
+        """
         return {
             "recent_denials_60m": self.reflexive.telemetry.denial_count(minutes=60),
             "event_count": len(self.reflexive.telemetry.events),
@@ -236,6 +236,15 @@ class RIFRuntime:
         # One read feeds all three decision figures. Four separate reads of a
         # log being appended to concurrently can disagree, so the "summary"
         # would describe no single state of the file.
+        """
+        Summarize persisted governance decisions and posture transitions.
+        
+        Parameters:
+            decisions (list[dict[str, Any]] | None): Optional decision snapshot to summarize; when omitted, reads the persisted decisions.
+        
+        Returns:
+            dict[str, Any]: Counts of decisions, posture transitions, decisions grouped by result, and decisions grouped by matched rule.
+        """
         rows = self.decisions_store.read_all() if decisions is None else decisions
         return {
             "decisions_total": self.decisions_store.count(rows),
@@ -247,11 +256,16 @@ class RIFRuntime:
     def verify_decision_chain(
         self, decisions: list[dict[str, Any]] | None = None
     ) -> dict[str, Any]:
-        """Recompute the decision log's hash chain.
-
-        Reports integrity of what is on disk. It does not prove that the log
-        records every decision the runtime made -- an attacker who can truncate
-        the file can rewrite a shorter valid chain.
+        """
+        Recomputes the hash chain for persisted decisions and reports its integrity.
+        
+        Parameters:
+            decisions (list[dict[str, Any]] | None): Optional decision records to verify
+                instead of reading the persisted decision log.
+        
+        Returns:
+            dict[str, Any]: Hash-chain integrity details for the supplied or persisted
+                decision records.
         """
         return self.decisions_store.verify(decisions).as_dict()
 
@@ -259,6 +273,14 @@ class RIFRuntime:
         # GET /v1/audit previously re-read and re-hashed decisions.jsonl five
         # times per call, on a route that is unauthenticated unless
         # RIF_REQUIRE_READ_AUTH is set. Read once, derive everything from it.
+        """
+        Summarize the runtime's current governance state and persisted decision history.
+        
+        Returns:
+            dict[str, Any]: A summary containing the active environment and posture,
+            live graph and telemetry data, persisted decision statistics, and decision
+            chain integrity results.
+        """
         decisions = self.decisions_store.read_all()
         return {
             "environment": self.environment_name,

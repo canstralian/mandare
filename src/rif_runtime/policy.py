@@ -26,6 +26,15 @@ def allowed(h: str, patterns: Iterable[str]) -> bool:
 
 
 def rule_matches(rule: PolicyRule, req: PolicyRequest) -> bool:
+    """Determine whether a policy rule matches a request.
+    
+    Parameters:
+    	rule (PolicyRule): The policy rule to evaluate.
+    	req (PolicyRequest): The request to compare with the rule.
+    
+    Returns:
+    	bool: `true` if the rule's action and target match the request, `false` otherwise.
+    """
     if rule.action != "*" and rule.action != req.action:
         return False
     if rule.target == "*":
@@ -37,27 +46,37 @@ def rule_matches(rule: PolicyRule, req: PolicyRequest) -> bool:
 
 
 def is_catch_all(rule: PolicyRule) -> bool:
-    """A rule that matches every request regardless of action or target."""
+    """
+    Determine whether a policy rule matches every action and target.
+    
+    Parameters:
+        rule (PolicyRule): The policy rule to inspect.
+    
+    Returns:
+        bool: `true` if the rule's action and target are both `"*"`, `false` otherwise.
+    """
     return rule.action == "*" and rule.target == "*"
 
 
 def specificity(rule: PolicyRule) -> int:
-    """How many of the rule's two selectors name a concrete value.
-
-    2 = both action and target are concrete, 1 = one wildcard, 0 = catch-all.
-    Used to order evaluation most-specific-first so a broad rule cannot
-    shadow a narrow one just by appearing earlier in ``policies.json``.
+    """
+    Determine how specifically a policy rule selects an action and target.
+    
+    Returns:
+    	int: The number of concrete selectors, from 0 to 2.
     """
     return int(rule.action != "*") + int(rule.target != "*")
 
 
 def ordered_rules(rules: Iterable[PolicyRule]) -> list[PolicyRule]:
-    """Selective rules, most specific first; catch-alls removed.
-
-    ``sorted`` is stable, so rules of equal specificity keep their configured
-    order and an operator can still break ties by position in the file.
-    Catch-alls are excluded here and applied by ``catch_all_rules`` only after
-    the environment constraints have had their say.
+    """
+    Order selective policy rules from most to least specific.
+    
+    Parameters:
+    	rules (Iterable[PolicyRule]): Policy rules to order.
+    
+    Returns:
+    	list[PolicyRule]: Selective rules ordered by descending specificity, with catch-all rules omitted.
     """
     return sorted(
         (rule for rule in rules if not is_catch_all(rule)),
@@ -80,6 +99,19 @@ class PolicyEngine:
         posture: Posture,
         policy_rules: Sequence[PolicyRule] = (),
     ) -> PolicyDecision:
+        """
+        Evaluate a policy request against posture, policy rules, and environment constraints.
+        
+        Parameters:
+            req (PolicyRequest): Request context and action to evaluate.
+            env_name (str): Name of the environment associated with the request.
+            profile (EnvironmentProfile): Environment permissions and network restrictions.
+            posture (Posture): Current runtime security posture.
+            policy_rules (Sequence[PolicyRule]): Configured selective and catch-all policy rules.
+        
+        Returns:
+            PolicyDecision: The resulting allow or deny decision, including the matching rule and reason.
+        """
         if posture == Posture.locked:
             return self.deny(req, env_name, posture, "runtime locked", "posture.locked")
         # Selective rules run before the environment constraints below: an

@@ -37,6 +37,7 @@ def test_startup_aborts_on_invalid_configuration(monkeypatch: pytest.MonkeyPatch
     """
 
     def _raise() -> RifSettings:
+        """Raise a configuration error for an unknown setting key."""
         raise ConfigError("unknown key: rif_totally_made_up")
 
     monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)
@@ -140,6 +141,7 @@ def test_validate_config_logs_critical_and_reraises(
     from rif_runtime.startup import validate_config
 
     def _raise() -> RifSettings:
+        """Raise a configuration error for an unknown setting key."""
         raise ConfigError("unknown key: rif_totally_made_up")
 
     monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)

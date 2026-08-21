@@ -99,10 +99,26 @@ def test_previous_hash_tampering_breaks_chain():
 
 
 def _decision(target: str = "https://api.anthropic.com") -> PolicyRequest:
+    """Create a policy request for an HTTP request to the specified target.
+    
+    Parameters:
+    	target (str): The URL targeted by the request.
+    
+    Returns:
+    	PolicyRequest: The constructed HTTP policy request.
+    """
     return PolicyRequest(actor="agent:test", action="http.request", target=target)
 
 
 def _allowing_runtime(tmp_path) -> RIFRuntime:
+    """Create a runtime configured to allow test HTTP traffic.
+    
+    Parameters:
+        tmp_path: Temporary directory used as the runtime data directory.
+    
+    Returns:
+        RIFRuntime: A runtime containing an allow rule for HTTP requests.
+    """
     runtime = RIFRuntime(data_dir=tmp_path)
     runtime.policy_store.upsert(
         PolicyRule(
@@ -269,7 +285,7 @@ def test_audit_summary_reports_chain_state(tmp_path):
 
 
 def test_two_runtimes_interleaving_appends_keep_one_chain(tmp_path):
-    """The in-process case: two RIFRuntime objects over the same directory."""
+    """Ensure interleaved writes from two runtime instances preserve one valid decision chain."""
     first = _allowing_runtime(tmp_path)
     second = RIFRuntime(data_dir=tmp_path)
 

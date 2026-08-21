@@ -93,10 +93,16 @@ def test_policy_rule_rejects_invalid_effect():
 
 
 def _open_profile() -> EnvironmentProfile:
+    """Create an open networking profile without a host allowlist."""
     return EnvironmentProfile(networking_type="open", allowed_hosts=[])
 
 
 def _shipped_rules() -> list[PolicyRule]:
+    """Load and validate the policies shipped with the runtime.
+    
+    Returns:
+    	list[PolicyRule]: The validated default policy rules.
+    """
     from rif_runtime.configuration.policies import DEFAULT_POLICIES
 
     return [PolicyRule.model_validate(row) for row in DEFAULT_POLICIES["rules"]]
@@ -316,6 +322,16 @@ def test_shipped_data_policies_matches_default_policies():
     )
 
     def normalise(rules):
+        """
+        Normalize policy rules into sorted tuples containing their identifiers, effects,
+        actions, and targets.
+        
+        Parameters:
+        	rules: Policy rule mappings to normalize.
+        
+        Returns:
+        	A sorted list of tuples containing each rule's ID, effect, action, and target.
+        """
         return sorted(
             (r["id"], r["effect"], r.get("action", "*"), r.get("target", "*"))
             for r in rules

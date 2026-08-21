@@ -248,10 +248,17 @@ def reset_settings() -> None:
 
 
 def load_config(path: str | Path | None = None) -> RuntimeConfig:
-    """Load the environments config from YAML (legacy interface).
-
-    Used by ``RIFRuntime.__init__``.  The path now defaults to
-    ``<settings.paths.config_dir>/environments.yaml``.
+    """
+    Load the legacy environments configuration from a YAML file.
+    
+    Parameters:
+        path (str | Path | None): YAML configuration path. When omitted, uses
+            ``environments.yaml`` in the configured configuration directory.
+    
+    Returns:
+        RuntimeConfig: Parsed configuration, or a restrictive single-profile
+            configuration when the YAML file is missing. The fallback profile uses
+            the configured runtime environment name or ``"production"``.
     """
     if path is None:
         settings = get_settings()

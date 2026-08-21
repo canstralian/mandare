@@ -126,6 +126,12 @@ def posture(posture: Posture) -> dict[str, Any]:
 
 @app.get("/")
 def root() -> dict[str, Any]:
+    """
+    Return basic service metadata and selected route links.
+    
+    Returns:
+    	dict[str, Any]: Service name, online status, and selected API routes.
+    """
     return {
         "name": "RIF Runtime",
         "status": "online",
@@ -135,21 +141,41 @@ def root() -> dict[str, Any]:
 
 @app.get("/v1/graph/summary", dependencies=[ReadPlaneAuth])
 def graph_summary() -> dict[str, Any]:
+    """Return a summary of the runtime graph."""
     return runtime.graph_summary()
 
 
 @app.get("/v1/telemetry/summary", dependencies=[ReadPlaneAuth])
 def telemetry_summary() -> dict[str, Any]:
+    """Return a summary of runtime telemetry.
+    
+    Returns:
+    	dict[str, Any]: The current runtime telemetry summary.
+    """
     return runtime.telemetry_summary()
 
 
 @app.get("/v1/audit", dependencies=[ReadPlaneAuth])
 def audit() -> dict[str, Any]:
+    """Return an audit of the current runtime state.
+    
+    Returns:
+    	dict[str, Any]: The generated runtime audit.
+    """
     return AuditorAgent().audit(runtime)
 
 
 @app.post("/v1/mcp/invoke")
 def mcp_invoke(payload: dict[str, Any]) -> PolicyDecision:
+    """
+    Evaluate an MCP invocation as an unauthenticated, non-recording policy simulation.
+    
+    Parameters:
+    	payload (dict[str, Any]): Invocation data, optionally including `actor`, `target`, and `reason`.
+    
+    Returns:
+    	PolicyDecision: The policy decision for the MCP invocation.
+    """
     req = PolicyRequest(
         actor=payload.get("actor", "agent:mcp"),
         action="mcp.invoke",
@@ -196,6 +222,20 @@ def metasploit_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/v1/mcp/metasploit/token", dependencies=[ControlPlaneAuth])
 def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
+    """
+    Mint a Metasploit capability token for a validated intent.
+    
+    Parameters:
+        payload (dict[str, Any]): Request data containing the intent and optional
+            approver and token lifetime.
+    
+    Returns:
+        CapabilityToken: The minted capability token.
+    
+    Raises:
+        HTTPException: If the intent is missing or invalid, or if the token
+            lifetime cannot be converted to an integer.
+    """
     if "intent" not in payload:
         raise HTTPException(status_code=422, detail="missing 'intent' in payload")
     try:
@@ -215,6 +255,12 @@ def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
 
 @app.get("/v1/persistence/summary", dependencies=[ReadPlaneAuth])
 def persistence_summary() -> dict[str, Any]:
+    """
+    Return a summary of the runtime's persisted state.
+    
+    Returns:
+    	dict[str, Any]: Persisted-state information.
+    """
     return runtime.persisted_summary()
 
 
@@ -223,11 +269,18 @@ def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
     # the response is meaningful after a restart. Reads the runtime's own
     # configured path so the two can't diverge under RIF_DATA_DIR.
+    """
+    Reconstruct the runtime state from the configured persisted decision log.
+    
+    Returns:
+    	dict[str, Any]: The recovered runtime state.
+    """
     return asdict(ReplayEngine(runtime.decisions_path).recover())
 
 
 @app.get("/v1/policies", dependencies=[ReadPlaneAuth])
 def list_policies() -> dict[str, Any]:
+    """Return all configured policy rules."""
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 
 

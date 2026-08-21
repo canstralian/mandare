@@ -197,6 +197,12 @@ PUBLIC_ROUTES = {
 
 
 def _declared_routes():
+    """
+    Collect the application's declared HTTP routes, excluding automatically handled methods.
+    
+    Returns:
+    	set[tuple[str, str]]: Pairs of HTTP methods and route paths.
+    """
     from rif_runtime.api import app as api_app
 
     seen = set()
@@ -210,6 +216,12 @@ def _declared_routes():
 
 
 def _guarded_routes():
+    """
+    Collect the HTTP methods and paths for routes protected by an API-key dependency.
+    
+    Returns:
+    	set: Pairs of HTTP methods and route paths for guarded application routes.
+    """
     from fastapi.routing import APIRoute
 
     from rif_runtime.api import app as api_app

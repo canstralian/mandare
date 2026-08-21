@@ -27,6 +27,14 @@ class JsonlStore:
             f.write(json.dumps(record, default=str) + "\n")
 
     def read_all(self) -> list[dict[str, Any]]:
+        """Read all nonblank JSON records stored in the file.
+        
+        Returns:
+        	list[dict[str, Any]]: The parsed records, or an empty list if the file does not exist.
+        
+        Raises:
+        	json.JSONDecodeError: If a nonblank line is not valid JSON.
+        """
         if not self.path.exists():
             return []
         rows: list[dict[str, Any]] = []
@@ -36,17 +44,27 @@ class JsonlStore:
         return rows
 
     def count(self, rows: list[dict[str, Any]] | None = None) -> int:
+        """Count records in the store or in a provided snapshot.
+        
+        Parameters:
+        	rows (list[dict[str, Any]] | None): Optional records to count instead of reading from the store.
+        
+        Returns:
+        	int: The number of records.
+        """
         return len(self.read_all() if rows is None else rows)
 
     def count_by(
         self, field: str, rows: list[dict[str, Any]] | None = None
     ) -> dict[str, int]:
-        """Tally ``field`` across the log, or across an already-read snapshot.
-
-        Passing ``rows`` lets a caller that needs several summaries derive them
-        all from one read. Separate reads of an append-only log that is being
-        written concurrently can disagree with each other, so a summary built
-        from several of them is not a snapshot of anything.
+        """Count occurrences of each value for a field in the log or a supplied snapshot.
+        
+        Parameters:
+            field (str): Name of the field to tally.
+            rows (list[dict[str, Any]] | None): Optional pre-read rows to summarize.
+        
+        Returns:
+            dict[str, int]: Counts keyed by field value, using ``"unknown"`` for missing fields.
         """
         out: dict[str, int] = {}
         for row in self.read_all() if rows is None else rows:
@@ -70,12 +88,26 @@ class ChainVerification:
         unchained_leading: int,
         broken_at: int | None = None,
     ) -> None:
+        """
+        Initialize the chain verification result.
+        
+        Parameters:
+            verified (bool): Whether all chained rows pass verification.
+            chained_rows (int): Number of rows included in the verified chain.
+            unchained_leading (int): Number of unchained rows preceding the chain.
+            broken_at (int | None): Index of the first invalid row, if verification failed.
+        """
         self.verified = verified
         self.chained_rows = chained_rows
         self.unchained_leading = unchained_leading
         self.broken_at = broken_at
 
     def as_dict(self) -> dict[str, Any]:
+        """Return the chain verification result as a dictionary.
+        
+        Returns:
+            dict[str, Any]: Verification status, row counts, and the index of any broken row.
+        """
         return {
             "verified": self.verified,
             "chained_rows": self.chained_rows,
@@ -122,15 +154,10 @@ class HashChainedJsonlStore(JsonlStore):
 
     @contextmanager
     def _locked(self) -> Iterator[IO[str]]:
-        """Open for append with an exclusive advisory lock held throughout.
-
-        The flush before unlocking is load-bearing, not tidiness. Python buffers
-        the write, and closing the handle is what flushes it -- which happens
-        *after* the lock is released. The next process would then take the lock
-        and read a tail that does not yet include the row just written, forking
-        the chain exactly as the lifetime cache did. Holding the lock until the
-        bytes are in the page cache is what makes the serialisation real.
-        """
+        """Provides an append-capable file handle while holding an exclusive advisory lock.
+        
+        The handle is flushed before the lock is released so subsequent writers can read
+        the latest contents."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a+", encoding="utf-8") as handle:
             if fcntl is not None:
@@ -173,6 +200,11 @@ class HashChainedJsonlStore(JsonlStore):
         return GENESIS_HASH
 
     def append(self, record: dict[str, Any]) -> None:
+        """Append a record with linked audit metadata to the JSONL store.
+        
+        Parameters:
+            record (dict[str, Any]): Payload to append to the store.
+        """
         payload = normalize_for_json(record)
         with self._locked() as handle:
             entry = AuditRecord(
@@ -192,9 +224,14 @@ class HashChainedJsonlStore(JsonlStore):
             handle.write(json.dumps(row) + "\n")
 
     def verify(self, rows: list[dict[str, Any]] | None = None) -> ChainVerification:
-        """Recompute every link and report where, if anywhere, it breaks.
-
-        Accepts an already-read snapshot for the same reason ``count_by`` does.
+        """
+        Verify the integrity and ordering of the store's hash chain.
+        
+        Parameters:
+            rows (list[dict[str, Any]] | None): Optional preloaded rows to verify instead of reading the store.
+        
+        Returns:
+            ChainVerification: Verification status, chained and leading unchained row counts, and the first broken row index when applicable.
         """
         rows = self.read_all() if rows is None else rows
         previous_hash = GENESIS_HASH
