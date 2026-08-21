@@ -246,3 +246,111 @@ def test_no_rules_falls_back_to_default_allow():
 
     assert decision.decision == "allow"
     assert decision.matched_rule == "default.allow"
+
+
+# --- first-party actions under deny-by-default -------------------------------
+#
+# Enabling the catch-all deny broke POST /v1/runs: `run.create` had no allowing
+# rule, so every authenticated run creation returned 403. The MST harness hit
+# the same fallthrough break and got an explicit rule; this first-party route
+# did not. These tests generalise that, so the next action the runtime
+# evaluates on its own behalf cannot be swept up silently.
+
+
+def _first_party_actions() -> set[str]:
+    """Every action literal the runtime itself passes to PolicyRequest."""
+    import ast
+    from pathlib import Path
+
+    actions = set()
+    for path in (Path(__file__).resolve().parent.parent / "src").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = getattr(func, "id", None) or getattr(func, "attr", None)
+            if name != "PolicyRequest":
+                continue
+            for kw in node.keywords:
+                if kw.arg == "action" and isinstance(kw.value, ast.Constant):
+                    actions.add(kw.value.value)
+    return actions
+
+
+def test_first_party_actions_are_the_expected_set():
+    """Pins the inventory so a new one shows up here first."""
+    assert _first_party_actions() == {"http.request", "mcp.invoke", "run.create"}
+
+
+def test_run_create_is_allowed_by_the_shipped_policy():
+    """POST /v1/runs must not 403 on policy grounds out of the box."""
+    req = PolicyRequest(
+        actor="user:00000000-0000-0000-0000-000000000000",
+        action="run.create",
+        target="a prompt",
+    )
+
+    decision = PolicyEngine().evaluate(
+        req, "RIF_Runtime", _open_profile(), Posture.normal, _shipped_rules()
+    )
+
+    assert decision.decision == "allow"
+    assert decision.matched_rule == "policy.allow_run_create"
+
+
+def test_shipped_data_policies_matches_default_policies():
+    """data/policies.json is the seeded copy of DEFAULT_POLICIES; keep them equal.
+
+    They are separate files, so a rule added to one and not the other produces
+    a runtime whose behaviour depends on whether data/ was pre-seeded.
+    """
+    import json
+    from pathlib import Path
+
+    from rif_runtime.configuration.policies import DEFAULT_POLICIES
+
+    shipped = json.loads(
+        (Path(__file__).resolve().parent.parent / "data" / "policies.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    def normalise(rules):
+        return sorted(
+            (r["id"], r["effect"], r.get("action", "*"), r.get("target", "*"))
+            for r in rules
+        )
+
+    assert normalise(shipped["rules"]) == normalise(DEFAULT_POLICIES["rules"])
+
+
+def test_mcp_invoke_simulation_reports_the_denial_rather_than_bypassing_it():
+    """/v1/mcp/invoke is a dry run: reporting `deny` is correct output.
+
+    Covered explicitly so the absence of an `mcp.invoke` allow rule reads as a
+    decision rather than an oversight like `run.create` was. Two distinct
+    denials reach it, and which one fires depends on the profile:
+    """
+    req = PolicyRequest(actor="agent:mcp", action="mcp.invoke", target="tool:whatever")
+
+    # Default profile: MCP egress is off, so the environment constraint denies
+    # it before any catch-all rule is reached.
+    egress_off = EnvironmentProfile(
+        networking_type="open", allow_mcp_server_network_access=False
+    )
+    decision = PolicyEngine().evaluate(
+        req, "RIF_Runtime", egress_off, Posture.normal, _shipped_rules()
+    )
+    assert decision.decision == "deny"
+    assert decision.matched_rule == "mcp.egress.disabled"
+
+    # With egress permitted it falls through to the catch-all, which is the
+    # deny-by-default behaviour rather than an allow.
+    egress_on = EnvironmentProfile(
+        networking_type="open", allow_mcp_server_network_access=True, allowed_hosts=[]
+    )
+    decision = PolicyEngine().evaluate(
+        req, "RIF_Runtime", egress_on, Posture.normal, _shipped_rules()
+    )
+    assert decision.decision == "deny"
+    assert decision.matched_rule == "policy.deny_unknown_by_default"

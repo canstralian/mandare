@@ -6,6 +6,14 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ### Fixed
 
+- **`POST /v1/runs` is allowed by the shipped policy.** Enabling catch-all
+  evaluation made `deny_unknown_by_default` apply to `run.create`, so every
+  authenticated run creation returned 403. Deny-by-default means denying what
+  is *not enumerated*, so the runtime's own first-party actions are now
+  enumerated: `data/policies.json` and `DEFAULT_POLICIES` ship an
+  `allow_run_create` rule, and a test pins the full first-party action
+  inventory so the next one cannot be swept up silently.
+
 - **Breaking (governance): wildcard policy rules are now evaluated.**
   `PolicyEngine.evaluate()` previously skipped every rule with
   `action: "*"` or `target: "*"`, which meant the shipped
