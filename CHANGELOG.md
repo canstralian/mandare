@@ -19,6 +19,11 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **Removed `tem]`**, a tracked 6.9 KB file of ANSI-escaped terminal output
+  rendering an obsolete `pyproject.toml` (version `0.2.0`), committed by a
+  shell redirect typo. Also removed a function-local `PolicyRequest` import in
+  `api.py` that shadowed the module-level one.
+
 - **Startup configuration validation moved to a lifespan handler.** Beyond
   clearing the `on_event` deprecation, the old hook gave the failure path no
   usable semantics: a `SystemExit` raised inside it was swallowed by anyio's

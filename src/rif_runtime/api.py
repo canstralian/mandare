@@ -141,8 +141,6 @@ def audit() -> dict[str, Any]:
 
 @app.post("/v1/mcp/invoke")
 def mcp_invoke(payload: dict[str, Any]) -> PolicyDecision:
-    from rif_runtime.schemas import PolicyRequest
-
     req = PolicyRequest(
         actor=payload.get("actor", "agent:mcp"),
         action="mcp.invoke",
