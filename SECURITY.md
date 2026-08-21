@@ -1,339 +1,142 @@
-# Security Model
+# Security
 
-## Overview
+## Scope
 
-RIF Runtime operates on a principle of **defense in depth** with multiple security layers protecting against unauthorized execution, evidence tampering, and policy bypass. This document describes the threat model and mitigations.
+RIF Runtime is a security-sensitive governance runtime. Its core security property is that policy evaluation remains authoritative over proposed agent actions.
 
-## Threat Model
+This document describes controls that are present in the repository today, plus limitations that matter when deploying the software. It is not a certification, penetration-test report, or claim of compliance with a particular regulatory framework.
 
-### T1: Unauthorized Capability Invocation
+## Security principles
 
-**Threat**: An untrusted actor or compromised agent attempts to execute a capability without policy approval.
+1. **Deny-oriented governance:** policy constraints can reject requests before a governed action path proceeds.
+2. **Explicit control-plane authentication:** mutable control-plane endpoints require `X-API-Key` credentials configured through `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no key is configured.
+3. **Evidence-aware operation:** decisions and posture transitions are persisted locally and can be replayed into runtime state.
+4. **Secret minimization:** the runtime contains recursive redaction helpers for common credential-bearing field names.
+5. **Defence in depth:** container, dependency, source-analysis, secret-scanning, and dependency-review controls complement application-level checks.
+6. **No model authority:** model output is not itself a policy grant, execution lease, or provider-access authorization.
 
-**Mitigations**:
-- **Policy Engine**: All capabilities must pass policy evaluation before execution
-- **Actor Validation**: Cryptographic verification of actor identity
-- **Audit Trail**: Immutable record of all attempts (approved and rejected)
+## Current controls
 
-### T2: Evidence Tampering
+### Policy and posture
 
-**Threat**: Attacker modifies stored decisions or execution evidence to hide unauthorized actions.
+The runtime evaluates `PolicyRequest` objects through `PolicyEngine` and maintains a runtime posture that can become more restrictive as denial conditions accumulate. Posture is persisted and restored at startup.
 
-**Mitigations**:
-- **Immutable Log**: JSONL append-only; no in-place edits
-- **Cryptographic Hashing**: SHA-256 hash chains for evidence integrity
-- **Signed Records**: HMAC-SHA256 signing of critical fields with runtime key
-- **Versioning**: Schema version in each record prevents silent format changes
+The exact policy semantics are implementation-defined and tested in `tests/`. Policy-store wildcard precedence remains an explicit design limitation; do not assume that arbitrary wildcard policy rules behave as a general-purpose rule engine.
 
-### T3: Policy Bypass
+### Control-plane authentication
 
-**Threat**: Attacker crafts malicious intent or parameters that circumvent policy evaluation.
+Mutable operations such as environment mutation, posture mutation, policy CRUD, and Metasploit capability-token minting are guarded by the `X-API-Key` dependency in `src/rif_runtime/auth.py`.
 
-**Mitigations**:
-- **Intent Validation**: Schema validation on all intent inputs
-- **Path Traversal Prevention**: Normalized path comparison
-- **Context Binding**: Policy decisions include execution context (sandbox level, actor reputation)
-- **Policy Versioning**: Active policy version tracked; rollback possible
+The configured key set is supplied through:
 
-### T4: Sandbox Escape
-
-**Threat**: Capability execution escapes sandbox isolation and accesses host resources.
-
-**Mitigations**:
-- **Resource Limits**: Memory, CPU, and file descriptor limits enforced
-- **Capability Dropping**: Linux capabilities dropped (CAP_SYS_ADMIN, CAP_NET_ADMIN, etc.)
-- **Read-Only Filesystem**: Root FS read-only; only temp directories writable
-- **Network Isolation**: Capabilities limited to approved egress targets
-- **seccomp**: System call filtering in strict mode
-
-### T5: Replay Attacks
-
-**Threat**: Attacker captures and replays an old authorization decision to re-execute an action.
-
-**Mitigations**:
-- **Timestamp Validation**: Decisions include strict timestamps; old decisions rejected
-- **Nonce Binding**: Each decision bound to a unique execution nonce
-- **State Verification**: Pre-execution state hash checked against decision state
-
-### T6: Elevation of Privilege
-
-**Threat**: Non-admin actor escalates privileges to execute admin capabilities.
-
-**Mitigations**:
-- **Role-Based Access Control**: Explicit role matrix in policy
-- **Least Privilege**: Non-root container user (UID 10001)
-- **Sudo Prevention**: No sudo in container; no password-less privilege escalation
-- **Capability Isolation**: Admin capabilities isolated to dedicated containers
-
-### T7: Side-Channel Attacks (Timing, Resource Leakage)
-
-**Threat**: Attacker infers policy decisions or evidence content through timing variations or resource consumption.
-
-**Mitigations**:
-- **Constant-Time Comparison**: Policy engine uses constant-time string comparison
-- **Resource Normalization**: Execution time normalized before logging to prevent timing leakage
-- **Batched Telemetry**: Metrics aggregated and rounded to hide individual request patterns
-
-### T8: Supply Chain Compromise
-
-**Threat**: Attacker compromises build pipeline or dependencies to inject malicious code.
-
-**Mitigations**:
-- **Dependency Pinning**: `requirements/runtime.txt` and `requirements/dev.txt`
-  are compiled from `pyproject.toml` with `pip-compile --generate-hashes`. CI
-  installs them with `pip install --require-hashes`, so pip rejects any
-  artefact whose digest is not in the lock. The `lock-sync` job fails any PR
-  that edits dependencies without recompiling. See `requirements/README.md`.
-- **Vulnerability Scanning**: `pip-audit` runs against both locks in the
-  `dependency-security` job of `merge-gate.yml` and can fail the build.
-- **Unconstrained Resolution Check**: the `clean-clone` job installs the
-  unpinned runtime set with no cache, so a pin cannot hide upstream breakage.
-
-**Not yet implemented** (tracked, do not treat as active controls):
-- **SBOM Generation**: no Software Bill of Materials is produced on release.
-- **Signed Releases**: release artefacts are not signed.
-- **Reproducible Builds**: Docker builds are not yet tagged with the Git SHA
-  for verification.
-
-## Security Controls
-
-### Authentication & Authorization
-
-```yaml
-actor: "agent:orchestrator"
-role: "admin"
-policy:
-  - action: "http.request"
-    target_pattern: "https://api.*.example.com/v1/*"
-    approval_required: false
-  - action: "file.write"
-    target_pattern: "/data/*"
-    approval_required: true
-    approvers: ["admin:security", "admin:devops"]
+```text
+RIF_CONTROL_PLANE_API_KEYS=key-one,key-two
 ```
 
-### Policy Rules
+The application hashes supplied and configured keys before constant-time comparison. This is application-level API-key authentication; it is not a substitute for enterprise identity federation, authorization administration, rotation infrastructure, or network controls.
 
-```yaml
-rules:
-  - id: "default-deny"
-    priority: 0
-    condition: "true"
-    effect: "deny"
-    
-  - id: "allow-trusted-http"
-    priority: 100
-    condition: "actor in trusted_actors && action == 'http.request' && target_domain in allowlist"
-    effect: "allow"
-    
-  - id: "require-approval"
-    priority: 50
-    condition: "action == 'file.delete'"
-    effect: "require_approval"
-    approval_timeout_minutes: 30
-```
+### Cryptographic utilities
 
-### Evidence Integrity
+`src/rif_runtime/security.py` provides:
 
-Each decision record is signed:
+- SHA-256 canonical digests;
+- HMAC-SHA256 signatures and verification;
+- PBKDF2-HMAC-SHA256 secret hashing;
+- Fernet encryption using a PBKDF2-derived key;
+- recursive redaction of common secret-bearing keys.
 
-```json
-{
-  "id": "dec_abc123",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "actor": "agent:orchestrator",
-  "action": "http.request",
-  "target": "https://api.example.com/v1/resource",
-  "policy_id": "default-policy",
-  "result": "allow",
-  "rationale": "actor in trusted_actors && target in allowlist",
-  "metadata": { "request_id": "req_xyz789" },
-  "_signature": "HMAC-SHA256(fields || runtime_secret)"
-}
-```
+`src/rif_runtime/audit.py` provides hash-chain record primitives with a genesis hash and chain verification.
 
-Verification:
+**Important limitation:** the existence of these primitives does not mean every persisted runtime record is cryptographically signed or hash-chained. The default JSONL decision store is not an externally anchored, immutable evidence ledger.
 
-```python
-def verify_decision(decision: Dict, runtime_secret: str) -> bool:
-    """Verify decision integrity."""
-    stored_sig = decision.pop("_signature")
-    canonical = json.dumps(decision, sort_keys=True, separators=(',', ':'))
-    expected_sig = hmac.new(
-        runtime_secret.encode(),
-        canonical.encode(),
-        hashlib.sha256
-    ).hexdigest()
-    return stored_sig == expected_sig
-```
+### Persistence and replay
 
-### Container Security
+The runtime persists decision and posture history under the configured data directory and can reconstruct graph/posture state with `ReplayEngine`.
 
-**Dockerfile Best Practices**:
+Replay is a reconstruction mechanism. It should not be described as proof that an external action occurred exactly as represented, nor as protection against an attacker who can rewrite the underlying files.
 
-```dockerfile
-# 1. Non-root user
-RUN adduser --disabled-password --no-create-home appuser
-USER appuser
+### Container baseline
 
-# 2. Read-only root filesystem
-# (enforced at runtime with --read-only)
+The supplied `Dockerfile` runs the application as a non-root user (`UID 10001`) on a Python slim base image.
 
-# 3. No setuid binaries
-RUN find / -perm /6000 -type f 2>/dev/null | xargs chmod a-s
+Deployment-level controls such as read-only filesystems, capability dropping, seccomp, network policy, resource limits, TLS termination, secret management, and runtime isolation depend on the deployment configuration. They must not be inferred merely from the existence of the Dockerfile.
 
-# 4. Minimal base image
-FROM python:3.12-slim  # Not alpine, but smaller than full
-```
+### Dependency and CI controls
 
-**Runtime Execution**:
+The repository contains:
 
-```bash
-docker run \
-  --user appuser:appuser \
-  --read-only \
-  --tmpfs /tmp \
-  --cap-drop=ALL \
-  --cap-add=NET_BIND_SERVICE \
-  --security-opt=no-new-privileges \
-  --security-opt=seccomp=strict.json \
-  --memory=512m \
-  --cpus=1 \
-  --pids-limit=100 \
-  rif-runtime-server
-```
+- hash-pinned runtime and development locks;
+- a lock-sync merge-gate job;
+- `pip install --require-hashes` in locked CI jobs;
+- `pip-audit` against both locks;
+- an unconstrained clean-clone resolution test;
+- Bandit;
+- CodeQL;
+- Gitleaks;
+- Dependency Review.
 
-### Network Security
+The workflows themselves are the authoritative evidence that these controls are configured. A workflow file is not evidence that a particular run passed; run status must be checked separately.
 
-**Egress Controls**:
+### Release limitations
 
-```yaml
-capabilities:
-  http_request:
-    network_isolation:
-      allowed_domains:
-        - "api.anthropic.com"
-        - "api.openai.com"
-        - "*.example.com"
-      blocked_ips:
-        - "169.254.169.254"  # AWS metadata
-        - "127.0.0.1"  # Loopback (unless whitelisted)
-        - "0.0.0.0/8"  # This network
-```
+The current release workflow builds Python distributions and publishes GitHub Releases. The repository does **not** currently claim:
 
-**TLS Verification**:
+- signed release artefacts;
+- SBOM generation as a release control;
+- reproducible builds;
+- cryptographically verified container provenance.
 
-```python
-# All outbound HTTPS must verify certificates
-http_client = httpx.Client(
-    verify=True,  # Enforce certificate verification
-    cert_reqs="required"
-)
-```
+These are future hardening items, not active controls.
 
-## Incident Response
+## Threats and current posture
 
-### Detecting Unauthorized Access
+| Threat | Current mitigation | Limitation |
+|---|---|---|
+| Unauthorized policy operation | Control-plane API-key guard | API keys are not enterprise IAM |
+| Policy bypass through malformed input | Pydantic validation and policy checks | Policy semantics are still evolving |
+| Secret leakage in structured data | Redaction helper and secret-scanning workflow | Redaction is field-name based, not a DLP system |
+| Local state tampering | Append-oriented persistence and replay | Local files can be modified by an attacker with filesystem access |
+| Replay of stale local state | Persisted posture/replay semantics | Replay is not an authorization protocol or nonce service |
+| Dependency compromise | Hash locks, audits, dependency review | No signed/SBOM/reproducible release chain yet |
+| Container privilege escalation | Non-root image baseline | Full runtime isolation is deployment-dependent |
+| Remote model authority | Provider egress remains governed/advisory | General decision-to-provider authorization seam is still specification work |
 
-Monitor for:
+## Enterprise deployment expectations
 
-```json
-{
-  "decision": "deny",
-  "reason": "policy violation",
-  "actor": "agent:unknown"
-}
-```
+Before treating RIF as a production control plane, deployment owners should independently establish:
 
-Query audit trail:
+- TLS and trusted ingress;
+- enterprise identity and authorization around administrative operations;
+- managed secret storage and key rotation;
+- restricted network egress;
+- immutable or independently protected evidence retention;
+- backup and restore procedures;
+- centralized logs and alerting;
+- dependency and image provenance appropriate to the threat model;
+- vulnerability management and incident response procedures;
+- explicit data-retention and privacy policies;
+- tested disaster recovery.
 
-```bash
-rif audit query --actor agent:unknown --result deny --since "24h ago"
-rif evidence export agent_unknown.zip
-```
+The repository does not currently provide all of those controls as a turnkey platform.
 
-### Revoking Compromised Actors
+## Reporting a vulnerability
 
-```bash
-# 1. Remove from trusted actors in policy
-# 2. Review all recent decisions by actor
-rif audit query --actor agent:compromised
-
-# 3. Replay to understand impact
-rif replay exec_123 --dry-run
-
-# 4. Force policy reload
-rif policy reload config/policies.revoked.yaml --force
-```
-
-### Evidence Preservation
-
-For forensics, immediately export evidence:
-
-```bash
-# Full bundle
-rif evidence export full_audit.zip
-
-# With crypto verification
-rif evidence export --verify full_audit.zip
-```
-
-## Compliance
-
-### OWASP Top 10
-
-| Risk | Control | Evidence |
-|------|---------|----------|
-| A1: Injection | Intent validation, parameterized compilation | `tests/unit/test_injection_prevention.py` |
-| A2: Broken Auth | Actor identity verification, role-based policy | `config/policies.yaml`, audit logs |
-| A3: Broken Access Control | Policy engine, capability isolation | Policy evaluation results |
-| A4: Insecure Deserialization | Pydantic schema validation | `rif_runtime/schemas.py` |
-| A5: Broken Encryption | HMAC-SHA256, TLS verification | Security scanning CI |
-| A6: Auth Bypass | Policy versioning, replay protection | Audit trail immutability |
-| A7: XSS / Injection | Not applicable (no web UI with user input) | - |
-| A8: Insecure Deserialization | Covered in A4 | - |
-| A9: Logging & Monitoring | Immutable audit trail | JSONL storage |
-| A10: Broken Crypto | HMAC, SHA-256, TLS 1.2+ | Cryptography library pinning |
-
-## Security Scanning
-
-### Automated CI Checks
-
-- **Bandit** (Python security linter): `.github/workflows/bandit.yml`
-- **CodeQL** (static analysis): `.github/workflows/codeql.yml`
-- **Gitleaks** (secret detection): `.github/workflows/gitleaks.yml`
-- **Dependency Review** (CVE tracking): `.github/workflows/dependency-review.yml`
-
-### Manual Security Audit
-
-```bash
-# Check for weak dependencies
-pip-audit
-
-# Review cryptography usage
-grep -r "crypto\|hash\|encrypt" src/ --include="*.py"
-
-# Find hardcoded secrets
-gitleaks detect --report-path gitleaks-report.json
-```
-
-## Security Reporting
-
-To report a security vulnerability, **do not** open a public issue. Instead:
+**Do not open a public issue for a security vulnerability.**
 
 [Click here to report a security vulnerability](mailto:distortedprojection@gmail.com)
 
-Please include:
-- a concise description of the vulnerability;
-- affected component/version;
-- reproduction steps or proof of concept, where appropriate;
-- potential impact.
+Please include the affected component/version, a concise description, reproduction steps or proof of concept where appropriate, and the potential impact.
 
 Please allow 7 days for an initial response. Coordinated disclosure is preferred.
 
-## Future Hardening
+## Security changes
 
-- **Hardware Security Module (HSM)**: Offload signing to HSM for production
-- **Mutual TLS (mTLS)**: Client certificate verification for agent connections
-- **Attestation**: TPM-based attestation of runtime integrity
-- **Distributed Ledger**: Immutable evidence on blockchain for regulated environments
+Security-sensitive changes should include:
+
+- the threat or failure mode being addressed;
+- the authoritative decision boundary;
+- regression tests for the security property;
+- evidence of the relevant CI/security checks;
+- documentation of any remaining limitation.
+
+Avoid describing a proposed control as implemented until the repository contains the executable control and a test or workflow demonstrates it.
