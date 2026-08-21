@@ -1,59 +1,83 @@
 # AGENTS.md
 
-RIF Runtime is a pure-Python FastAPI service (`rif_runtime.api:app`) plus a Typer
-CLI (`rif`). There is no database or external service. For architecture, layout,
-conventions, and gotchas see `CLAUDE.md`; for how to build/run/test/drive the
-service see `.claude/skills/run-rif-runtime/SKILL.md`.
+Guidance for AI coding agents working in RIF Runtime.
 
-## Cursor Cloud specific instructions
+## Repository model
 
-- Dependencies are installed into a virtualenv at `.venv` (gitignored). Activate
-  it before running anything: `source .venv/bin/activate`. The startup update
-  script keeps it in sync with `pip install -e .` + `requirements.txt` +
-  `requirements-dev.txt` (`pyproject.toml` currently has empty `dependencies`).
-- That bootstrap is defined in `.cursor/environment.json` (repo-owned) and runs
-  `scripts/cloud-agent-install.sh` — the only supported install entrypoint.
-  Flow: reuse a structurally valid `.venv` (python + pip + activate) → stdlib
-  `venv` if `ensurepip` works → already-installed `virtualenv` → else
-  `/usr/bin/python3 -m pip install --user virtualenv` and create `.venv` →
-  install deps → acceptance gate (`import fastapi` / `rif_runtime`) and write
-  `.venv/.rif-bootstrap-ok`. Do not rely on `apt-get install python3.12-venv`:
-  many Cloud images omit `ensurepip`, and restricted egress blocks Ubuntu
-  archives. PyPI is allowlisted; system pip is present even when `ensurepip`
-  is not. Prefer linking docs to this script over copying shell snippets.
-- CI (`.github/workflows/ci.yml`) gates on three commands, run in this order:
-  `ruff check src tests`, `mypy src/rif_runtime --ignore-missing-imports`,
-  `pytest -q`. `quality.yml` also enforces `ruff format .` — run all four before
-  considering a change done. All 86 tests pass on a clean install.
-- To run the server for agent-driven testing, launch uvicorn directly, NOT
-  `rif serve`: `python -m uvicorn rif_runtime.api:app --host 127.0.0.1 --port 8000`.
-  `rif serve` uses `--reload`, which spawns a WatchFiles worker whose PID/cmdline
-  don't match the launch invocation, so `kill $!` and `pkill -f` fail to stop it;
-  the direct uvicorn process is a single PID that `kill` stops cleanly (see
-  SKILL.md). Interactive Swagger UI is at `/docs`.
-- Quick end-to-end check once the server is up:
-  `BASE=http://127.0.0.1:8000 bash scripts/smoke.sh` (exercises an allow + a deny
-  decision; the deny escalates posture to `elevated`). No server needed for a
-  single decision: `rif check "agent:test" "http.request" "https://blocked.example.com"`.
-  Action names matter: only real network actions (`http.request`, `api.call`,
-  `mcp.invoke`, `package.install`) are checked against `allowed_hosts`.
-- Running any real `RIFRuntime()` (server or CLI) appends to
-  `decisions.jsonl` / `posture_history.jsonl` under the configured data
-  directory (`RIF_DATA_DIR`, default `data/`, gitignored) — expected and
-  harmless. Posture is restored from those logs at startup, so a run that
-  escalated to `locked` leaves the next `rif check` locked too; clear it with
-  `POST /v1/posture/reset` or by pointing `RIF_DATA_DIR` elsewhere. The test
-  suite isolates itself into a temp directory (`tests/conftest.py`).
+RIF Runtime is a Python FastAPI service (`rif_runtime.api:app`) with a Typer CLI (`rif`). It primarily uses local JSON/JSONL persistence, but the repository also contains an **optional Supabase integration** for run/evidence persistence and JWT verification. Do not describe the project as having no external integrations.
 
-## Local Cursor CLI hardening (optional, single-user)
+For architecture, read [`ARCHITECTURE.md`](ARCHITECTURE.md). For contributor expectations, read [`CONTRIBUTING.md`](CONTRIBUTING.md). For security-sensitive work, read [`SECURITY.md`](SECURITY.md). For documentation authority, read [`docs/README.md`](docs/README.md).
 
-For a trusted local machine + private repos, prefer the RIF-optimized Agent CLI
-baseline documented in `docs/cursor/README.md`:
+## Evidence-first rule
 
-- Copy `docs/cursor/cli-config.json.example` → `~/.cursor/cli-config.json`
-- Project permissions / sandbox: `.cursor/cli.json`, `.cursor/sandbox.json`
-- Always-on rule: `.cursor/rules/rif-evidence-first.mdc`
+Do not turn documentation, a roadmap item, a specification, or a workflow definition into a claim that the runtime currently implements it.
 
-Summary: `approvalMode: allowlist`, sandbox workspace-write, restricted
-WebFetch domains, Shell on for build/test, WebSearch/GenerateImage off, Max
-Mode off. Prefer repository evidence over external network research.
+Before asserting a capability exists, inspect the relevant code and tests. Before asserting a CI/security control passed, inspect the workflow run/status. Mark uncertain claims `[UNVERIFIED]` rather than filling the gap with inference.
+
+## Current development path
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+python -m pip install -r requirements-dev.txt
+```
+
+Locked dependency path:
+
+```bash
+python -m pip install --require-hashes -r requirements/dev.txt
+python -m pip install -e . --no-deps
+```
+
+## Current CLI
+
+```bash
+rif serve
+rif check <actor> <action> <target>
+rif replay [decisions_path]
+rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
+```
+
+Do not invent or reuse historical examples for commands that are not in `src/rif_runtime/cli.py`.
+
+## Validation
+
+Run the relevant checks before declaring work complete:
+
+```bash
+ruff check src tests
+ruff format --check src tests
+mypy src/rif_runtime --ignore-missing-imports
+pytest -q
+```
+
+For dependency/security changes:
+
+```bash
+pip-audit --requirement requirements/runtime.txt --disable-pip
+pip-audit --requirement requirements/dev.txt --disable-pip
+bandit -r src/ -ll
+```
+
+The repository also configures CodeQL, Gitleaks, Dependency Review, and a merge gate in GitHub Actions.
+
+## Runtime state
+
+Runtime-generated state normally lives under `data/`, with `RIF_DATA_DIR` available for isolation. Tests should use isolated temporary directories rather than shared repository state.
+
+Posture can persist across restarts. Do not assume a fresh `RIFRuntime()` starts at normal posture when persisted state is present.
+
+## Security boundaries
+
+The control plane uses `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS`. A missing configuration fails closed for guarded operations.
+
+Do not grant authority to model output. In particular, do not treat an API key for an external model/provider as proof that RIF policy has authorized provider egress.
+
+## Contract discipline
+
+If a change crosses identity, capability, evidence, replay, MCP, or provider-egress boundaries, inspect `spec/README.md` and open specification reviews first. Do not implement a second competing contract while a cross-domain review is unresolved.
+
+## Documentation
+
+When behaviour changes, update the implementation-backed documentation in the same change. Keep historical release notes historical. Avoid unsupported performance, compliance, security, or maturity claims.
