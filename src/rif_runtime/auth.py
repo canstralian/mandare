@@ -1,7 +1,16 @@
-"""Authentication guard for mutable control-plane endpoints.
+"""Authentication guards for the control-plane surface.
 
-Covers: environment mutation, posture mutation, policy CRUD, and
-Metasploit capability token minting (RIF issue #39).
+Two guards, two scopes:
+
+``require_api_key``  — mutable operations: environment mutation, posture
+mutation, policy CRUD, and Metasploit capability token minting (RIF issue
+#39). Always enforced, and fails closed when no keys are configured.
+
+``require_read_api_key`` — read operations that disclose governance state
+(the audit summary, the configured rules, recovered state, persistence and
+telemetry counters). Enforcement is **opt-in** via ``RIF_REQUIRE_READ_AUTH``
+so that existing read clients are not broken by an upgrade; when enabled it
+accepts the same keys and fails closed the same way.
 """
 
 from __future__ import annotations
@@ -13,6 +22,8 @@ import os
 from fastapi import Depends, Header, HTTPException, status
 
 ENV_VAR = "RIF_CONTROL_PLANE_API_KEYS"
+READ_AUTH_ENV_VAR = "RIF_REQUIRE_READ_AUTH"
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
 def _configured_keys() -> set[str]:
@@ -59,4 +70,25 @@ def require_api_key(
     return x_api_key
 
 
+def read_auth_required() -> bool:
+    """Whether read endpoints are guarded, per ``RIF_REQUIRE_READ_AUTH``."""
+    return os.getenv(READ_AUTH_ENV_VAR, "").strip().lower() in _TRUTHY
+
+
+def require_read_api_key(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> str | None:
+    """FastAPI dependency for governance-state read endpoints.
+
+    A no-op unless ``RIF_REQUIRE_READ_AUTH`` is set, in which case it applies
+    exactly the same check as ``require_api_key``. The flag exists so this can
+    ship without breaking read clients that predate it; the intent is for it to
+    become the default in a later release.
+    """
+    if not read_auth_required():
+        return None
+    return require_api_key(x_api_key)
+
+
 ControlPlaneAuth = Depends(require_api_key)
+ReadPlaneAuth = Depends(require_read_api_key)

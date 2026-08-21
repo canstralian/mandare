@@ -33,7 +33,6 @@ These routes are guarded by `X-API-Key` through `RIF_CONTROL_PLANE_API_KEYS`.
 | `POST` | `/v1/environment/{name}` | Change the active environment |
 | `POST` | `/v1/posture/{posture}` | Set runtime posture |
 | `POST` | `/v1/posture/reset` | Reset posture |
-| `GET` | `/v1/policies` | List policy rules |
 | `PUT` | `/v1/policies/{rule_id}` | Create/update a policy rule |
 | `DELETE` | `/v1/policies/{rule_id}` | Delete a policy rule |
 | `POST` | `/v1/mcp/metasploit/token` | Mint a governed capability token |
@@ -92,6 +91,37 @@ X-API-Key: replace-with-a-secret-key
 ```
 
 If no control-plane key is configured, guarded operations return `503` rather than silently becoming unauthenticated.
+
+### Read-scope authentication
+
+These routes disclose governance state — decision history, configured rules,
+recovered state, and counters:
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/v1/audit` | Audit summary |
+| `GET` | `/v1/policies` | List policy rules |
+| `GET` | `/v1/recovered-state` | State rebuilt from the decision log |
+| `GET` | `/v1/persistence/summary` | Persisted decision/posture counters |
+| `GET` | `/v1/telemetry/summary` | Recent denial counters |
+| `GET` | `/v1/graph/summary` | Governance graph summary |
+
+They are **open by default**. Setting `RIF_REQUIRE_READ_AUTH=true` guards them
+with the same `X-API-Key` check as the mutable operations, including the same
+fail-closed behaviour when no key is configured:
+
+```bash
+export RIF_REQUIRE_READ_AUTH=true
+export RIF_CONTROL_PLANE_API_KEYS='replace-with-a-secret-key'
+```
+
+The flag is opt-in so that upgrading does not break existing read clients. It
+is intended to become the default; enable it now if the service is reachable
+beyond a trusted network. `/health` and `/` stay open either way so liveness
+probes need no credential.
+
+`/openapi.json` and `/docs` also stay open and enumerate the route surface;
+disable them in production if that inventory is itself sensitive.
 
 ## Example
 

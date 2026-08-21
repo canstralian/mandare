@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError
 
 from .agents.auditor import AuditorAgent
-from .auth import ControlPlaneAuth
+from .auth import ControlPlaneAuth, ReadPlaneAuth
 from .configuration.policies import PolicyRule
 from .integrations import supabase as sb
 from .mcp.capabilities import capability_catalog
@@ -120,17 +120,17 @@ def root() -> dict[str, Any]:
     }
 
 
-@app.get("/v1/graph/summary")
+@app.get("/v1/graph/summary", dependencies=[ReadPlaneAuth])
 def graph_summary() -> dict[str, Any]:
     return runtime.graph_summary()
 
 
-@app.get("/v1/telemetry/summary")
+@app.get("/v1/telemetry/summary", dependencies=[ReadPlaneAuth])
 def telemetry_summary() -> dict[str, Any]:
     return runtime.telemetry_summary()
 
 
-@app.get("/v1/audit")
+@app.get("/v1/audit", dependencies=[ReadPlaneAuth])
 def audit() -> dict[str, Any]:
     return AuditorAgent().audit(runtime)
 
@@ -202,12 +202,12 @@ def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
     )
 
 
-@app.get("/v1/persistence/summary")
+@app.get("/v1/persistence/summary", dependencies=[ReadPlaneAuth])
 def persistence_summary() -> dict[str, Any]:
     return runtime.persisted_summary()
 
 
-@app.get("/v1/recovered-state")
+@app.get("/v1/recovered-state", dependencies=[ReadPlaneAuth])
 def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
     # the response is meaningful after a restart. Reads the runtime's own
@@ -215,7 +215,7 @@ def recovered_state() -> dict[str, Any]:
     return asdict(ReplayEngine(runtime.decisions_path).recover())
 
 
-@app.get("/v1/policies")
+@app.get("/v1/policies", dependencies=[ReadPlaneAuth])
 def list_policies() -> dict[str, Any]:
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 

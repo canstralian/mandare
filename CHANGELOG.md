@@ -19,6 +19,17 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **Security: governance-state read endpoints can now require authentication.**
+  `/v1/audit`, `/v1/policies` (GET), `/v1/recovered-state`,
+  `/v1/persistence/summary`, `/v1/telemetry/summary` and `/v1/graph/summary`
+  return decision history and configured rules and were unauthenticated with no
+  way to change that. Setting `RIF_REQUIRE_READ_AUTH=true` now guards them with
+  the existing `X-API-Key` check. The flag defaults to off so existing read
+  clients keep working; it is intended to become the default. `docs/API.md` also
+  no longer claims `GET /v1/policies` is a guarded mutable operation.
+- **A route-inventory test now fails CI on any new unguarded endpoint**, so the
+  public surface has to be declared rather than defaulted into.
+
 - **Governance: the configured posture now reaches the runtime.**
   `RIF_POSTURE` / `[runtime] posture` was parsed, validated, and never read, so
   a runtime configured `locked` started up allowing everything. It is now
