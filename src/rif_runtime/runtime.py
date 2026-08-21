@@ -4,7 +4,7 @@ from typing import Any
 
 from .config import get_settings, load_config
 from .configuration.policies import PolicyStore
-from .governance.posture import escalate_posture
+from .governance.posture import at_least_posture, escalate_posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
 from .mcp.metasploit import (
@@ -46,7 +46,7 @@ class RIFRuntime:
         self.posture = self._restore_posture()
 
     def _restore_posture(self) -> Posture:
-        """Derive the posture this process must start in from the audit logs.
+        """Derive the posture this process must start in.
 
         ``posture_history.jsonl`` is authoritative when it has rows: it records
         every transition, including an operator's explicit set or reset, so its
@@ -58,13 +58,30 @@ class RIFRuntime:
         Without this a restart silently dropped a ``locked`` runtime back to
         ``normal``, re-opening everything ``PolicyEngine.evaluate()``'s
         ``posture.locked`` check had shut down.
+
+        The configured posture (``RIF_POSTURE`` / ``[runtime] posture``) is
+        then applied as a *floor*, not an assignment. It was previously parsed,
+        validated, and never read, so ``RIF_POSTURE=locked`` started a runtime
+        that allowed everything. A floor is the safe reading of that setting:
+        an operator who configures ``locked`` cannot have it quietly lowered by
+        a stale ``normal`` in the history, while a runtime that escalated to
+        ``restricted`` at runtime does not get relaxed back down to a
+        configured ``normal`` either.
         """
+        return at_least_posture(self._restored_posture(), self._configured_posture())
+
+    def _restored_posture(self) -> Posture:
+        """Last persisted posture, or the one replay derives from decisions."""
         for row in reversed(self.posture_store.read_all()):
             try:
                 return Posture(row["new_posture"])
             except (KeyError, ValueError):
                 continue
         return ReplayEngine(self.decisions_path).recover_posture()
+
+    def _configured_posture(self) -> Posture:
+        """Posture floor declared by configuration."""
+        return Posture(get_settings().runtime.posture)
 
     @property
     def profile(self) -> EnvironmentProfile:

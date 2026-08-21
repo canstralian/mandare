@@ -38,6 +38,22 @@ These routes are guarded by `X-API-Key` through `RIF_CONTROL_PLANE_API_KEYS`.
 | `DELETE` | `/v1/policies/{rule_id}` | Delete a policy rule |
 | `POST` | `/v1/mcp/metasploit/token` | Mint a governed capability token |
 
+## Startup posture
+
+The posture a process starts in is the **more restrictive** of:
+
+1. the last entry in `posture_history.jsonl` (or, with no history, the posture
+   `ReplayEngine` derives from `decisions.jsonl`); and
+2. the configured posture — `RIF_POSTURE`, or `[runtime] posture` in
+   `rif.toml`, defaulting to `normal`.
+
+Configuration is a **floor, not an assignment**: it can only tighten a runtime.
+A runtime that escalated to `locked` is not relaxed to a configured `elevated`.
+
+One asymmetry follows from this and is deliberate: `POST /v1/posture/reset`
+relaxes the *running* process, but the next restart re-applies the configured
+floor. To make a reset survive restart, lower the configured posture as well.
+
 ## Policy evaluation order
 
 `PolicyEngine.evaluate()` decides in this order, stopping at the first match:

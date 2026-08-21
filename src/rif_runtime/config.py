@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
-from .schemas import RuntimeConfig
+from .schemas import Posture, RuntimeConfig
 
 _SETTINGS_TOML_PATH = Path("rif.toml")
 
@@ -46,13 +46,11 @@ class ProviderMode(StrEnum):
     hybrid = "hybrid"
 
 
-class PostureLevel(StrEnum):
-    """Runtime governance posture levels."""
-
-    normal = "normal"
-    elevated = "elevated"
-    restricted = "restricted"
-    locked = "locked"
+# The runtime's posture enum, re-exported under the name this module has
+# always used. It was previously a second, identical StrEnum defined here,
+# which let configuration and runtime drift apart in principle while looking
+# interchangeable in practice. One definition now backs both.
+PostureLevel = Posture
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,15 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **Governance: the configured posture now reaches the runtime.**
+  `RIF_POSTURE` / `[runtime] posture` was parsed, validated, and never read, so
+  a runtime configured `locked` started up allowing everything. It is now
+  applied as a floor on the restored posture: configuration can tighten a
+  runtime but never relax one. `POST /v1/posture/reset` still relaxes the
+  running process, but the floor is re-applied on restart. Defaults are
+  unchanged (`normal` is a no-op floor). `config.PostureLevel` is now
+  `schemas.Posture` rather than a second identical enum.
+
 ### Documentation and governance
 
 - Reworked the project overview to distinguish implemented behaviour from specification and planned work.
