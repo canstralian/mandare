@@ -46,6 +46,14 @@ COPY . .
 # install cannot itself be hash-checked. Mirrors the CI install order.
 RUN python -m pip install -e . --no-deps
 
+# Every preceding layer runs as root, so /app/data lands root-owned while the
+# process runs as appuser -- the first decision append then dies with
+# PermissionError, after the container has already reported healthy. The data
+# directory is the only path the runtime writes: policies.json, decisions.jsonl,
+# posture_history.jsonl, metasploit_evidence.jsonl all live there. config/ stays
+# root-owned and read-only on purpose.
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+
 # Switch to the non-privileged user to run the application.
 USER appuser
 

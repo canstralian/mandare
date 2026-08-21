@@ -6,6 +6,18 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ### Fixed
 
+- **The container could not write its own state.** Every layer before
+  `USER appuser` runs as root, so `COPY . .` left `/app/data` root-owned while
+  the process ran unprivileged: the container reported healthy and then failed
+  on the first decision append with `PermissionError`. `/app/data` is now
+  chowned to the runtime user. The Image workflow's smoke test previously only
+  read `/health`, which cannot catch this — it now evaluates a policy request
+  and asserts the decision reached `decisions.jsonl` on disk.
+- **`.dockerignore` excludes local runtime state.** `COPY` reads the build
+  context rather than git, so a developer's `data/*.jsonl` was baked into the
+  image despite being git-ignored. `data/policies.json` still ships: it is the
+  seeded default policy.
+
 - **Server, environment and root-path settings are now honoured.** Seven of the
   eleven `RIF_*` settings were parsed, validated and then read by nothing.
   `RIF_SERVER_HOST` / `RIF_SERVER_PORT` were the worst of it: `.env.example`
