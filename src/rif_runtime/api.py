@@ -1,29 +1,70 @@
+import os
 from dataclasses import asdict
-from typing import Any
+from typing import Annotated, Any
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError
-from rif_runtime.agents.auditor import AuditorAgent
-from rif_runtime.configuration.policies import PolicyRule
-from rif_runtime.mcp.capabilities import capability_catalog
-from rif_runtime.mcp.metasploit import (
+
+from .agents.auditor import AuditorAgent
+from .auth import ControlPlaneAuth
+from .configuration.policies import PolicyRule
+from .governance.drift import recommend_correction
+from .integrations import supabase as sb
+from .mcp.capabilities import capability_catalog
+from .mcp.metasploit import (
     CapabilityToken,
     GovernanceMode,
     MetasploitIntent,
 )
-
-from .auth import ControlPlaneAuth
-from .governance.drift import recommend_correction
 from .replay import ReplayEngine
+from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
-from .schemas import PolicyDecision, PolicyRequest, Posture
+from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
 from .startup import register_config_startup
 
 runtime = RIFRuntime()
-app = FastAPI(title="RIF Runtime", version="0.1.0")
+app = FastAPI(
+    title="RIF Runtime",
+    version="0.3.0",
+    description="Governed execution substrate for intelligent systems.",
+)
 
-# Wire configuration validation into app startup
+# CORS — configure allowed origins via RIF_CORS_ORIGINS (comma-separated).
+# Default permits only localhost dev; set to your Vercel URL in production.
+_cors_origins = [
+    o.strip()
+    for o in os.environ.get("RIF_CORS_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 register_config_startup(app)
+
+_bearer = HTTPBearer(auto_error=False)
+_BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
+
+
+def _require_identity(credentials: _BearerCredentials) -> str:
+    """Verify a Supabase Bearer JWT and return the user UUID string."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return sb.verify_jwt(credentials.credentials)
+
+
+IdentityId = Annotated[str, Depends(_require_identity)]
 
 
 @app.get("/health")
@@ -61,14 +102,14 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
+    # set_posture(), not a bare assignment: the transition has to reach
+    # posture_history.jsonl or the next restart restores the old posture.
+    return {"posture": runtime.set_posture(Posture.normal).value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
-    return {"posture": runtime.posture}
+    return {"posture": runtime.set_posture(posture)}
 
 
 @app.get("/")
@@ -170,8 +211,9 @@ def persistence_summary() -> dict[str, Any]:
 @app.get("/v1/recovered-state")
 def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
-    # the response is meaningful after a restart.
-    return asdict(ReplayEngine().recover())
+    # the response is meaningful after a restart. Reads the runtime's own
+    # configured path so the two can't diverge under RIF_DATA_DIR.
+    return asdict(ReplayEngine(runtime.decisions_path).recover())
 
 
 @app.get("/v1/drift/recommend")
@@ -204,3 +246,50 @@ def upsert_policy(rule_id: str, rule: PolicyRule) -> PolicyRule:
 @app.delete("/v1/policies/{rule_id}", dependencies=[ControlPlaneAuth])
 def delete_policy(rule_id: str) -> dict[str, Any]:
     return {"deleted": runtime.policy_store.delete(rule_id)}
+
+
+@app.post("/v1/runs")
+def create_run(req: RunRequest, identity_id: IdentityId) -> RunRecord:
+    """Create a governed execution run authenticated via Supabase JWT.
+
+    Flow: verify identity → evaluate policy → record evidence → return run.
+    The endpoint is deny-safe: a policy denial still writes evidence before
+    returning 403 so the decision is always auditable.
+    """
+    run_id = str(uuid4())
+
+    policy_req = PolicyRequest(
+        actor=f"user:{identity_id}",
+        action="run.create",
+        target=req.prompt[:200],
+        reason="vercel-frontend-run",
+        context=req.context,
+    )
+    decision = runtime.evaluate(policy_req)
+
+    run_status = (
+        RunStatus.policy_approved
+        if decision.decision == Decision.allow
+        else RunStatus.denied
+    )
+    record = RunRecord(
+        run_id=run_id,
+        identity_id=identity_id,
+        status=run_status,
+        prompt=req.prompt,
+        context=req.context,
+        policy_decision=decision.decision.value,
+        matched_rule=decision.matched_rule,
+    )
+
+    sb.write_run(run_id, identity_id, run_status.value, req.prompt)
+    sb.write_evidence(run_id, "policy_decision", decision.model_dump(mode="json"))
+
+    if decision.decision != Decision.allow:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"policy denied: {decision.reason}",
+            headers={"X-RIF-Run-Id": run_id},
+        )
+
+    return record

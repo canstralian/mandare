@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(python)",
+      "Shell(python3)",
+      "Shell(pytest)",
+      "Shell(ruff)",
+      "Shell(mypy)",
+      "Shell(pip)",
+      "Shell(rif)",
+      "Shell(uvicorn)",
+      "Shell(git)",
+      "Shell(gh)",
+      "Shell(bash)",
+      "Shell(curl)",
+      "Shell(source)",
+      "Read(**)",
+      "Write(**)",
+      "WebFetch(github.com)",
+      "WebFetch(*.github.com)",
+      "WebFetch(raw.githubusercontent.com)",
+      "WebFetch(*.githubusercontent.com)",
+      "WebFetch(huggingface.co)",
+      "WebFetch(*.huggingface.co)",
+      "WebFetch(api.openai.com)",
+      "WebFetch(developers.cloudflare.com)",
+      "WebFetch(docs.anthropic.com)",
+      "WebFetch(modelcontextprotocol.io)",
+      "WebFetch(*.modelcontextprotocol.io)",
+      "WebFetch(airtable.com)",
+      "WebFetch(*.airtable.com)",
+      "Mcp(filesystem:*)",
+      "Mcp(github:*)",
+      "Mcp(rif-evidence:*)",
+      "Mcp(rif-replay:*)",
+      "Mcp(rif-policy:*)",
+      "Mcp(airtable:*)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env*)",
+      "Write(**/.env)",
+      "Write(**/.env*)",
+      "Write(**/*.pem)",
+      "Write(**/*.key)",
+      "Shell(rm)",
+      "Shell(sudo)"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "task_id": "py_003_two_sum",
+  "language": "python",
+  "prompt": "Write a function two_sum(nums: list[int], target: int) -> tuple[int, int] that returns the indices of the two numbers in nums that add up to target. You may assume exactly one solution exists and you may not use the same element twice.",
+  "entrypoint": "two_sum",
+  "tests": [
+    "assert two_sum([2, 7, 11, 15], 9) == (0, 1)",
+    "assert two_sum([3, 2, 4], 6) == (1, 2)",
+    "assert two_sum([3, 3], 6) == (0, 1)",
+    "assert two_sum([-1, -2, -3, -4, -5], -8) == (2, 4)",
+    "assert two_sum([0, 4, 3, 0], 0) == (0, 3)"
+  ],
+  "refinement_turns": [
+    {
+      "turn": 1,
+      "instruction": "Replace the O(n²) brute-force nested loop with a single-pass hash-map approach that records each number's index as it is visited.",
+      "change_type": "performance"
+    },
+    {
+      "turn": 2,
+      "instruction": "Rename internal variables to be more expressive (e.g., seen_map, complement) and add a one-line comment explaining the invariant maintained by the hash map.",
+      "change_type": "refactor"
+    },
+    {
+      "turn": 3,
+      "instruction": "Add PEP 257 docstring, type annotations, and a Raises section documenting the ValueError raised when no solution is found.",
+      "change_type": "style"
+    },
+    {
+      "turn": 4,
+      "instruction": "Add an explicit guard that raises ValueError with a descriptive message if no valid pair exists, instead of returning None or raising a KeyError.",
+      "change_type": "additive"
+    },
+    {
+      "turn": 5,
+      "instruction": "Guarantee the returned tuple always has the smaller index first (i.e., result[0] < result[1]) regardless of traversal order.",
+      "change_type": "semantic"
+    }
+  ]
+}

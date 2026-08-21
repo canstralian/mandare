@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rif-runtime"
-version = "0.3.0rc1"
+version = "0.3.0rc2"
 description = "Governed execution substrate for intelligent systems."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -43,18 +43,42 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+supabase = [
+    "supabase>=2.0,<3.0",
+]
+# Single source of truth for the development toolchain. `requirements/dev.txt`
+# is compiled from this extra with `--generate-hashes`; every CI job installs
+# that lock, so no two jobs can resolve a different toolchain.
+#
+# When you add or re-pin dev tooling here, also update `requirements-dev.txt`
+# to match, then run `make lock`. That root file is NOT generated and does not
+# read the lock: it is an unconstrained mirror of this list, and it is what
+# `Dockerfile.dev` and `scripts/cloud-agent-install.sh` install. Tooling added
+# here but not there is simply absent from the dev image and the cloud
+# bootstrap.
 dev = [
-    "pytest>=8.4",
-    "mypy>=1.18",
+    # Floor is 9.0.3, not 8.x: PYSEC-2026-1845 affects pytest <9.0.3 and
+    # `pip-audit` on requirements/dev.txt fails the security job below that.
+    "pytest>=9.0.3,<10.0",
+    "pytest-cov>=7.1,<8.0",
+    "mypy>=1.18,<2.0",
+    # Pinned to a minor series, not floated. Unpinned installs pulled ruff
+    # 0.16.x, which re-sorts imports and enables new lints — turning main red
+    # with no code change. The lock pins the exact patch.
+    "ruff>=0.15,<0.16",
     # Required by tests/test_rif_familiar_contracts.py. Without these the
-    # quality.yml `pip install -e ".[dev]"` path collects an ImportError even
-    # though ci.yml (which installs requirements-dev.txt) passes.
+    # `pip install -e ".[dev]"` path collects an ImportError.
     "jsonschema[format]>=4.25,<5.0",
     "rfc3339-validator>=0.1.4,<0.2",
     # PyYAML ships no py.typed. mypy 1.x reports import-untyped for it even
-    # under --ignore-missing-imports (2.x silences it), so ci.yml fails without
-    # this while quality.yml passes.
+    # under --ignore-missing-imports (2.x silences it).
     "types-PyYAML>=6.0,<7.0",
+    # Packaging
+    "build>=1.3,<2.0",
+    "wheel>=0.45,<1.0",
+    # Security
+    "bandit>=1.8,<2.0",
+    "pip-audit>=2.7,<3.0",
 ]
 
 [project.scripts]
