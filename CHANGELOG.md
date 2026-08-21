@@ -19,6 +19,17 @@ This changelog records user- and contributor-relevant changes. It does not repla
   is one such consumer and now declares an `allow` rule for `code.refine`.
   See "Policy evaluation order" in `docs/API.md`.
 
+- **Resolved the zero-coverage modules.** `graph/relationships.py` had no
+  caller, contract, documentation or test and was removed. The rest turned out
+  to be seams rather than accidents and are now covered instead:
+  `agents/manifest.py` binds `.rif/agents/manifest.schema.yaml` (a test now
+  fails if the dataclass and schema drift), `agents/deputy.py` and
+  `agents/orchestrator.py` are the worked examples `agents/template.py`
+  documents, and `execution/state.py` is seeded material for the Track B work
+  held by `docs/spec-review-identity-spine-migration.md` — its overlap with
+  `runs.schemas.RunStatus` is now pinned by a test so a silent reconciliation
+  is noticed. Coverage rose from 89% to 95%.
+
 - **Removed `tem]`**, a tracked 6.9 KB file of ANSI-escaped terminal output
   rendering an obsolete `pyproject.toml` (version `0.2.0`), committed by a
   shell redirect typo. Also removed a function-local `PolicyRequest` import in
