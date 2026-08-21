@@ -321,9 +321,15 @@ gitleaks detect --report-path gitleaks-report.json
 
 To report a security vulnerability, **do not** open a public issue. Instead:
 
-1. Email `security@example.com` with details
-2. Allow 7 days for initial response
-3. Embargoed disclosure until patch is released
+[Click here to report a security vulnerability](mailto:distortedprojection@gmail.com)
+
+Please include:
+- a concise description of the vulnerability;
+- affected component/version;
+- reproduction steps or proof of concept, where appropriate;
+- potential impact.
+
+Please allow 7 days for an initial response. Coordinated disclosure is preferred.
 
 ## Future Hardening
 
