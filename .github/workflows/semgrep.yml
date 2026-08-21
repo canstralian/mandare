@@ -1,0 +1,77 @@
+# Self-hosted Semgrep scan.
+#
+# Semgrep already reaches this repo through the Semgrep GitHub App, which posts
+# the `semgrep-cloud-platform/scan` check. That check depends on an external
+# account staying funded and connected; this workflow does not. It runs the
+# Semgrep CLI directly so the scan survives the app being disconnected, rate
+# limited, or out of credits.
+#
+# Extracted from PR #100, which cannot merge as-is: its other changes were
+# written against 027de82 and have since been superseded by #101 (bandit is now
+# in the [dev] extra and the hash-pinned lock; the bare `pass` statements
+# autoflake flagged are gone). Only this file and the gitleaks permission
+# narrowing are still live, so they are lifted out on their own.
+name: Semgrep
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: semgrep-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Pinned to full commit SHAs rather than tags, so the p/github-actions
+      # ruleset below does not flag this workflow for the very issue it checks
+      # for, and so a tag cannot be silently retargeted under us.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      # Deliberately no `cache: pip`. setup-python's pip cache keys on a
+      # dependency file, and semgrep appears in none of this repo's requirements
+      # files — so the key would never change when semgrep ships new rules, and
+      # a cached wheel could pin the scanner to an old ruleset indefinitely.
+      # That is the same stale-cache failure the requirements/ locks exist to
+      # prevent, and a security scanner is the last place to want it. Equally,
+      # semgrep is intentionally left unpinned: a scanner pinned to a version is
+      # a scanner that stops learning about new vulnerability classes.
+      - name: Install Semgrep
+        run: python -m pip install --upgrade pip semgrep
+
+      # The CLI, not semgrep/semgrep-action@v1: that action rejects the
+      # generateSarif input and does not emit semgrep.sarif for the upload step.
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config=p/python \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/github-actions \
+            --sarif \
+            --output=semgrep.sarif
+
+      # continue-on-error because github/codeql-action/upload-sarif requires
+      # Code Scanning to be enabled on the repository; without it the step fails
+      # with "Resource not accessible by integration". The scan itself has
+      # already run and failed the job on findings by this point, so the upload
+      # is reporting, not gating. Same pattern as bandit.yml and codeql.yml.
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: semgrep.sarif
