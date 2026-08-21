@@ -19,9 +19,9 @@ The HTTP route definitions in `src/rif_runtime/api.py` are the source of truth. 
 
 | Method | Route | Purpose | Auth |
 |---|---|---|---|
-| `POST` | `/v1/policy/evaluate` | Evaluate a policy request | None |
-| `POST` | `/v1/mcp/invoke` | Evaluate/invoke the governed MCP path | None |
-| `POST` | `/v1/mcp/metasploit/evaluate` | Evaluate a Metasploit capability request | None |
+| `POST` | `/v1/policy/evaluate` | Evaluate a policy request and record the decision | `X-API-Key` |
+| `POST` | `/v1/mcp/invoke` | Evaluate the governed MCP path in dry-run mode | None |
+| `POST` | `/v1/mcp/metasploit/evaluate` | Evaluate a Metasploit capability request in dry-run mode | None |
 | `GET` | `/v1/mcp/metasploit/capabilities` | Inspect governed Metasploit capability metadata | None |
 
 ## Mutable control-plane operations
@@ -125,10 +125,11 @@ disable them in production if that inventory is itself sensitive.
 
 ## Example
 
-Evaluate a policy request:
+Evaluate and record a policy request using the configured control-plane key:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/policy/evaluate \
+  -H 'X-API-Key: replace-with-a-secret-key' \
   -H 'content-type: application/json' \
   -d '{"actor":"agent:test","action":"http.request","target":"https://example.com"}'
 ```
