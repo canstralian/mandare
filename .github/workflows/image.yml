@@ -128,7 +128,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        # Tags on this action are v-prefixed; "0.28.0" does not exist and the
+        # job failed to resolve the action at all. Pinned to a real release
+        # rather than @master, which lint.yml used -- a mutable ref on a
+        # third-party action in a job holding security-events: write.
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: "fs"
           scan-ref: "."
