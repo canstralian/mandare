@@ -121,15 +121,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Mirrors scripts/cloud-agent-install.sh exactly: editable install, then
-      # the unpinned runtime set, then the unpinned dev set. Installing only
-      # requirements.txt would not collect the suite — the contract tests import
-      # jsonschema, which is a test dependency rather than a runtime one.
+      # Mirrors scripts/cloud-agent-install.sh exactly: runtime deps first (which
+      # includes `.` so pip installs the package non-editably from the local tree),
+      # then editable re-install with --no-deps so the source-tree __file__ path
+      # resolves correctly for tests, then the unpinned dev set.
       - name: Install unconstrained
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
           python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps
           python -m pip install -r requirements-dev.txt
 
       # Deliberately not linting here: ruff and mypy findings shift with every

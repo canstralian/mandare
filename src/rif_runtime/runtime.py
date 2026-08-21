@@ -23,7 +23,12 @@ from .storage.jsonl import JsonlStore
 class RIFRuntime:
     def __init__(self, data_dir: str | Path | None = None) -> None:
         self.config = load_config()
-        self.environment_name = self.config.default_environment
+        _settings_env = get_settings().runtime.environment
+        self.environment_name = (
+            _settings_env
+            if _settings_env in self.config.environments
+            else self.config.default_environment
+        )
         # One configured directory owns every piece of persistent state —
         # policies, decisions, posture history, evidence — so RIF_DATA_DIR
         # (equivalently [paths] data_dir in rif.toml) relocates all of them
