@@ -1,0 +1,30 @@
+# Gitleaks configuration.
+#
+# Extends the default ruleset rather than replacing it: every built-in rule
+# stays active, and this file only records specific, justified exceptions.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Reviewed findings that are not credentials"
+
+# Allowlisted by fingerprint (commit:file:rule:line), which is the narrowest
+# form gitleaks offers -- it exempts exactly one occurrence in one historical
+# commit, not a file, a path glob, or a rule. A new occurrence anywhere else
+# still fails the scan.
+#
+# 9fd5da7 added a container smoke test to the Image workflow that passed the
+# literal `smoke-test-key` in a curl -H 'X-API-Key: ...' header, which the
+# curl-auth-header rule matches. It was never a credential: the same literal
+# was handed to the throwaway container one line earlier as
+# RIF_CONTROL_PLANE_API_KEYS, so it authenticated a container that exists for
+# ~40 seconds inside the job that created it.
+#
+# It is already gone from the branch tip -- e55d60e replaced it with a value
+# generated per run via `openssl rand` and masked with ::add-mask::, because a
+# checked-in key is indistinguishable from a leaked one to a scanner. This
+# entry exists only because gitleaks scans commit history, where the original
+# commit still contains it.
+fingerprints = [
+  "9fd5da737106c35537ebde8bb7c21dd9f16bcbca:.github/workflows/image.yml:curl-auth-header:77",
+]
