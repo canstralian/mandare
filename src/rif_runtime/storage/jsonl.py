@@ -117,7 +117,8 @@ class HashChainedJsonlStore(JsonlStore):
     and the single-writer assumption returns; the runtime targets Linux.
     """
 
-    #: Bytes to read back when locating the final line. One row is ~1 KB.
+    #: Initial bytes to read when locating the final line. Grows if needed so
+    #: a single oversized row is never truncated mid-JSON.
     _TAIL_WINDOW = 65536
 
     @contextmanager
@@ -146,6 +147,28 @@ class HashChainedJsonlStore(JsonlStore):
                 if fcntl is not None:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
+    def _read_last_line(self, handle: IO[str], size: int) -> str:
+        """Return the complete last non-empty line, expanding the read window.
+
+        A fixed window can start mid-row when a payload exceeds ``_TAIL_WINDOW``.
+        Expand until a newline precedes the final line, or the file start is
+        reached (single-line file).
+        """
+        window = self._TAIL_WINDOW
+        while True:
+            start = max(0, size - window)
+            handle.seek(start)
+            chunk = handle.read(size - start)
+            stripped = chunk.rstrip("\r\n")
+            if not stripped.strip():
+                return ""
+            newline_at = stripped.rfind("\n")
+            if newline_at != -1:
+                return stripped[newline_at + 1 :]
+            if start == 0:
+                return stripped
+            window = min(size, window * 2)
+
     def _tail_hash(self, handle: IO[str]) -> str:
         """Hash the next row must link to, read from the end of the open file.
 
@@ -157,15 +180,13 @@ class HashChainedJsonlStore(JsonlStore):
         if size == 0:
             return GENESIS_HASH
 
-        handle.seek(max(0, size - self._TAIL_WINDOW))
-        lines = [line for line in handle.read().splitlines() if line.strip()]
-        if not lines:
+        last_line = self._read_last_line(handle, size)
+        if not last_line.strip():
             return GENESIS_HASH
 
-        try:
-            chain = json.loads(lines[-1]).get(CHAIN_KEY)
-        except json.JSONDecodeError:
-            return GENESIS_HASH
+        # Corrupt last row must not forge a genesis link and fork the chain;
+        # let JSONDecodeError propagate rather than returning GENESIS_HASH.
+        chain = json.loads(last_line).get(CHAIN_KEY)
         if isinstance(chain, dict) and "current_hash" in chain:
             return str(chain["current_hash"])
         # Final row predates chaining: start the chain from genesis. verify()

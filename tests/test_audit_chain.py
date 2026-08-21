@@ -222,6 +222,30 @@ def test_chain_survives_reopening_the_store(tmp_path):
     assert result.chained_rows == 2
 
 
+def test_oversized_last_row_does_not_fork_chain_on_next_append(tmp_path):
+    """A final row larger than _TAIL_WINDOW must still yield a verified chain.
+
+    ``_tail_hash`` used a fixed end-window and fell back to GENESIS_HASH when
+    ``json.loads`` failed on a truncated mid-row slice, forking the chain.
+    """
+    path = tmp_path / "log.jsonl"
+    store = HashChainedJsonlStore(path)
+    store.append({"event": "small"})
+    oversized = "x" * (HashChainedJsonlStore._TAIL_WINDOW + 2048)
+    store.append({"event": "oversized", "blob": oversized})
+    assert path.stat().st_size > HashChainedJsonlStore._TAIL_WINDOW
+
+    store.append({"event": "after-oversized"})
+
+    rows = store.read_all()
+    assert rows[2][CHAIN_KEY]["previous_hash"] == rows[1][CHAIN_KEY]["current_hash"]
+    assert rows[2][CHAIN_KEY]["previous_hash"] != GENESIS_HASH
+    result = store.verify()
+    assert result.verified is True
+    assert result.chained_rows == 3
+    assert result.broken_at is None
+
+
 def test_recorded_decisions_produce_a_verifiable_chain(tmp_path):
     """End to end: real decisions, hashed payloads, verified after the fact.
 
