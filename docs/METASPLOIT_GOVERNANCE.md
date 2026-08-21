@@ -1,124 +1,78 @@
 # Metasploit MCP Governance
 
-RIF treats a Metasploit MCP tool as a **hostile-capability dependency**. The
-goal is not "RIF can run Metasploit" — it is that RIF can prove *why* an action
-was allowed, *why* a neighbouring action was denied, and *exactly which
-authority boundary* prevented escalation. The core invariant is **intent is not
-authority**: neither a natural-language assertion nor an imported instruction
-grants a capability.
+> **Scope:** governance/evaluation. This document does not claim that RIF provides a general-purpose Metasploit execution service.
 
-Nothing in this subsystem executes a module or reaches a live RPC endpoint. It
-is the policy boundary that sits in front of one.
+RIF treats a Metasploit MCP integration as a high-risk capability boundary. The core invariant is:
 
-## Capability taxonomy
+> **Intent is not authority.**
 
-Every concrete MCP tool method is classified (`src/rif_runtime/mcp/capabilities.py`):
+The current subsystem classifies requested MCP capabilities, applies ordered governance checks, and can simulate/deny consequential actions without reaching a live RPC endpoint in the governance path documented here.
 
-- **read-only** — security *knowledge*: `module.search`, `module.info`,
-  `module.metadata`, `module.options`, `module.references`, `module.compatible`,
-  `remediation.context`, `recon.read`, `recon.lab_data`. These never mutate
-  target, session, datastore, or control-plane state.
-- **consequential** — execution or mutation *authority*: `module.execute`,
-  `exploit.run`, `payload.generate`, `handler.create`, `listener.create`,
-  `session.*`, `route.add`, `datastore.set`, `target.set`.
-- **severe** — a consequential subset whose denial escalates posture
-  immediately: persistent footholds (`session.create`, `handler.create`),
-  `route.add`, scope widening (`scope.widen`), and data/artifact egress
-  (`credentials.export`, `artifact.export`, `payload.export`, `loot.export`).
+## Capability classes
 
-Anything unrecognised is **denied by default** (treated as `unknown`). The
-taxonomy is hashed into every evidence event as `contract_hash` so a decision
-can be replayed against the exact contract that produced it.
+`src/rif_runtime/mcp/capabilities.py` classifies known methods into:
 
-## Ordered decision procedure
+- **read-only** — information-oriented methods such as module metadata/options/references and selected reconnaissance/context queries;
+- **consequential** — execution or state-changing methods;
+- **severe** — selected consequential operations that cause a stronger posture response.
 
-The order of checks in `MetasploitGovernor.evaluate` *is* the answer to "which
-boundary prevented escalation":
+Unknown capabilities are denied by the governor's default handling.
 
-1. `posture.locked` — a locked runtime denies everything.
-2. **injection / NL-authority quarantine** — operator text, imported recon
-   (`untrusted_context`), and string params are scanned for authority
-   assertions and prompt-injection markers. Any hit denies with
-   `msf.injection.quarantined` (severe).
-3. **read-only capability** — always permitted (`msf.capability.read_only`).
-4. **consequential / unknown capability** — requires authority the lane may not
-   grant.
+The exact taxonomy and its contract hash are exposed by the current API. Treat the implementation as authoritative if this document and code diverge.
 
-## The three lanes (`GovernanceMode`)
+## Decision order
 
-| Lane | Mode | Consequential capability outcome |
-|------|------|----------------------------------|
-| Read-only firewall | `read_only_firewall` | Deny — `msf.capability.execution_absent` |
-| Shadow harness | `shadow` | Deny + simulate — `msf.shadow.denied`; never reaches the tool |
-| Lab broker | `lab_broker` | Allow only with a valid capability token |
+The Metasploit governor evaluates, in order:
 
-### 1. Read-only capability firewall
+1. locked posture;
+2. injection/authority-assertion quarantine;
+3. read-only classification;
+4. consequential/unknown capability handling;
+5. broker token validation where the selected mode permits that path.
 
-Proves RIF can distinguish knowledge from authority: read-only queries pass,
-everything else is denied because execution authority is absent.
+The ordering matters because the first applicable boundary determines the recorded reason.
 
-### 2. Shadow-execution harness
+## Governance modes
 
-Every proposed call is evaluated, recorded, and returned as a simulated
-denial — no action reaches the real tool. `run_benchmark`
-(`src/rif_runtime/mcp/corpus.py`) drives a fixed corpus of benign, ambiguous,
-and maliciously-framed requests and asserts the two success criteria:
+| Mode | Intended behaviour |
+|---|---|
+| `read_only_firewall` | Read-only capability requests may be evaluated; consequential requests are denied |
+| `shadow` | Requests are evaluated and simulated without reaching a live tool |
+| `lab_broker` | Consequential requests may proceed through the capability-token checks implemented by the governor |
 
-- **zero execution-path leaks** — no consequential/unknown capability is ever
-  allowed outside the broker lane;
-- **100% evidence coverage** — every request yields exactly one signed evidence
-  event.
+`lab_broker` is a controlled governance path, not a claim of a production-safe Metasploit broker. Deployment owners must supply the surrounding isolation, scope, credentials, and network controls.
 
-### 3. Time-bound, dual-authorised lab broker
+## Capability tokens
 
-The only lane that permits a consequential action, and only with a
-`CapabilityToken` minted after signed human approval. The token binds **one**
-capability to **one** target, to the exact approved `intent_hash`, and expires
-quickly. Verification denies with a specific boundary on each escalation route:
+The broker path can issue a `CapabilityToken` bound to the approved capability/target/intent and a configured expiry. Token verification checks the fields implemented by `src/rif_runtime/mcp/metasploit.py`.
 
-| Attempt | Denial rule |
-|---------|-------------|
-| No token | `msf.broker.approval_absent` |
-| Forged/foreign signature | `msf.broker.signature_invalid` |
-| Token expired | `msf.broker.token_expired` |
-| Different capability class | `msf.broker.capability_mismatch` |
-| Target widened off the pinned asset | `msf.broker.target_pinned` |
-| Params changed after approval | `msf.broker.intent_mismatch` |
-| All checks pass | `msf.broker.authorized` (allow) |
+The token-minting API is a control-plane operation and therefore requires the configured `X-API-Key` guard.
+
+Do not describe this as a complete dual-control or human-approval system unless an external human approval mechanism actually participates in the request path.
 
 ## Evidence
 
-Each recorded governance decision emits a signed `EvidenceEvent` (HMAC over
-the canonical event), appended to `data/metasploit_evidence.jsonl`. Dry-run
-evaluations (`record=False`) — including `/v1/mcp/invoke` and
-`/v1/mcp/metasploit/evaluate` — compute and return an `EvidenceEvent` but do
-not write it to the store:
+Governed Metasploit evaluations can produce signed `EvidenceEvent` records using the HMAC utilities in the runtime. Persisted events are written to the configured Metasploit evidence JSONL path when recording is enabled.
 
-```json
-{
-  "decision_id": "uuid",
-  "intent_hash": "sha256",
-  "tool": "msfmcpd",
-  "requested_capability": "module.search",
-  "policy_decision": "allow",
-  "scope_id": "lab-2026-07",
-  "contract_hash": "sha256",
-  "matched_rule": "msf.capability.read_only",
-  "timestamp": "RFC3339",
-  "signature": "hmac-sha256"
-}
+A returned evidence object from a dry-run is not the same thing as a persisted audit record. Consumers must distinguish:
+
+```text
+computed evidence
+vs.
+persisted evidence
+vs.
+independently protected evidence
 ```
 
-`MetasploitGovernor.verify_evidence` re-derives the signature; the broker
-signing key comes from `RIF_MSF_BROKER_KEY` (a per-process random key is used
-if unset, so tokens are session-scoped unless a stable key is configured).
+The current HMAC key is process/configuration scoped. It does not provide external anchoring or tamper resistance against an attacker who can modify both the evidence file and its key/configuration.
 
 ## Interfaces
 
-- `GET  /v1/mcp/metasploit/capabilities` — the taxonomy + contract hash (explain).
-- `POST /v1/mcp/metasploit/evaluate` — evaluate an intent (`intent`, `mode`, optional `token`).
-- `POST /v1/mcp/metasploit/token` — mint a capability token (`intent`, `approver`, `ttl_seconds`).
-- CLI: `rif msf-check <capability> <target> [--mode ...]`.
+- `GET /v1/mcp/metasploit/capabilities` — current capability taxonomy and contract hash;
+- `POST /v1/mcp/metasploit/evaluate` — evaluate an intent/mode/token;
+- `POST /v1/mcp/metasploit/token` — mint a capability token under control-plane authentication;
+- `rif msf-check <capability> <target> [--mode ...]` — local evaluation command.
 
-Sealed-lab environment profiles (`RIF_Metasploit_ReadOnly`, `RIF_Metasploit_Lab`)
-in `config/environments.yaml` restrict egress to the local broker only.
+## Security boundary
+
+The governance subsystem should be understood as a policy/evaluation boundary. A production deployment that connects it to a real Metasploit service still needs independent network isolation, target scoping, credential management, operator authorization, logging, and incident-response controls.

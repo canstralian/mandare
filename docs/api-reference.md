@@ -1,68 +1,13 @@
-# API Reference
+# API Reference (legacy pointer)
 
-> **Note:** The `/execute`, `/replay/{execution_id}`, `/evidence/{execution_id}`, and
-> `/telemetry/{execution_id}` routes described here are **planned** and not yet implemented.
-> The current API surface lives in `src/rif_runtime/api.py`; see `docs/API.md` for the
-> existing routes. `GET /health` exists today but returns `environment` and `posture`
-> fields in addition to `status`.
+The previous version of this document described a planned execution/evidence API that is not the current HTTP surface.
 
-## Base URL
+For the current, implementation-backed route list, use [`API.md`](API.md).
 
-```text
-/v1
-```
+For the generated request/response schemas, run the service and use:
 
-## Execute
+- `/docs` — Swagger UI;
+- `/redoc` — ReDoc;
+- `/openapi.json` — OpenAPI document.
 
-### POST /execute
-
-Request:
-
-```json
-{
-  "intent": "summarize evidence",
-  "mode": "normal"
-}
-```
-
-Response:
-
-```json
-{
-  "execution_id": "exec_123",
-  "status": "completed"
-}
-```
-
-## Replay
-
-### POST /replay/{execution_id}
-
-## Evidence
-
-### GET /evidence/{execution_id}
-
-## Telemetry
-
-### GET /telemetry/{execution_id}
-
-## Health
-
-### GET /health
-
-Response:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-## Errors
-
-- 400 INVALID_REQUEST
-- 401 UNAUTHORIZED
-- 403 FORBIDDEN
-- 409 CONFLICT
-- 429 RATE_LIMITED
-- 500 INTERNAL_ERROR
+Do not infer that a route exists from a specification, roadmap, or historical example. `src/rif_runtime/api.py` is the implementation source of truth.

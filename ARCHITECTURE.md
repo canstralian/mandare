@@ -1,262 +1,121 @@
 # RIF Runtime Architecture
 
-## Overview
+## Purpose
 
-RIF (Reflexive Intelligence Framework) Runtime is a governed execution substrate for intelligent systems. It provides a policy-driven layer between intent and execution, with complete auditability and replay capability.
+RIF Runtime places a deterministic governance boundary between an agent or caller and actions the runtime is willing to evaluate or invoke.
 
-## Core Components
+The architectural invariant is:
 
-### 1. Intent Compiler (`rif_runtime/execution`)
-Parses user/agent intent into structured, policy-evaluable command objects. Validates schema and context before forwarding to policy engine.
+> **Policy is authoritative; model output is advisory.**
 
-**Files:**
-- `execution/compiler.py` — intent parsing & validation
-- `execution/models.py` — command object schemas
+This document describes the implementation currently present in `src/rif_runtime/`. Proposed architecture is kept separate and explicitly labelled as such.
 
-### 2. Policy Engine (`rif_runtime/policy`, `rif_runtime/governance`)
-Evaluates execution requests against active policies before any action is taken. Records all evaluations for audit.
+## Implemented request path
 
-**Files:**
-- `policy.py` — core policy evaluation logic
-- `governance/policy_store.py` — policy persistence
-- `governance/graph.py` — governance relationship tracking
-
-### 3. Capability Router (`rif_runtime/capabilities`)
-Maps validated & approved commands to executable capabilities. Routes through adapter layer for isolation.
-
-**Files:**
-- `capabilities/registry.py` — capability discovery & registration
-- `capabilities/adapter.py` — capability isolation interface
-
-### 4. Execution Layer (`rif_runtime/execution`)
-Executes approved capabilities in isolated contexts. Captures stdout, stderr, return values, and timing.
-
-**Files:**
-- `execution/executor.py` — capability invocation
-- `execution/sandbox.py` — execution environment isolation
-
-### 5. Evidence & Audit (`rif_runtime/audit`, `rif_runtime/storage`)
-Records all decisions, inputs, outputs, and policy evaluations. Enables deterministic replay.
-
-**Files:**
-- `audit.py` — audit trail management
-- `storage/decision_store.py` — persisted decision records
-- `storage/posture_store.py` — security posture snapshots
-
-### 6. Reflexive Review (`rif_runtime/explainability`)
-Post-execution analysis and governance refinement. Feeds learnings back into policy layer.
-
-**Files:**
-- `explainability.py` — decision explanation & tracing
-- `governance/reflexive_loop.py` — policy adaptation
-
-### 7. API Layer (`rif_runtime/api`)
-HTTP endpoints for policy evaluation, capability invocation, audit queries, and governance inspection.
-
-**Files:**
-- `api.py` — FastAPI app definition
-- `api/routes/*.py` — endpoint implementations
-
-### 8. CLI (`rif_runtime/cli`)
-Command-line interface for local invocation, validation, evidence export, and telemetry.
-
-**Files:**
-- `cli.py` — Typer CLI app
-
-## Data Flow
-
-```
-┌─────────────┐
-│   Agent     │
-└──────┬──────┘
-       │ intent: "POST https://api.example.com/resource"
-       ▼
-┌─────────────────────┐
-│ Intent Compiler     │
-│ (parse & validate)  │
-└──────┬──────────────┘
-       │ CommandObject { actor, action, target, params }
-       ▼
-┌──────────────────────┐
-│  Policy Engine       │
-│  (evaluate rules)    │
-└──────┬───────────────┘
-       │ decision: allow/deny with rationale
-       ▼
-┌─────────────────────────┐
-│ Capability Router       │
-│ (map to handler)        │
-└──────┬──────────────────┘
-       │ handler_ref
-       ▼
-┌─────────────────────────┐
-│ Adapter Layer           │
-│ (prepare isolation)     │
-└──────┬──────────────────┘
-       │ sandboxed_context
-       ▼
-┌─────────────────────────┐
-│ Execution Layer         │
-│ (run in sandbox)        │
-└──────┬──────────────────┘
-       │ result, timing, exit_code
-       ▼
-┌─────────────────────────┐
-│ Evidence Record         │
-│ (persist all state)     │
-└──────┬──────────────────┘
-       │ decision_id
-       ▼
-┌─────────────────────────┐
-│ Reflexive Review        │
-│ (analyze outcome)       │
-└──────┬──────────────────┘
-       │ feedback loop → policy refinement
-       ▼
-┌─────────────────────────┐
-│ Governance Graph        │
-│ (update relationships)  │
-└─────────────────────────┘
+```text
+Caller
+  |
+  v
+PolicyRequest
+  |
+  v
+RIFRuntime.evaluate()
+  |
+  +--> PolicyEngine --------------------+
+  |                                     |
+  +--> policy / environment constraints |
+  |                                     v
+  |                               PolicyDecision
+  |                                     |
+  +--> GovernanceGraph <----------------+
+  |
+  +--> ReflexiveLoop -> Posture
+  |
+  +--> JsonlStore -> decisions.jsonl / posture_history.jsonl
+  |
+  +--> telemetry / audit / recovery surfaces
 ```
 
-## Storage Model
+The exact behaviour of this path is defined by the Python implementation and its tests. The API route definitions in `src/rif_runtime/api.py` are the source of truth for the HTTP surface.
 
-### Decisions (`data/decisions.jsonl`)
-One JSON object per line; immutable append-only log of all policy evaluations.
+## Major components
 
-```json
-{
-  "id": "dec_abc123",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "actor": "agent:orchestrator",
-  "action": "http.request",
-  "target": "https://api.example.com/v1/resource",
-  "policy_id": "default-policy",
-  "result": "allow",
-  "rationale": "actor in approved_actors list",
-  "metadata": { "request_id": "req_xyz789" }
-}
-```
+| Component | Implementation | Role | Status |
+|---|---|---|---|
+| API | `src/rif_runtime/api.py` | FastAPI HTTP surface | Implemented |
+| CLI | `src/rif_runtime/cli.py` | Local operator/developer commands | Implemented |
+| Runtime | `src/rif_runtime/runtime.py` | Wires policy, posture, graph, telemetry and persistence | Implemented |
+| Policy | `src/rif_runtime/policy.py` | Evaluates policy requests and constraints | Implemented |
+| Configuration | `src/rif_runtime/config.py`, `rif.toml`, `config/` | Runtime/environment configuration | Implemented |
+| Posture | `src/rif_runtime/governance/` | Tracks and escalates runtime posture | Implemented |
+| Graph | `src/rif_runtime/graph/` | In-memory actor/target relationship view | Implemented |
+| Persistence | `src/rif_runtime/storage/` | JSONL append-oriented state storage | Implemented |
+| Replay | `src/rif_runtime/replay.py` | Reconstructs graph/posture state from decision history | Implemented |
+| Audit primitives | `src/rif_runtime/audit.py` | Hash-chain record primitives and verification | Implemented as a library surface; not equivalent to every persisted decision being hash-chained |
+| Security utilities | `src/rif_runtime/security.py` | Canonicalization, hashing, HMAC, encryption helpers and redaction | Implemented |
+| MCP | `src/rif_runtime/mcp/` | MCP governance and Metasploit-specific evaluation | Implemented in the current scope |
+| Supabase integration | `src/rif_runtime/integrations/supabase.py` | Optional remote persistence/JWT verification | Optional |
+| Resources / runs / execution packages | `src/rif_runtime/resources/`, `runs/`, `execution/` | Supporting domain surfaces | Present; not all are on the default request path |
 
-### Posture History (`data/posture_history.jsonl`)
-Snapshots of system security state at decision points.
+## Persistence model
 
-```json
-{
-  "id": "pos_def456",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "decision_id": "dec_abc123",
-  "runtime_version": "0.3.0rc1",
-  "policy_version": "2",
-  "actor_reputation": 95,
-  "environment_flags": ["sandbox", "network_limited"]
-}
-```
+The default runtime uses a configured data directory. The repository seed contains `data/policies.json`; runtime-generated JSONL files are normally ignored by Git.
 
-## Module Organization
+Common files include:
 
-```
-src/rif_runtime/
-├── __init__.py
-├── api.py                          # FastAPI app entry
-├── cli.py                          # Typer CLI entry
-├── policy.py                       # Policy evaluation logic
-├── audit.py                        # Audit trail
-├── auth.py                         # Authentication & identity
-├── config.py                       # Configuration loading
-├── schemas.py                      # Shared Pydantic models
-├── security.py                     # Security utilities (signing, hashing)
-├── startup.py                      # Initialization hooks
-├── explainability.py               # Decision explanation
-├── replay.py                       # Deterministic replay
-├── runtime.py                      # Runtime orchestration
-├── agents/                         # Agent integrations
-│   ├── __init__.py
-│   ├── base.py
-│   └── openai_adapter.py
-├── capabilities/                   # Capability system
-│   ├── __init__.py
-│   ├── registry.py
-│   ├── adapter.py
-│   └── http_capability.py
-├── execution/                      # Execution layer
-│   ├── __init__.py
-│   ├── compiler.py
-│   ├── executor.py
-│   ├── sandbox.py
-│   └── models.py
-├── governance/                     # Governance engine
-│   ├── __init__.py
-│   ├── graph.py
-│   ├── policy_store.py
-│   ├── reflexive_loop.py
-│   └── models.py
-├── graph/                          # Governance graph
-│   ├── __init__.py
-│   └── serializer.py
-├── mcp/                            # Model Context Protocol
-│   ├── __init__.py
-│   ├── client.py
-│   └── server_registry.py
-├── resources/                      # Resource definitions
-│   ├── __init__.py
-│   └── registry.py
-├── storage/                        # Persistence layer
-│   ├── __init__.py
-│   ├── decision_store.py
-│   ├── posture_store.py
-│   └── backend.py
-└── configuration/                  # Configuration schemas
-    ├── __init__.py
-    ├── policy_config.py
-    └── runtime_config.py
-```
+- `decisions.jsonl` — persisted policy decisions;
+- `posture_history.jsonl` — persisted posture transitions;
+- `metasploit_evidence.jsonl` — Metasploit-related evidence when that path is used.
 
-## Configuration
+JSONL is durable local state, not a distributed database. File integrity, backup, concurrency, retention, and recovery are deployment responsibilities unless a future storage contract states otherwise.
 
-Runtime configuration via:
-1. `rif.toml` — static configuration
-2. Environment variables — overrides (`RIF_*` prefix)
-3. `config/` directory — policy, capability, and resource definitions
+## Authentication boundary
 
-## Extension Points
+Mutable control-plane operations use the `X-API-Key` header and the `RIF_CONTROL_PLANE_API_KEYS` environment variable. If no control-plane keys are configured, guarded operations fail closed.
 
-### Custom Capabilities
-Implement `rif_runtime.capabilities.Capability` interface and register in `config/capabilities.yaml`.
+This is an application-level API-key guard, not a complete enterprise identity system. Production deployments should place the service behind an appropriate identity, network, secret-management, TLS, logging, and authorization architecture.
 
-### Custom Policies
-Extend `rif_runtime.governance.PolicyRule` and reload via policy store.
+## Optional remote persistence
 
-### Custom Evidence Handlers
-Implement `rif_runtime.storage.EvidenceBackend` for non-JSONL persistence.
+The repository includes an optional Supabase integration. It can verify Supabase JWTs and write execution/evidence records when configured. Local JSONL remains the authoritative store for the helper functions in that integration; remote writes are intentionally non-authoritative and failures are logged rather than silently replacing local state.
 
-## Security Model
+## Security boundaries
 
-- **Defense in Depth**: Policy layer → capability adapter → execution sandbox
-- **Immutable Audit**: JSONL append-only, cryptographic validation
-- **Least Privilege**: Non-root container user, minimal syscall surface
-- **Cryptographic Binding**: Signed evidence bundles, replay verification
+The runtime contains several useful security primitives:
 
-See `SECURITY.md` for detailed threat model.
+- deny-oriented policy evaluation;
+- control-plane authentication;
+- secret redaction helpers;
+- cryptographic hashing/HMAC/encryption helpers;
+- an audit hash-chain library;
+- replay and persisted-state recovery;
+- non-root container execution in the supplied Dockerfile;
+- dependency locks and security scanning in CI.
 
-## Performance Characteristics
+These controls should not be conflated with a complete sandbox, zero-trust deployment, compliance certification, or tamper-proof audit system. See [`SECURITY.md`](SECURITY.md) for the current limitations.
 
-- **Decision Latency**: ~50ms (policy evaluation)
-- **Execution Overhead**: Sandbox overhead ~5-10% depending on capability
-- **Storage**: ~1KB per decision record; ~500 records/day typical
-- **Graph Traversal**: O(n) policy evaluation; O(log n) with index
+## Specifications and target architecture
 
-## Versioning
+`spec/` and several documents under `docs/` describe contracts and architecture that are ahead of the current implementation. They are useful design inputs, but they are not automatically runtime guarantees.
 
-- **Runtime Version**: SemVer in `pyproject.toml`
-- **API Version**: URL-prefixed (`/v1/`, `/v2/`)
-- **Evidence Version**: Schema version in record headers
-- **Policy Version**: Tracked separately; independent releases
+In particular, the following remain architectural work rather than claims about the current request path:
 
-## Future Architecture
+- a general capability router/execution adapter pipeline;
+- a unified EvidenceRecord contract across all runtime paths;
+- governed remote-inference authorization;
+- automated reflexive repair/evolution;
+- distributed or tamper-evident evidence storage;
+- enterprise identity federation and policy administration.
 
-See `docs/ROADMAP.md` for planned enhancements:
-- Multi-node governance (Kubernetes integration)
-- Real-time telemetry export
-- Advanced ML-driven policy optimization
-- Distributed evidence ledger
+When implementation and design documentation disagree, current executable code and passing tests determine shipped behaviour; the discrepancy should then be documented and corrected rather than rationalized.
+
+## Change discipline
+
+Architecture changes should answer four questions:
+
+1. **Authority:** who or what is allowed to make the decision?
+2. **Boundary:** where does the proposed action cross from evaluation into effect?
+3. **Evidence:** what durable fact proves what happened?
+4. **Recovery:** can the resulting state be inspected and reconstructed?
+
+For changes that alter a cross-domain contract, use the specification-review process described in [`spec/README.md`](spec/README.md) before implementing a second, competing contract.

@@ -1,328 +1,170 @@
 # Development Guide
 
+This guide is intentionally command-first. If a command is not backed by the current repository, it does not belong here.
+
 ## Prerequisites
 
-- Python 3.12+
-- Docker & Docker Compose
+- Python 3.12 or 3.13
 - Git
-- Make (recommended)
+- Docker and Docker Compose, if you want container workflows
+- Make, if you want the repository shortcuts
 
-## Local Setup
-
-### 1. Clone & Virtual Environment
+## Local setup
 
 ```bash
 git clone https://github.com/canstralian/rif-runtime.git
 cd rif-runtime
 python3 -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+source .venv/bin/activate
+python -m pip install -e .
+python -m pip install -r requirements-dev.txt
 ```
 
-### 2. Install Development Dependencies
+For the locked CI environment:
 
 ```bash
-pip install -e ".[dev]"
-pip install -r requirements-dev.txt
+python -m pip install --require-hashes -r requirements/dev.txt
+python -m pip install -e . --no-deps
 ```
 
-### 3. Verify Installation
+## Run the service
+
+Development server:
 
 ```bash
-rif --version
-python -m pytest --version
-mypy --version
+rif serve
 ```
 
-## Running the Application
+The CLI uses Uvicorn with reload enabled. For a single foreground process, use:
 
-### Development Mode (Hot Reload)
+```bash
+python -m uvicorn rif_runtime.api:app --host 127.0.0.1 --port 8000
+```
+
+The service exposes FastAPI documentation at `/docs` and `/redoc`.
+
+## Run with Docker
 
 ```bash
 docker compose up --build
 ```
 
-Or directly with uvicorn:
+The repository uses `compose.yaml`, not `docker-compose.yml`.
+
+For the production-oriented compose file supplied by the repository:
 
 ```bash
-uvicorn 'src.rif_runtime.api:app' --host=0.0.0.0 --port=8000 --reload
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Access Points
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) before using that configuration as a production baseline.
 
-- **API**: `http://localhost:8000`
-- **Docs (Swagger UI)**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-- **Health**: `http://localhost:8000/health`
+## Current CLI
 
-### CLI Development
+The implemented commands are:
 
 ```bash
-rif execute --intent "test intent"
-rif policy check config/policies.yaml
-rif evidence export latest.zip
+rif serve
+rif check <actor> <action> <target>
+rif replay [decisions_path]
+rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
 ```
 
-## Project Structure
+Do not use the older `rif execute`, `rif evidence`, or `rif telemetry` examples found in historical documentation; those are not current CLI commands.
 
-```
-rif-runtime/
-├── src/rif_runtime/          # Main package
-├── tests/                    # Test suite
-├── config/                   # Configuration templates
-├── data/                     # Runtime data (gitignored)
-├── docs/                     # Documentation
-├── spec/                     # API specifications
-├── scripts/                  # Utility scripts
-├── Dockerfile                # Container image
-├── docker-compose.yml        # Development stack
-├── pyproject.toml            # Package metadata & tool config
-├── requirements.txt          # Runtime deps
-├── requirements-dev.txt      # Development deps
-├── rif.toml                  # Runtime configuration
-└── Makefile                  # Common tasks
-```
+## Validation
 
-## Code Quality
-
-### Linting
+Run the focused checks first:
 
 ```bash
-# Ruff (fast Python linter)
-ruff check src/ tests/
-
-# Type checking
-mypy src/ tests/
-
-# All checks
-make lint
+ruff check src tests
+ruff format --check src tests
+mypy src/rif_runtime --ignore-missing-imports
+pytest -q
 ```
 
-### Formatting
+Security checks used by the repository include:
 
 ```bash
-# Check formatting
-ruff format --check src/ tests/
-
-# Auto-format
-ruff format src/ tests/
+bandit -r src/ -ll
+pip-audit --requirement requirements/runtime.txt --disable-pip
+pip-audit --requirement requirements/dev.txt --disable-pip
 ```
 
-### Testing
+Gitleaks, CodeQL, Dependency Review, and the merge gate are configured in GitHub Actions. A configured workflow is not the same thing as a passing run; verify the run when reporting validation status.
+
+## Dependency locks
+
+The canonical generated locks are:
+
+- `requirements/runtime.txt` — runtime dependencies;
+- `requirements/dev.txt` — runtime plus development dependencies.
+
+Regenerate them with:
 
 ```bash
-# Run tests
-pytest
-
-# With coverage
-pytest --cov=src/rif_runtime tests/
-
-# Specific test file
-pytest tests/test_policy.py
-
-# Verbose output
-pytest -v tests/
+make lock
 ```
 
-### Security Scanning
+Deliberately upgrade resolved versions with:
 
 ```bash
-# Bandit (security linter)
-bandit -r src/
-
-# Gitleaks (secret detection)
-gitleaks detect
+make lock-upgrade
 ```
 
-## Configuration
+See [`requirements/README.md`](requirements/README.md) for the lock model.
 
-### Runtime Config (`rif.toml`)
+## Runtime state
 
-```toml
-[runtime]
-version = "0.3.0rc1"
-log_level = "INFO"
-evidence_dir = "data/"
+By default, runtime-generated state lives under `data/`. The `RIF_DATA_DIR` environment variable can point the runtime at an isolated directory, which is useful for tests and experiments.
 
-[policy]
-default_policy = "config/policies.yaml"
-auto_reload = true
+Common files include:
 
-[capabilities]
-registry = "config/capabilities.yaml"
+- `decisions.jsonl`;
+- `posture_history.jsonl`;
+- `metasploit_evidence.jsonl`.
 
-[storage]
-backend = "jsonl"
-decisions_file = "data/decisions.jsonl"
-posture_file = "data/posture_history.jsonl"
-```
+Avoid using repository state as a test fixture. Tests should use isolated temporary directories where persistence is involved.
 
-### Environment Variables
+## API development
 
-Prefix with `RIF_`:
+`src/rif_runtime/api.py` is the current HTTP route source of truth.
 
-```bash
-RIF_LOG_LEVEL=DEBUG
-RIF_POLICY_AUTO_RELOAD=false
-RIF_STORAGE_BACKEND=sqlite
-```
+When changing an endpoint:
 
-### Policy Configuration
+1. update the Pydantic request/response models if required;
+2. add or update tests;
+3. update [`docs/API.md`](docs/API.md) and any CLI/user documentation affected;
+4. consider authentication, persistence, replay, and compatibility impact.
 
-See `config/policies.yaml` for policy definitions and examples.
+The application also exposes OpenAPI at `/openapi.json` while running.
 
-## Common Tasks
+## Policy development
 
-### Add a New Capability
+Policy changes should be treated as security-sensitive. Before merging, explain:
 
-1. Create capability module: `src/rif_runtime/capabilities/my_capability.py`
-2. Implement `Capability` interface
-3. Register in `config/capabilities.yaml`
-4. Test with `tests/test_my_capability.py`
+- what actor/action/target combinations change;
+- whether deny precedence changes;
+- whether posture transitions change;
+- whether persisted records or replay semantics change;
+- what regression tests prove the intended boundary.
 
-### Add a New API Endpoint
+## MCP development
 
-1. Create route file: `src/rif_runtime/api/routes/my_route.py`
-2. Define Pydantic models in `schemas.py` if needed
-3. Add route to `api.py` using `app.include_router()`
-4. Document in `spec/openapi.yaml`
-5. Test with `tests/test_api_my_route.py`
+MCP integrations are governance boundaries, not an implicit permission to execute tools. Changes should make the authorization decision explicit and should not promote model output into authority.
 
-### Add a Policy Rule
+The Metasploit integration is currently a governed evaluation surface; it should not be described as unrestricted Metasploit execution.
 
-1. Define rule structure in `rif_runtime/governance/models.py`
-2. Implement evaluation logic in `rif_runtime/policy.py`
-3. Add test cases
-4. Document in `docs/POLICIES.md`
+## Documentation development
 
-## Debugging
+Documentation has an evidence discipline:
 
-### Enable Debug Logging
+- implemented behaviour is described from code/tests;
+- configured controls are described from repository configuration;
+- specifications are labelled as specifications;
+- future work is labelled planned;
+- unknown status is marked unverified.
 
-```bash
-export RIF_LOG_LEVEL=DEBUG
-rif execute --intent "test" --verbose
-```
+Avoid stale endpoint lists, invented performance targets, unsupported compliance claims, and examples for commands that do not exist.
 
-### Inspect Evidence
-
-```bash
-# View recent decisions
-tail -20 data/decisions.jsonl | python -m json.tool
-
-# Export decision bundle
-rif evidence export exec_123 bundle.zip
-```
-
-### Docker Container Debugging
-
-```bash
-# Shell access
-docker compose exec server /bin/bash
-
-# View logs
-docker compose logs -f server
-
-# Inspect network
-docker network inspect rif-runtime_default
-```
-
-## Testing
-
-### Test Organization
-
-```
-tests/
-├── test_policy.py              # Policy engine tests
-├── test_capabilities.py        # Capability system tests
-├── test_api.py                 # API endpoint tests
-├── test_audit.py               # Audit & evidence tests
-├── test_execution.py           # Execution layer tests
-├── test_mcp_integration.py     # MCP server tests
-└── fixtures/                   # Test data & mocks
-    ├── policies.yaml
-    ├── decisions.jsonl
-    └── sample_events.json
-```
-
-### Writing Tests
-
-Use pytest with fixtures:
-
-```python
-import pytest
-from rif_runtime.policy import PolicyEngine
-
-@pytest.fixture
-def policy_engine():
-    return PolicyEngine(policy_file="tests/fixtures/policies.yaml")
-
-def test_policy_evaluation(policy_engine):
-    result = policy_engine.evaluate(
-        actor="test:agent",
-        action="http.request",
-        target="https://api.example.com"
-    )
-    assert result.decision == "allow"
-```
-
-## Continuous Integration
-
-GitHub Actions workflows in `.github/workflows/`:
-
-- `ci.yml` — Tests on push/PR
-- `quality.yml` — Code quality checks
-- `codeql.yml` — Security analysis
-- `bandit.yml` — Dependency vulnerabilities
-- `gitleaks.yml` — Secret detection
-- `release.yml` — Release automation
-
-View results on GitHub Actions tab.
-
-## Making Changes
-
-1. Create a branch: `git checkout -b feature/my-feature`
-2. Make changes and commit: `git commit -am "Add feature"`
-3. Push and create a pull request
-4. Ensure CI passes (tests, lint, security scans)
-5. Request review from maintainers
-6. Merge when approved
-
-## Performance Profiling
-
-### CPU Profiling
-
-```python
-import cProfile
-import pstats
-
-profiler = cProfile.Profile()
-profiler.enable()
-
-# ... code to profile ...
-
-profiler.disable()
-stats = pstats.Stats(profiler)
-stats.sort_stats('cumulative').print_stats(10)
-```
-
-### Memory Profiling
-
-```bash
-pip install memory-profiler
-python -m memory_profiler -m rif execute --intent "test"
-```
-
-## Documentation
-
-- API docs auto-generated at `/docs`
-- Architecture: `ARCHITECTURE.md`
-- Security model: `SECURITY.md`
-- Release process: `release-engineering-guide.md`
-- CLI reference: `cli-reference.md`
-
-## Resources
-
-- [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [Pydantic Docs](https://docs.pydantic.dev/)
-- [Pytest Docs](https://docs.pytest.org/)
-- [MyPy Docs](https://mypy.readthedocs.io/)
+See [`docs/README.md`](docs/README.md) for the documentation map.
