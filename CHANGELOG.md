@@ -6,6 +6,30 @@ This changelog records user- and contributor-relevant changes. It does not repla
 
 ### Fixed
 
+- **Server, environment and root-path settings are now honoured.** Seven of the
+  eleven `RIF_*` settings were parsed, validated and then read by nothing.
+  `RIF_SERVER_HOST` / `RIF_SERVER_PORT` were the worst of it: `.env.example`
+  presented them as the way to choose a bind address while `rif serve`
+  hardcoded its own. `rif serve` now takes its defaults from configuration
+  (explicit flags still win), `RIF_SERVER_ROOT_PATH` reaches the ASGI app, and
+  `RIF_ENVIRONMENT` selects the active profile — with an unknown name raising
+  rather than silently falling back, since the environment carries the egress
+  constraints.
+- **The default bind address is loopback.** `[server] host` defaulted to
+  `0.0.0.0`, which was harmless only because nothing read it. Wiring it up
+  unchanged would have turned every `rif serve` into a network listener, so the
+  default and the shipped `rif.toml` are now `127.0.0.1`; the container image
+  passes `--host=0.0.0.0` explicitly.
+- **The shipped `rif.toml` named an environment that does not exist**
+  (`production`, absent from `environments.yaml`). Now `RIF_Runtime`.
+- **The `.env.example` fidelity guard no longer passes vacuously.** It grepped
+  `src/` for each variable name, which `config.py`'s own `_ENV_MAP` satisfies
+  for every name, so it proved nothing. Replaced with per-setting behavioural
+  tests plus a completeness check, so a setting that stops being honoured fails
+  regardless of how the lookup is written. Settings that are deliberately
+  recorded-but-not-enforced are declared explicitly and must say so in
+  `.env.example`.
+
 - **`POST /v1/runs` is allowed by the shipped policy.** Enabling catch-all
   evaluation made `deny_unknown_by_default` apply to `run.create`, so every
   authenticated run creation returned 403. Deny-by-default means denying what

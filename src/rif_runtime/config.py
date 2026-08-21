@@ -73,7 +73,12 @@ class ServerSection(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    host: str = "0.0.0.0"  # nosec B104 — intentional bind-all default, overridable via RIF_SERVER_HOST
+    # Loopback, not 0.0.0.0. This default was previously bind-all, which was
+    # harmless only because nothing read it: `rif serve` hardcoded 127.0.0.1.
+    # Now that the CLI takes its default from here, bind-all would silently
+    # expose every `rif serve` to the network. Deployments that must listen
+    # externally say so explicitly -- the Dockerfile passes --host=0.0.0.0.
+    host: str = "127.0.0.1"
     port: int = 8000
     root_path: str = ""
 

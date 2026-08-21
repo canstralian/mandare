@@ -40,6 +40,9 @@ app = FastAPI(
     # a package version of 0.3.0rc2, so /openapi.json advertised a release the
     # installed distribution was not.
     version=__version__,
+    # Mount prefix when served behind a reverse proxy at a sub-path. Read from
+    # settings rather than left implicit, which made RIF_SERVER_ROOT_PATH inert.
+    root_path=validate_config().server.root_path,
     description="Governed execution substrate for intelligent systems.",
 )
 

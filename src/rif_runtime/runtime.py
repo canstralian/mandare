@@ -2,7 +2,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from .config import get_settings, load_config
+from .config import RuntimeSection, get_settings, load_config
 from .configuration.policies import PolicyStore
 from .governance.posture import at_least_posture, escalate_posture
 from .governance.reflexive import ReflexiveLoop
@@ -23,7 +23,7 @@ from .storage.jsonl import HashChainedJsonlStore, JsonlStore
 class RIFRuntime:
     def __init__(self, data_dir: str | Path | None = None) -> None:
         self.config = load_config()
-        self.environment_name = self.config.default_environment
+        self.environment_name = self._configured_environment()
         # One configured directory owns every piece of persistent state —
         # policies, decisions, posture history, evidence — so RIF_DATA_DIR
         # (equivalently [paths] data_dir in rif.toml) relocates all of them
@@ -86,6 +86,29 @@ class RIFRuntime:
     def _configured_posture(self) -> Posture:
         """Posture floor declared by configuration."""
         return Posture(get_settings().runtime.posture)
+
+    def _configured_environment(self) -> str:
+        """Environment named by configuration, else the profile default.
+
+        ``RIF_ENVIRONMENT`` / ``[runtime] environment`` was parsed and
+        validated and then never read -- the runtime always took
+        ``default_environment`` from environments.yaml, so selecting an
+        environment by configuration silently did nothing.
+
+        An unknown name raises rather than falling back: environments carry the
+        egress constraints, so quietly serving a different profile than the one
+        configured is the kind of silent downgrade this runtime exists to
+        prevent.
+        """
+        configured = get_settings().runtime.environment
+        if configured in self.config.environments:
+            return configured
+        if configured != RuntimeSection.model_fields["environment"].default:
+            raise ValueError(
+                f"configured environment {configured!r} is not defined in "
+                f"environments.yaml (known: {sorted(self.config.environments)})"
+            )
+        return self.config.default_environment
 
     @property
     def profile(self) -> EnvironmentProfile:

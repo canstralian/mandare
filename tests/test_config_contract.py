@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+import textwrap
 from collections.abc import Generator
 from pathlib import Path
 
@@ -291,6 +292,16 @@ def _source_text() -> str:
     )
 
 
+# Settings that are parsed and surfaced but deliberately not acted on. Each
+# needs a reason, and .env.example must say the same thing to the operator.
+RECORDED_ONLY_SETTINGS = {
+    "RIF_CLOUD_EGRESS": "advisory flag; egress is decided by profile + rules",
+    "RIF_PROVIDER_MODE": "provider config is not authorization",
+    "RIF_PROVIDER_MODEL": "provider config is not authorization",
+    "RIF_PROVIDER_ENDPOINT": "provider config is not authorization",
+}
+
+
 def test_env_example_documents_only_variables_the_code_reads():
     source = _source_text()
     inert = sorted(name for name in _documented_env_vars() if name not in source)
@@ -299,6 +310,179 @@ def test_env_example_documents_only_variables_the_code_reads():
         f".env.example documents {len(inert)} variable(s) that nothing in src/ "
         f"reads: {inert}. Remove them, or implement them. A setting that looks "
         "like a control but does nothing is a false assurance."
+    )
+
+
+# --- every mapped setting must change something ------------------------------
+#
+# Two earlier versions of this guard were vacuous. The first grepped src/ for
+# the variable name, which config.py's own _ENV_MAP satisfies for every name.
+# The second matched the `settings.<section>.<key>` attribute path, which the
+# ordinary `server = get_settings().server` / `server.host` idiom never spells
+# out. Static analysis kept measuring the wrong thing, so these assert observed
+# behaviour instead: set the variable, then look at what the runtime does. A
+# setting that stops being honoured fails here regardless of how it is written.
+
+
+def test_data_dir_setting_relocates_persistent_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    reset_settings()
+    from rif_runtime.runtime import RIFRuntime
+
+    assert RIFRuntime().decisions_path == tmp_path / "decisions.jsonl"
+
+
+def test_config_dir_setting_selects_the_environments_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "environments.yaml").write_text(
+        textwrap.dedent(
+            """\
+            default_environment: OnlyHere
+            environments:
+              OnlyHere:
+                networking_type: open
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path))
+    reset_settings()
+    from rif_runtime.config import load_config
+
+    assert load_config().default_environment == "OnlyHere"
+
+
+def test_environment_setting_selects_the_active_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RIF_ENVIRONMENT", "RIF_CI")
+    reset_settings()
+    from rif_runtime.runtime import RIFRuntime
+
+    assert RIFRuntime().environment_name == "RIF_CI"
+
+
+def test_unknown_environment_setting_raises_rather_than_falling_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A silent fallback would serve a different egress profile than configured."""
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RIF_ENVIRONMENT", "no_such_environment")
+    reset_settings()
+    from rif_runtime.runtime import RIFRuntime
+
+    with pytest.raises(ValueError, match="no_such_environment"):
+        RIFRuntime()
+
+
+def test_posture_setting_reaches_the_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RIF_POSTURE", "restricted")
+    reset_settings()
+    from rif_runtime.runtime import RIFRuntime
+
+    assert RIFRuntime().posture == "restricted"
+
+
+def test_server_host_and_port_settings_reach_uvicorn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`rif serve` hardcoded these, so both were documented, parsed and ignored."""
+    from unittest.mock import patch
+
+    from typer.testing import CliRunner
+
+    from rif_runtime.cli import app as cli_app
+
+    monkeypatch.setenv("RIF_SERVER_HOST", "10.1.2.3")
+    monkeypatch.setenv("RIF_SERVER_PORT", "9123")
+    reset_settings()
+
+    with patch("rif_runtime.cli.uvicorn.run") as run:
+        CliRunner().invoke(cli_app, ["serve"])
+
+    assert run.call_args.kwargs["host"] == "10.1.2.3"
+    assert run.call_args.kwargs["port"] == 9123
+
+
+def test_server_root_path_setting_reaches_the_asgi_app(tmp_path: Path) -> None:
+    """Mount prefix for reverse-proxy sub-path deployments.
+
+    Runs in a subprocess because api.py reads the setting while building the
+    module-level app: once this process has imported it, the object is fixed
+    and an in-process override would prove nothing.
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+
+    env = {
+        **os.environ,
+        "RIF_SERVER_ROOT_PATH": "/api/v1",
+        "RIF_DATA_DIR": str(tmp_path),
+    }
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import json; from rif_runtime.api import app; "
+            "print(json.dumps(app.root_path))",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout.strip()) == "/api/v1"
+
+
+def test_recorded_only_settings_are_declared_in_env_example() -> None:
+    """An operator reading the file must see which settings do not act."""
+    text = ENV_EXAMPLE.read_text(encoding="utf-8")
+
+    for name in RECORDED_ONLY_SETTINGS:
+        preamble = text[: text.index(f"{name}=")]
+        section = preamble.rsplit("# ---", 1)[-1].lower()
+        assert (
+            "not acted on" in section
+            or "does not itself" in section
+            or "not authorization" in section
+        ), f"{name} is recorded-only but .env.example does not say so"
+
+
+def test_every_mapped_setting_is_covered_here_or_declared_recorded_only() -> None:
+    """No mapped setting may escape both the behavioural tests and the exemptions.
+
+    This is the part that keeps the section above complete: adding a key to
+    _ENV_MAP without either proving it does something or declaring that it does
+    not fails here.
+    """
+    from rif_runtime.config import _ENV_MAP
+
+    covered = {
+        "RIF_DATA_DIR",
+        "RIF_CONFIG_DIR",
+        "RIF_ENVIRONMENT",
+        "RIF_POSTURE",
+        "RIF_SERVER_HOST",
+        "RIF_SERVER_PORT",
+        "RIF_SERVER_ROOT_PATH",
+    }
+    unaccounted = sorted(set(_ENV_MAP) - covered - set(RECORDED_ONLY_SETTINGS))
+
+    assert not unaccounted, (
+        f"{unaccounted} are mapped but neither behaviourally tested above nor "
+        "declared in RECORDED_ONLY_SETTINGS."
     )
 
 
