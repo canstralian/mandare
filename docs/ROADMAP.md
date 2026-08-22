@@ -19,8 +19,13 @@ This is a roadmap, not a statement that every item below exists today.
 | Replay/recovery of local runtime state | Implemented |
 | Audit hash-chain primitives | Implemented as a library surface |
 | MCP governance surfaces | Implemented in current scope |
+| Capability identity/admission contract | Implemented first vertical slice |
+| Governed capability execution | Implemented through `RIFRuntime.execute_capability()` |
 | Remote provider authorization seam | Specification work / gated |
 | Unified EvidenceRecord contract | Specification/design |
+| Signed skill/artifact verification | Planned |
+| Skill/static security inspection | Planned |
+| Benchmark/regression evidence ingestion | Planned |
 | Reflexive repair | Planned |
 | Controlled evolution | Planned |
 | Distributed evidence / enterprise storage | Planned |
@@ -28,7 +33,18 @@ This is a roadmap, not a statement that every item below exists today.
 
 ## Near-term engineering priorities
 
-### 1. Specification integrity
+### 1. Capability supply-chain evidence
+
+The first capability-governance slice now separates executable adapters from their governance identity and requires integrity plus passing evaluation evidence before admission. The next increment should make that evidence durable and independently verifiable.
+
+- persist capability records rather than keeping them only in process memory;
+- ingest artifact digests and signatures;
+- represent source commit/version and retrieval provenance;
+- add static inspection and dependency findings;
+- ingest regression/benchmark results;
+- keep admission decisions replayable.
+
+### 2. Specification integrity
 
 Keep implementation and contract work synchronized without allowing parallel interpretations of the same boundary.
 
@@ -37,7 +53,7 @@ Keep implementation and contract work synchronized without allowing parallel int
 - keep identity, capability, evidence, and replay contracts explicit;
 - make contract tests executable where practical.
 
-### 2. Governed provider egress
+### 3. Governed provider egress
 
 The next provider-inference seam is a **Specification Review**, not an implementation shortcut.
 
@@ -64,13 +80,13 @@ Evidence
 
 Provider credentials must never become implicit authority. This work is subject to the repository's existing Track-B governance and must not bypass an open cross-domain review.
 
-### 3. Evidence contract
+### 4. Evidence contract
 
 Define what an EvidenceRecord means, which events are authoritative, how provenance is represented, and what replay can and cannot prove.
 
 The goal is stronger than "we wrote a log": evidence should have a clear owner, schema, retention model, integrity story, and verification procedure.
 
-### 4. Enterprise release assurance
+### 5. Enterprise release assurance
 
 Future release hardening should add, in a deliberate sequence:
 
