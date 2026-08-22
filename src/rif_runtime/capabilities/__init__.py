@@ -1,7 +1,21 @@
-"""
-Capability subsystem.
+"""Capability identity, lifecycle, and evidence contracts."""
 
-Import concrete classes directly from their modules.
-"""
+from .models import (
+    CapabilityEvaluation,
+    CapabilityIntegrity,
+    CapabilityLifecycle,
+    CapabilityProvenance,
+    CapabilityRecord,
+    CapabilityStatus,
+)
+from .registry import CapabilityRegistry
 
-__all__: list[str] = []
+__all__ = [
+    "CapabilityEvaluation",
+    "CapabilityIntegrity",
+    "CapabilityLifecycle",
+    "CapabilityProvenance",
+    "CapabilityRecord",
+    "CapabilityRegistry",
+    "CapabilityStatus",
+]
