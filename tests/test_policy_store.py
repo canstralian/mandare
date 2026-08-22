@@ -354,3 +354,22 @@ def test_mcp_invoke_simulation_reports_the_denial_rather_than_bypassing_it():
     )
     assert decision.decision == "deny"
     assert decision.matched_rule == "policy.deny_unknown_by_default"
+
+
+def test_a_cold_start_with_no_data_dir_seeds_the_shipped_rules(tmp_path):
+    """An empty data directory is not an empty policy.
+
+    The Vercel deployment sets RIF_DATA_DIR=/tmp/rif-data, which is empty on
+    every cold start, so it was read as "deny-by-default with no rules loaded,
+    therefore the deployment denies everything". JsonStore seeds DEFAULT_POLICIES
+    when the file is absent, so a cold start gets exactly the shipped ruleset --
+    including the allow rules, not just the catch-all deny.
+    """
+    absent = tmp_path / "never-created" / "policies.json"
+    assert not absent.exists()
+
+    rules = {rule.id: rule for rule in PolicyStore(absent).list()}
+
+    assert rules["deny_unknown_by_default"].effect == "deny"
+    assert rules["allow_run_create"].effect == "allow"
+    assert rules["allow_known_model_hosts"].effect == "allow"

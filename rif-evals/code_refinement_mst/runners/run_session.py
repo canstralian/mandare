@@ -231,16 +231,30 @@ def write_report(
     md_lines = [
         "# MST-RIF Report",
         "",
-        "| task_id | model | turns_attempted | turns_passed |"
+        "| task_id | model | turns_attempted | turns_passed | turns_blocked |"
         " first_regression_turn | mst_score |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in combined:
+        # A blocked turn verifies nothing, so a session policy gated shut scores
+        # a perfect MST. The JSON has carried turns_blocked and
+        # score_is_meaningful since that was found; without them here the
+        # Markdown still showed a fully blocked run as a clean 4/4. Rows merged
+        # from an older report may predate both keys, hence the defaults.
+        blocked = row.get("turns_blocked", 0)
+        meaningful = row.get("score_is_meaningful", True)
+        score = row["mst_score"] if meaningful else f"{row['mst_score']} (INVALID)"
         md_lines.append(
             f"| {row['task_id']} | {row['model']} | {row['turns_attempted']} |"
-            f" {row['turns_passed']} | {row['first_regression_turn']} |"
-            f" {row['mst_score']} |"
+            f" {row['turns_passed']} | {blocked} |"
+            f" {row['first_regression_turn']} | {score} |"
         )
+    if any(not row.get("score_is_meaningful", True) for row in combined):
+        md_lines += [
+            "",
+            "> **INVALID**: every turn in that session was blocked by policy, so"
+            " nothing was verified and the score measures nothing.",
+        ]
     md_path = reports_dir / "mst_report.md"
     md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
 

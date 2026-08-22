@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 from pathlib import Path
 
@@ -443,13 +446,20 @@ def test_a_multibyte_payload_at_the_window_boundary_still_links(tmp_path):
     character straddling the window boundary raised UnicodeDecodeError instead
     of returning the tail. The read is binary and decodes a whole record.
     """
-    store = HashChainedJsonlStore(tmp_path / "log.jsonl")
+    path = tmp_path / "log.jsonl"
+    store = HashChainedJsonlStore(path)
     store.append({"event": "before"})
-    # json.dumps escapes non-ASCII by default, so put the multi-byte characters
-    # somewhere the bytes on disk are genuinely multi-byte: the raw file is
-    # written as UTF-8, and the boundary walk must not care either way.
     store.append({"target": "é" * HashChainedJsonlStore._TAIL_WINDOW})
     store.append({"event": "after"})
+
+    # Guard the premise. json.dumps escapes non-ASCII unless told otherwise, and
+    # while it did, this test put pure ASCII on disk -- no multi-byte character
+    # ever straddled the window boundary, so it proved nothing about the decode
+    # path it claims to cover.
+    assert "é".encode() in path.read_bytes(), (
+        "rows were escaped to ASCII, so no multi-byte character straddles the "
+        "tail window and this test does not exercise the decode path"
+    )
 
     assert store.verify().verified is True
     assert store.read_all()[1]["target"].startswith("é")
@@ -471,3 +481,74 @@ def test_a_torn_final_line_is_reported_rather_than_silently_forked(tmp_path):
 
     with pytest.raises(ValueError, match="damaged"):
         store.append({"event": "three"})
+
+
+def test_a_blank_trailing_line_does_not_fork_the_chain(tmp_path):
+    """Writers must end the chain where readers think it ends.
+
+    read_all() skips blank lines, so treating one as the tail left the two
+    disagreeing: a single whitespace-only line appended after a valid row sent
+    the next append back to genesis and reported a permanent break.
+    """
+    path = tmp_path / "log.jsonl"
+    store = HashChainedJsonlStore(path)
+    store.append({"event": "one"})
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("   \n\n")
+    store.append({"event": "two"})
+
+    result = store.verify()
+    assert result.verified is True
+    assert result.chained_rows == 2
+
+    rows = store.read_all()
+    assert len(rows) == 2
+    assert rows[1][CHAIN_KEY]["previous_hash"] == rows[0][CHAIN_KEY]["current_hash"]
+
+
+def test_a_blank_only_file_starts_the_chain_at_genesis(tmp_path):
+    """Whitespace is not a record, so a file of it is an empty log."""
+    path = tmp_path / "log.jsonl"
+    path.write_text("\n   \n\n", encoding="utf-8")
+    store = HashChainedJsonlStore(path)
+    store.append({"event": "first"})
+
+    assert store.read_all()[0][CHAIN_KEY]["previous_hash"] == GENESIS_HASH
+    assert store.verify().verified is True
+
+
+def test_readers_never_observe_a_half_written_row(tmp_path):
+    """read_all() takes a shared lock, so it cannot parse a torn line.
+
+    A writer holds LOCK_EX across the whole append, but an unlocked reader can
+    still land between the write syscalls Python issues for a large row and hit
+    a JSONDecodeError -- a 500 from GET /v1/audit. Rows here are deliberately
+    far larger than one buffer so the window is wide enough to hit.
+    """
+    path = tmp_path / "log.jsonl"
+    writer = textwrap.dedent(f"""
+        import sys
+        sys.path.insert(0, {str(Path(__file__).resolve().parents[1] / "src")!r})
+        from rif_runtime.storage.jsonl import HashChainedJsonlStore
+
+        store = HashChainedJsonlStore({str(path)!r})
+        for index in range(40):
+            store.append({{"index": index, "blob": "x" * 200_000}})
+    """)
+
+    process = subprocess.Popen([sys.executable, "-c", writer])
+    try:
+        reader = HashChainedJsonlStore(path)
+        reads = 0
+        while process.poll() is None:
+            # The assertion is simply that this does not raise.
+            rows = reader.read_all()
+            assert all("index" in row for row in rows)
+            reads += 1
+    finally:
+        process.wait(timeout=60)
+
+    assert process.returncode == 0
+    assert reads > 0, "the writer finished before any concurrent read happened"
+    assert reader.verify().verified is True
+    assert len(reader.read_all()) == 40

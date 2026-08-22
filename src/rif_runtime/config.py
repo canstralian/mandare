@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
-from .schemas import Posture, RuntimeConfig
+from .schemas import EnvironmentProfile, Posture, RuntimeConfig
 
 _SETTINGS_TOML_PATH = Path("rif.toml")
 
@@ -275,8 +275,6 @@ def load_config(path: str | Path | None = None) -> RuntimeConfig:
         # Naming the fallback after the request is not a silent profile swap:
         # there is no other profile to serve, and the one served is the
         # restrictive default rather than something the operator did not choose.
-        from .schemas import EnvironmentProfile
-
         name = get_settings().runtime.environment or "production"
         return RuntimeConfig(
             default_environment=name,

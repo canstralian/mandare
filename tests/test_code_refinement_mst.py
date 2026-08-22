@@ -153,3 +153,51 @@ def test_a_verified_session_is_marked_meaningful(tmp_path):
     result = session["result"]
     assert result["turns_blocked"] == 0
     assert result["score_is_meaningful"] is True
+
+
+def test_the_markdown_report_marks_an_unusable_score(tmp_path):
+    """A blocked session must not read as a clean run in mst_report.md.
+
+    turns_blocked and score_is_meaningful reached the JSON when it was found
+    that a policy-gated session scores a perfect MST while verifying nothing,
+    but write_report rendered only the raw MST fields -- so the Markdown, which
+    is what a reader actually looks at, still showed a fully blocked run as 4/4.
+    """
+    from run_session import write_report
+
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    write_report(
+        [
+            {
+                "task_id": "blocked-task",
+                "model": "scripted",
+                "turns_attempted": 4,
+                "turns_passed": 4,
+                "turns_blocked": 4,
+                "first_regression_turn": None,
+                "mst_score": 1.0,
+                "score_is_meaningful": False,
+            },
+            {
+                "task_id": "clean-task",
+                "model": "scripted",
+                "turns_attempted": 4,
+                "turns_passed": 4,
+                "turns_blocked": 0,
+                "first_regression_turn": None,
+                "mst_score": 1.0,
+                "score_is_meaningful": True,
+            },
+        ],
+        reports,
+    )
+
+    markdown = (reports / "mst_report.md").read_text(encoding="utf-8")
+    blocked, clean = (
+        next(line for line in markdown.splitlines() if line.startswith(f"| {task}"))
+        for task in ("blocked-task", "clean-task")
+    )
+    assert "INVALID" in blocked, "a fully blocked session still reads as a clean run"
+    assert "INVALID" not in clean, "a verified session must not be marked invalid"
+    assert "turns_blocked" in markdown

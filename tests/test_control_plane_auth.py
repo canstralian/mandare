@@ -267,20 +267,18 @@ def test_a_non_ascii_configured_key_does_not_break_the_guard(monkeypatch):
     assert response.status_code == 401
 
 
-def test_a_non_ascii_candidate_reaches_the_guard_without_raising():
+def test_a_non_ascii_candidate_reaches_the_guard_without_raising(monkeypatch):
     """Same property at the unit boundary, where HTTP encoding cannot mask it."""
-    import os
-
     from rif_runtime.auth import require_api_key
 
-    os.environ[ENV_VAR] = "clé-de-contrôle"
-    try:
-        with pytest.raises(HTTPException) as rejected:
-            require_api_key("kéy")
-        assert rejected.value.status_code == 401
-        assert require_api_key("clé-de-contrôle") == "clé-de-contrôle"
-    finally:
-        del os.environ[ENV_VAR]
+    # monkeypatch, not os.environ: setting it directly and deleting in a finally
+    # clears any RIF_CONTROL_PLANE_API_KEYS the test process already had, for
+    # every test that runs after this one.
+    monkeypatch.setenv(ENV_VAR, "clé-de-contrôle")
+    with pytest.raises(HTTPException) as rejected:
+        require_api_key("kéy")
+    assert rejected.value.status_code == 401
+    assert require_api_key("clé-de-contrôle") == "clé-de-contrôle"
 
 
 def test_api_keys_are_not_run_through_a_fast_hash(monkeypatch):

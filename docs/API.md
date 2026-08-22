@@ -14,6 +14,7 @@ The HTTP route definitions in `src/rif_runtime/api.py` are the source of truth. 
 | `GET` | `/v1/persistence/summary` | Persistence summary | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
 | `GET` | `/v1/recovered-state` | Recovered runtime state | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
 | `GET` | `/v1/audit` | Audit/decision view | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/policies` | List policy rules | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
 
 ## Governance operations
 

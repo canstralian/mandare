@@ -152,6 +152,37 @@ class HashChainedJsonlStore(JsonlStore):
                 if fcntl is not None:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
+    @contextmanager
+    def _read_locked(self) -> Iterator[IO[bytes]]:
+        """Open for reading with a shared advisory lock held throughout.
+
+        Serialising writers is only half of it. A writer holds ``LOCK_EX``
+        across the whole append, but an unlocked reader can still land between
+        the write syscalls Python issues for a large row and parse a half-
+        written line -- ``json.JSONDecodeError``, surfacing as a 500 from
+        ``GET /v1/audit``. The window is negligible for a ~1 KB row, but
+        ``target`` on ``POST /v1/policy/evaluate`` is unbounded, which is the
+        same reason the tail read cannot assume a fixed size.
+
+        A shared lock excludes writers without excluding other readers.
+        """
+        with self.path.open("rb") as handle:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+            try:
+                yield handle
+            finally:
+                if fcntl is not None:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def read_all(self) -> list[dict[str, Any]]:
+        """Read every row under a shared lock, so no row is seen half-written."""
+        if not self.path.exists():
+            return []
+        with self._read_locked() as handle:
+            text = handle.read().decode("utf-8")
+        return [json.loads(line) for line in text.splitlines() if line.strip()]
+
     def _tail_hash(self, handle: IO[bytes]) -> str:
         """Hash the next row must link to, read from the end of the open file.
 
@@ -170,6 +201,12 @@ class HashChainedJsonlStore(JsonlStore):
         boundary -- a newline before the final record, or the start of the file.
         Ordinary rows are ~1 KB, so the first read almost always suffices; the
         growth costs anything only on the rows that would otherwise be wrong.
+
+        Blank lines are skipped rather than treated as the tail. ``read_all``
+        ignores them, so taking one as the tail would leave readers and writers
+        disagreeing about where the chain ends: a single whitespace-only line
+        appended after a valid row sent the next append back to genesis and
+        forked the chain, which is the same failure the window fix removed.
         """
         handle.seek(0, os.SEEK_END)
         size = handle.tell()
@@ -177,27 +214,24 @@ class HashChainedJsonlStore(JsonlStore):
             return GENESIS_HASH
 
         window = self._TAIL_WINDOW
+        last = b""
         while True:
             start = max(0, size - window)
             handle.seek(start)
-            # Trailing newline stripped first, so the final record is what
-            # follows the last remaining newline rather than the empty string
-            # after it.
-            chunk = handle.read(size - start).rstrip(b"\n")
-            boundary = chunk.rfind(b"\n")
-            if boundary != -1:
-                # A newline inside the slice: everything after it is one whole
-                # record, whatever the bytes before it may be a fragment of.
-                last = chunk[boundary + 1 :]
+            lines = handle.read(size - start).split(b"\n")
+            # Unless the slice begins at the file start, its first element is
+            # the tail of a record that began before the window. Dropping it
+            # can only cost an extra doubling, never correctness.
+            complete = lines if start == 0 else lines[1:]
+
+            found = next((line for line in reversed(complete) if line.strip()), None)
+            if found is not None:
+                last = found
                 break
             if start == 0:
-                # No newline and the slice is the whole file: a single record.
-                last = chunk
-                break
+                # Nothing but blank lines in the whole file.
+                return GENESIS_HASH
             window *= 2
-
-        if not last.strip():
-            return GENESIS_HASH
 
         try:
             chain = json.loads(last.decode("utf-8")).get(CHAIN_KEY)
@@ -245,7 +279,13 @@ class HashChainedJsonlStore(JsonlStore):
                 "current_hash": entry.current_hash,
             }
             handle.seek(0, os.SEEK_END)
-            handle.write((json.dumps(row) + "\n").encode("utf-8"))
+            # ensure_ascii=False so the file holds real UTF-8 rather than
+            # \uXXXX escapes. The digest is computed over the payload dict, not
+            # these bytes, so both forms verify identically and json.loads reads
+            # either -- but escaping everything to ASCII meant the binary tail
+            # read above could never actually meet a multi-byte character, so
+            # the hazard it exists for was untestable through this class.
+            handle.write((json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8"))
 
     def verify(self, rows: list[dict[str, Any]] | None = None) -> ChainVerification:
         """Recompute every link and report where, if anywhere, it breaks.

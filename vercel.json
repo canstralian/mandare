@@ -7,8 +7,7 @@
       "config": {
         "includeFiles": [
           "config/**",
-          "rif.toml",
-          "data/policies.json"
+          "rif.toml"
         ]
       }
     }

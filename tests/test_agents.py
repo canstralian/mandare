@@ -147,35 +147,54 @@ def test_execution_state_is_not_used_by_the_runtime():
 
     root = Path(__file__).resolve().parent.parent / "src" / "rif_runtime"
 
-    def imports_execution_state(node: ast.AST) -> bool:
+    def imports_execution_state(node: ast.AST, module_name: str) -> bool:
         """Every spelling of the import, absolute and relative.
 
         `ast` puts the leading dots of a relative import in `node.level`, not in
         `node.module` -- so `from .state import X` is module="state", level=1,
         and matching on the literal ".state" never fires. The first version of
         this guard did exactly that and could not detect any relative form.
+
+        Matching on the *spelling* is not enough either: `from .. import state`
+        reads like this module but resolves to `rif_runtime.state`, a different
+        module that does not exist. Relative imports are therefore resolved
+        against the importing module's own package, and only an import that
+        resolves to `rif_runtime.execution.state` counts.
         """
+        target = "rif_runtime.execution.state"
         if isinstance(node, ast.Import):
-            return any(a.name == "rif_runtime.execution.state" for a in node.names)
+            return any(alias.name == target for alias in node.names)
         if not isinstance(node, ast.ImportFrom):
             return False
-        module = node.module or ""
-        names = {alias.name for alias in node.names}
-        # from [rif_runtime.]execution.state import X  /  from .state import X
-        if module.endswith("execution.state") or (node.level and module == "state"):
-            return True
-        # from [rif_runtime.]execution import state  /  from . import state
-        return "state" in names and (
-            module.endswith("execution") or (node.level and not module)
+
+        if node.level:
+            package = module_name.rsplit(".", 1)[0] if "." in module_name else ""
+            # One dot means the importer's own package; each extra dot climbs.
+            parts = package.split(".") if package else []
+            climb = node.level - 1
+            if climb > len(parts):
+                return False
+            base = ".".join(parts[: len(parts) - climb] if climb else parts)
+            resolved = f"{base}.{node.module}" if node.module else base
+        else:
+            resolved = node.module or ""
+
+        # `from ...execution import state` / `from ...execution.state import X`
+        return resolved == target or (
+            resolved == target.rsplit(".", 1)[0]
+            and any(alias.name == "state" for alias in node.names)
         )
 
     importers = []
     for path in root.rglob("*.py"):
         if path.name == "state.py" and path.parent.name == "execution":
             continue
+        relative = path.relative_to(root).with_suffix("")
+        parts = [part for part in relative.parts if part != "__init__"]
+        module_name = ".".join(("rif_runtime", *parts))
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if imports_execution_state(node):
+            if imports_execution_state(node, module_name):
                 importers.append(str(path.relative_to(root)))
 
     assert not importers, (
