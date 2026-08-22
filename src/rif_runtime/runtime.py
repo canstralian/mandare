@@ -9,7 +9,7 @@ from .config import get_settings, load_config
 from .configuration.policies import PolicyStore
 from .execution.kernel import ExecutionKernel
 from .execution.manifest import ExecutionManifest
-from .execution.result import ExecutionResult
+from .execution.result import ExecutionResult, ExecutionStatus
 from .governance.posture import escalate_posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
@@ -35,10 +35,6 @@ class RIFRuntime:
             if _settings_env in self.config.environments
             else self.config.default_environment
         )
-        # One configured directory owns every piece of persistent state —
-        # policies, decisions, posture history, evidence — so RIF_DATA_DIR
-        # (equivalently [paths] data_dir in rif.toml) relocates all of them
-        # together. Tests pass an explicit tmp_path instead.
         self.data_dir = Path(
             data_dir if data_dir is not None else get_settings().paths.data_dir
         )
@@ -56,25 +52,11 @@ class RIFRuntime:
         self.capability_evidence_store = JsonlStore(
             self.data_dir / "capability_evidence.jsonl"
         )
-        # Re-entrant: evaluate() holds the lock across its call to
-        # record_decision(), which acquires it again.
         self._lock = threading.RLock()
         self.posture = self._restore_posture()
 
     def _restore_posture(self) -> Posture:
-        """Derive the posture this process must start in from the audit logs.
-
-        ``posture_history.jsonl`` is authoritative when it has rows: it records
-        every transition, including an operator's explicit set or reset, so its
-        last entry is the posture the runtime was left in. Falling back to
-        replaying ``decisions.jsonl`` covers a first boot after decisions were
-        recorded without any transition (no escalation yet, hence ``normal``
-        unless the denial thresholds say otherwise).
-
-        Without this a restart silently dropped a ``locked`` runtime back to
-        ``normal``, re-opening everything ``PolicyEngine.evaluate()``'s
-        ``posture.locked`` check had shut down.
-        """
+        """Derive the posture this process must start in from the audit logs."""
         for row in reversed(self.posture_store.read_all()):
             try:
                 return Posture(row["new_posture"])
@@ -137,13 +119,7 @@ class RIFRuntime:
             self.capability_registry.register(capability, record)
 
     def execute_capability(self, manifest: ExecutionManifest) -> ExecutionResult:
-        """Execute only after policy authorization and capability admission.
-
-        The execution kernel remains deliberately capability-agnostic. RIF's
-        governed path performs policy evaluation first, then verifies the
-        capability's integrity/evaluation record, then executes the manifest.
-        Every attempt writes a compact evidence record for later inspection.
-        """
+        """Execute only after policy authorization and capability admission."""
         with self._lock:
             policy_request = PolicyRequest(
                 actor=manifest.actor,
@@ -166,7 +142,7 @@ class RIFRuntime:
                     }
                 )
                 return ExecutionResult(
-                    status="denied",
+                    status=ExecutionStatus.DENIED,
                     message=f"policy denied: {decision.reason}",
                     metadata={"manifest_id": manifest.manifest_id},
                 )
@@ -214,10 +190,8 @@ class RIFRuntime:
             self.posture = self.reflexive.observe(decision, self.posture)
             if outcome.severe:
                 self.posture = escalate_posture(self.posture)
-
             self.decisions_store.append(decision.model_dump())
             self.evidence_store.append(outcome.evidence.model_dump())
-
             if old_posture != self.posture:
                 self.posture_store.append(
                     {"old_posture": str(old_posture), "new_posture": str(self.posture)}
