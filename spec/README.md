@@ -16,7 +16,7 @@ domains are:
 | `evidence/` | seeded | Observation event schema (copied from `contracts/rif_familiar/`) |
 | `replay/` | placeholder | Replay contract not yet extracted from `src/rif_runtime/replay.py` |
 | `skill/` | placeholder | Skill package format (`SKILL.md` + `skill.yaml` + tests) not yet formalized |
-| `state/` | placeholder | Structured runtime state contract not yet extracted from `runtime_state.json` |
+| `state/` | placeholder | Structured runtime state contract not yet extracted (no `runtime_state.json` exists — see `spec/state/README.md`) |
 
 Beyond the six original domains, governed-integration contracts also live here:
 

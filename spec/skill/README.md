@@ -1,8 +1,11 @@
 # spec/skill
 
 Contract for the skill package format — the self-contained, versioned, testable
-unit that packages a single capability (`SKILL.md` + `skill.yaml` + `scripts/` +
+unit that packages a single capability (`SKILL.md` + a YAML manifest + `scripts/` +
 `references/` + `tests/`), per ADR-0008.
+
+ADR-0008 names that manifest `skill.yaml`; the one existing example in this
+repository calls it `manifest.yaml`. The filename is unsettled — see "Next slice".
 
 **Placeholder** — no schema yet. This runtime does not currently have a formal
 skill package format; `.claude/skills/run-rif-runtime/` is the closest existing
