@@ -298,6 +298,50 @@ def test_run_create_is_allowed_by_the_shipped_policy():
     assert decision.matched_rule == "policy.allow_run_create"
 
 
+def test_legacy_policies_missing_allow_run_create_are_upgraded(tmp_path):
+    """Existing policies.json without allow_run_create must still allow run.create.
+
+    JsonStore only seeds when the file is missing. Pre-PR deployments that
+    already have deny_unknown_by_default would otherwise deny every
+    POST /v1/runs once wildcard evaluation is enabled. Required first-party
+    rules are inserted on load; optional seed rules that an operator deleted
+    (e.g. allow_known_model_hosts) are not restored.
+    """
+    import json
+
+    from rif_runtime.runtime import RIFRuntime
+
+    legacy = {
+        "rules": [
+            {
+                "id": "deny_unknown_by_default",
+                "effect": "deny",
+                "action": "*",
+                "target": "*",
+                "reason": "deny by default",
+            },
+        ]
+    }
+    (tmp_path / "policies.json").write_text(json.dumps(legacy), encoding="utf-8")
+
+    runtime = RIFRuntime(data_dir=tmp_path)
+    rule_ids = [rule.id for rule in runtime.policy_store.list()]
+    assert "allow_run_create" in rule_ids
+    assert "allow_known_model_hosts" not in rule_ids
+    assert rule_ids.index("allow_run_create") < rule_ids.index(
+        "deny_unknown_by_default"
+    )
+
+    decision = runtime.evaluate(
+        PolicyRequest(actor="a", action="run.create", target="runs")
+    )
+    assert decision.decision == "allow"
+    assert decision.matched_rule == "policy.allow_run_create"
+
+    persisted = json.loads((tmp_path / "policies.json").read_text(encoding="utf-8"))
+    assert [r["id"] for r in persisted["rules"]] == rule_ids
+
+
 def test_shipped_data_policies_matches_default_policies():
     """data/policies.json is the seeded copy of DEFAULT_POLICIES; keep them equal.
 
