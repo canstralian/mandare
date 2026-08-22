@@ -1,5 +1,6 @@
-"""Capability identity, lifecycle, and evidence contracts."""
+"""Executable capabilities and their governance records."""
 
+from .capability import Capability
 from .models import (
     CapabilityEvaluation,
     CapabilityIntegrity,
@@ -11,6 +12,7 @@ from .models import (
 from .registry import CapabilityRegistry
 
 __all__ = [
+    "Capability",
     "CapabilityEvaluation",
     "CapabilityIntegrity",
     "CapabilityLifecycle",
