@@ -121,8 +121,14 @@ class HashChainedJsonlStore(JsonlStore):
     _TAIL_WINDOW = 65536
 
     @contextmanager
-    def _locked(self) -> Iterator[IO[str]]:
+    def _locked(self) -> Iterator[IO[bytes]]:
         """Open for append with an exclusive advisory lock held throughout.
+
+        Binary, not text. The tail is located by seeking to a byte offset
+        counted back from the end, and a text handle decodes from wherever it
+        lands: land mid-character and the read raises ``UnicodeDecodeError``.
+        Byte offsets are only meaningful on a binary handle, so the decode
+        happens explicitly below, on a slice already known to be a whole record.
 
         The flush before unlocking is load-bearing, not tidiness. Python buffers
         the write, and closing the handle is what flushes it -- which happens
@@ -132,7 +138,7 @@ class HashChainedJsonlStore(JsonlStore):
         bytes are in the page cache is what makes the serialisation real.
         """
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a+", encoding="utf-8") as handle:
+        with self.path.open("ab+") as handle:
             if fcntl is not None:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             try:
@@ -146,26 +152,65 @@ class HashChainedJsonlStore(JsonlStore):
                 if fcntl is not None:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def _tail_hash(self, handle: IO[str]) -> str:
+    def _tail_hash(self, handle: IO[bytes]) -> str:
         """Hash the next row must link to, read from the end of the open file.
 
         Must be called with the lock held: the value is only true for as long
         as no other writer can append.
+
+        The window is a starting guess, not a bound. Reading a fixed number of
+        bytes back from the end and taking the last line assumes the final
+        record fits in that many bytes -- and ``target`` on
+        ``POST /v1/policy/evaluate`` is an unbounded string, so it need not. A
+        record larger than the window left the read starting mid-record, the
+        parse failed, and the next append linked to genesis: a forked chain,
+        reported forever after as a break indistinguishable from tampering.
+
+        So the window doubles until the slice provably contains a record
+        boundary -- a newline before the final record, or the start of the file.
+        Ordinary rows are ~1 KB, so the first read almost always suffices; the
+        growth costs anything only on the rows that would otherwise be wrong.
         """
         handle.seek(0, os.SEEK_END)
         size = handle.tell()
         if size == 0:
             return GENESIS_HASH
 
-        handle.seek(max(0, size - self._TAIL_WINDOW))
-        lines = [line for line in handle.read().splitlines() if line.strip()]
-        if not lines:
+        window = self._TAIL_WINDOW
+        while True:
+            start = max(0, size - window)
+            handle.seek(start)
+            # Trailing newline stripped first, so the final record is what
+            # follows the last remaining newline rather than the empty string
+            # after it.
+            chunk = handle.read(size - start).rstrip(b"\n")
+            boundary = chunk.rfind(b"\n")
+            if boundary != -1:
+                # A newline inside the slice: everything after it is one whole
+                # record, whatever the bytes before it may be a fragment of.
+                last = chunk[boundary + 1 :]
+                break
+            if start == 0:
+                # No newline and the slice is the whole file: a single record.
+                last = chunk
+                break
+            window *= 2
+
+        if not last.strip():
             return GENESIS_HASH
 
         try:
-            chain = json.loads(lines[-1]).get(CHAIN_KEY)
-        except json.JSONDecodeError:
-            return GENESIS_HASH
+            chain = json.loads(last.decode("utf-8")).get(CHAIN_KEY)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # `last` is a complete record by construction, so this is a
+            # genuinely damaged final line (a torn write), not a short read.
+            # Returning genesis would start a second chain over the damage and
+            # report it as tampering forever; read_all() cannot parse this row
+            # either. Fail loudly rather than silently forking.
+            raise ValueError(
+                f"final row of {self.path} is not valid JSON; the log is "
+                "damaged and appending would fork the chain"
+            ) from exc
         if isinstance(chain, dict) and "current_hash" in chain:
             return str(chain["current_hash"])
         # Final row predates chaining: start the chain from genesis. verify()
@@ -200,7 +245,7 @@ class HashChainedJsonlStore(JsonlStore):
                 "current_hash": entry.current_hash,
             }
             handle.seek(0, os.SEEK_END)
-            handle.write(json.dumps(row) + "\n")
+            handle.write((json.dumps(row) + "\n").encode("utf-8"))
 
     def verify(self, rows: list[dict[str, Any]] | None = None) -> ChainVerification:
         """Recompute every link and report where, if anywhere, it breaks.

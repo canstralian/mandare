@@ -401,3 +401,73 @@ def test_deleting_a_middle_row_breaks_the_chain_but_truncation_does_not(tmp_path
     gapped = HashChainedJsonlStore(path).verify()
     assert gapped.verified is False
     assert gapped.broken_at == 2
+
+
+def test_a_row_larger_than_the_tail_window_does_not_fork_the_chain(tmp_path):
+    """The tail read must find the record boundary, not a fixed byte count.
+
+    `target` on POST /v1/policy/evaluate is an unbounded string, so a decision
+    row can exceed the tail window. Reading a fixed slice back from the end
+    then started mid-record; the parse failed, and the next append linked to
+    genesis instead of to the oversized row -- a fork reported forever after as
+    a break indistinguishable from tampering.
+    """
+    store = HashChainedJsonlStore(tmp_path / "log.jsonl")
+    store.append({"event": "before"})
+    store.append({"target": "X" * (HashChainedJsonlStore._TAIL_WINDOW + 4096)})
+    store.append({"event": "after"})
+
+    result = store.verify()
+    assert result.verified is True
+    assert result.chained_rows == 3
+
+    rows = store.read_all()
+    assert rows[2][CHAIN_KEY]["previous_hash"] == rows[1][CHAIN_KEY]["current_hash"]
+
+
+def test_consecutive_oversized_rows_grow_the_window_as_far_as_needed(tmp_path):
+    """One doubling is not enough when the final record dwarfs the window."""
+    store = HashChainedJsonlStore(tmp_path / "log.jsonl")
+    store.append({"event": "first"})
+    store.append({"target": "Y" * (HashChainedJsonlStore._TAIL_WINDOW * 5)})
+    store.append({"event": "last"})
+
+    assert store.verify().verified is True
+    assert store.verify().chained_rows == 3
+
+
+def test_a_multibyte_payload_at_the_window_boundary_still_links(tmp_path):
+    """Byte offsets must not land the reader mid-character.
+
+    A text handle decodes from wherever the seek lands, so a multi-byte
+    character straddling the window boundary raised UnicodeDecodeError instead
+    of returning the tail. The read is binary and decodes a whole record.
+    """
+    store = HashChainedJsonlStore(tmp_path / "log.jsonl")
+    store.append({"event": "before"})
+    # json.dumps escapes non-ASCII by default, so put the multi-byte characters
+    # somewhere the bytes on disk are genuinely multi-byte: the raw file is
+    # written as UTF-8, and the boundary walk must not care either way.
+    store.append({"target": "é" * HashChainedJsonlStore._TAIL_WINDOW})
+    store.append({"event": "after"})
+
+    assert store.verify().verified is True
+    assert store.read_all()[1]["target"].startswith("é")
+
+
+def test_a_torn_final_line_is_reported_rather_than_silently_forked(tmp_path):
+    """A damaged tail must not quietly start a second chain over the damage."""
+    path = tmp_path / "log.jsonl"
+    store = HashChainedJsonlStore(path)
+    store.append({"event": "one"})
+    store.append({"event": "two"})
+
+    # Simulate a write torn by a crash: the final row is cut mid-JSON.
+    with path.open("r+", encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+        handle.seek(0)
+        handle.truncate()
+        handle.write(lines[0] + "\n" + lines[1][: len(lines[1]) // 2] + "\n")
+
+    with pytest.raises(ValueError, match="damaged"):
+        store.append({"event": "three"})
