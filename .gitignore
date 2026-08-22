@@ -1,4 +1,3 @@
-.venv/
 .venv*/
 __pycache__/
 *.pyc
@@ -9,8 +8,6 @@ dist/
 build/
 *.egg-info/
 .env
-data/*.jsonl
-
 data/*.jsonl
 data/*.tmp
 

@@ -21,3 +21,17 @@ implement this contract. It is the Metasploit MCP tool taxonomy
 authority; this schema describes a device's declared authority set, budgets, and
 relay policy. The two are unrelated. A general capability-manifest contract for
 the runtime (as opposed to the RIF Familiar device) is still to be written.
+
+## Open contract question — snapshot binding
+
+The manifest above describes a capability set that is **declared and pinned at
+registration**. It does not cover a capability catalog **observed at decision
+time** from a remote MCP server, which since MCP `2026-07-28` is a cacheable,
+mutable artifact (`ttlMs`, `cacheScope`) carrying no stability guarantee.
+
+`docs/spec-review-capability-snapshot-authority.md` (Track B, Draft) holds the
+normative treatment: what observation becomes authoritative for a unit of work,
+and what governs its replacement. Its current resolution is that a
+`capability_snapshot_id` binds to a `Decision`, not to a `Run` or an `Execution`.
+
+No implementation is authorized until that review is approved.

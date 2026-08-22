@@ -1,175 +1,99 @@
 # CLAUDE.md
 
-Guidance for AI assistants (Claude Code and others) working in this repository.
+Guidance for AI coding assistants working in RIF Runtime.
 
-## What this is
+## What this repository is
 
-RIF Runtime is a governed agent runtime: a policy engine that mediates actions
-taken by AI agents (HTTP requests, MCP tool invocations, package installs) and
-produces an auditable trail of allow/deny decisions. It is a small FastAPI
-service plus a Typer CLI, backed by JSONL/JSON files for persistence — no
-database, no external services.
+RIF Runtime is a governed Python runtime with a FastAPI HTTP surface and Typer CLI. The default persistence model is local JSON/JSONL, with an optional Supabase integration for run/evidence persistence and JWT verification.
 
-Core execution circuit:
+The central trust model is:
 
 ```text
-Agent request
-  -> PolicyEngine.evaluate()      (src/rif_runtime/policy.py)
-  -> PolicyDecision
-  -> GovernanceGraph.record_decision()   (src/rif_runtime/graph/memory.py)
-  -> ReflexiveLoop.observe() -> new Posture   (src/rif_runtime/governance/reflexive.py)
-  -> JsonlStore.append() (decisions + posture transitions)   (src/rif_runtime/storage/jsonl.py)
-  -> Audit / telemetry / graph summary APIs
+request
+  -> policy evaluation
+  -> decision
+  -> posture / graph / telemetry
+  -> persistence
+  -> replay / inspection
 ```
 
-Trust model: deny by default, environment-scoped allowed hosts, and a
-"posture" that escalates automatically as denials accumulate (normal ->
-elevated -> restricted -> locked). A locked posture denies everything
-regardless of other rules.
+Do not describe future execution, evidence, provider-inference, or autonomous-evolution architecture as shipped behaviour.
 
-## Layout
+## Important source-of-truth files
 
-```text
-src/rif_runtime/
-  api.py                  FastAPI app, all HTTP routes (source of truth for the API surface)
-  cli.py                  Typer CLI: `rif serve`, `rif check`, `rif replay`
-  runtime.py              RIFRuntime — wires config, policy engine, reflexive loop,
-                           graph, and persistence together; one instance per process
-  config.py               Loads config/environments.yaml into RuntimeConfig
-  policy.py               PolicyEngine — the actual allow/deny decision logic
-  schemas.py               Pydantic models: PolicyRequest, PolicyDecision, Decision,
-                           Posture, EnvironmentProfile, RuntimeConfig
-  replay.py                ReplayEngine — rebuilds graph + posture from decisions.jsonl
-                           (forensic recovery after restart)
-  agents/                 Thin example agents (orchestrator, auditor, deputy) —
-                           illustrate how an agent would construct PolicyRequests
-                           and consume decisions; not a framework
-  governance/
-    posture.py            PostureManager — denial-count thresholds -> Posture
-    reflexive.py          ReflexiveLoop — glues TelemetryStore + PostureManager
-    telemetry.py          TelemetryStore — in-memory rolling window of decisions
-  graph/
-    memory.py             GovernanceGraph — networkx MultiDiGraph of actor->target edges
-    relationships.py      Query helpers over the graph (actor_targets, denied_edges)
-  configuration/
-    policies.py           PolicyRule + PolicyStore — JSON-backed CRUD for declarative
-                           policy rules, exposed via /v1/policies (NOTE: see Gotchas)
-    store.py               JsonStore — generic atomic-write JSON file helper
-  storage/
-    jsonl.py               JsonlStore — append-only JSONL log with count()/count_by()
+- `src/rif_runtime/api.py` — current HTTP route definitions
+- `src/rif_runtime/cli.py` — current CLI commands
+- `src/rif_runtime/runtime.py` — runtime orchestration
+- `src/rif_runtime/policy.py` — policy decision logic
+- `src/rif_runtime/schemas.py` — API/domain schemas
+- `src/rif_runtime/replay.py` — local state reconstruction
+- `src/rif_runtime/auth.py` — control-plane API-key guard
+- `src/rif_runtime/security.py` — cryptographic/redaction utilities
+- `src/rif_runtime/audit.py` — audit hash-chain primitives
+- `src/rif_runtime/integrations/supabase.py` — optional remote persistence/JWT integration
 
-config/environments.yaml  Environment profiles: RIF_Runtime, RIF_Research, RIF_CI
-data/                      Runtime state: decisions.jsonl, posture_history.jsonl
-                           (gitignored), policies.json (checked in, seeds via PolicyStore)
-docs/                      ARCHITECTURE.md, API.md, RIF_RUNTIME_MVP.md, ROADMAP.md
-tests/                     pytest suite, mirrors src/ modules being exercised
-scripts/smoke.sh           Curl-based smoke test against a running `rif serve`
-```
+For architecture interpretation, read `ARCHITECTURE.md`. For security work, read `SECURITY.md`. For specification boundaries, read `spec/README.md` and open specification reviews.
 
-## Development workflow
-
-Setup:
+## Development
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
-pip install -r requirements-dev.txt
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+python -m pip install -r requirements-dev.txt
 ```
 
-Run the API:
+Locked environment:
 
 ```bash
-rif serve              # uvicorn with --reload, http://127.0.0.1:8000
+python -m pip install --require-hashes -r requirements/dev.txt
+python -m pip install -e . --no-deps
 ```
 
-CLI usage:
+Current CLI:
 
 ```bash
-rif check <actor> <action> <target>     # evaluate one request, print the decision
-rif replay [decisions_path]             # rebuild graph/posture from a decisions.jsonl
+rif serve
+rif check <actor> <action> <target>
+rif replay [decisions_path]
+rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
 ```
 
-Test, lint, type-check (this is exactly what `.github/workflows/ci.yml` runs, in order):
+## Validation
 
 ```bash
 ruff check src tests
+ruff format --check src tests
 mypy src/rif_runtime --ignore-missing-imports
 pytest -q
 ```
 
-Run all three before considering a change done — CI enforces all three on every
-push/PR. `ruff format .` is also enforced (by `quality.yml`'s
-`ruff-mypy-pytest` job, separate from `ci.yml`); run it before committing so
-the repo stays uniformly formatted.
-
-Manual smoke test against a running server:
+Security/dependency checks:
 
 ```bash
-rif serve &
-BASE=http://127.0.0.1:8000 ./scripts/smoke.sh
+bandit -r src/ -ll
+pip-audit --requirement requirements/runtime.txt --disable-pip
+pip-audit --requirement requirements/dev.txt --disable-pip
 ```
 
-## Conventions
+The repository also configures CodeQL, Gitleaks, Dependency Review, and the merge gate. Check the actual workflow run before claiming that a check passed.
 
-- Python 3.12, Pydantic v2 models (`model_dump`, `model_validate`, `model_copy`)
-  for everything that crosses an API boundary or gets persisted.
-- The codebase is formatted with `ruff format .`; run it before committing.
-  Double quotes, spaced operators/keyword args, and trailing commas on
-  multi-line calls are the enforced style — don't hand-roll a denser style
-  even in modules that used to be terser (e.g. `policy.py`).
-- New persisted state goes through `JsonlStore` (append-only logs, e.g.
-  decisions) or `JsonStore` (whole-file JSON with atomic temp-file replace,
-  e.g. policies). Don't hand-roll file I/O elsewhere.
-- `RIFRuntime` is constructed fresh per process/test (`RIFRuntime()`), not a
-  singleton with DI — tests instantiate it directly. Tests that touch
-  persistent storage must supply isolated paths via `tmp_path` (following
-  `tests/test_policy_store.py`) rather than relying on shared files under
-  `data/`.
-- Enums (`Decision`, `Posture`, …) subclass `enum.StrEnum` so they serialize
-  cleanly and compare equal to plain strings (tests assert
-  `r.posture == "elevated"`). Note that unlike the older `str, Enum` form,
-  `str(Posture.normal)` is `"normal"`, not `"Posture.normal"` — the audit log
-  in `posture_history.jsonl` records the bare value.
-- Environment profiles are config-driven (`config/environments.yaml`), not
-  hardcoded; add new environments there rather than branching in code.
+## State and tests
 
-## Gotchas / known inconsistencies
+Runtime state is normally under `data/`, with `RIF_DATA_DIR` available for isolation. Tests should use temporary directories for persistence.
 
-- **PolicyStore rule matching is exact-match only.** `RIFRuntime` owns a
-  shared `PolicyStore` (`self.policy_store`) and passes its rules into
-  `PolicyEngine.evaluate()`. Only fully-specific rules (non-`"*"` `action`
-  and `target`) are consulted as overrides, checked right after the
-  `posture.locked` check and before the built-in package/MCP/network
-  constraints — see `policy.py:rule_matches`. Wildcard rules (like the
-  seeded `deny_unknown_by_default`) are intentionally skipped so they don't
-  blanket-deny everything; they're inert placeholders until rule precedence
-  for partial wildcards is designed.
-- **Docs lag the code.** `docs/API.md` lists `POST /v1/runtime/reset-posture`,
-  but the actual route in `api.py` is `POST /v1/posture/reset`. `README.md`
-  and `docs/RIF_RUNTIME_MVP.md` both describe the project with overlapping
-  but not identical endpoint lists. Treat `src/rif_runtime/api.py` as the
-  source of truth for the API surface, and update the docs when you change
-  routes.
-- **Version bump checklist.** `__version__` is derived from installed package
-  metadata via `importlib.metadata.version("rif-runtime")` (single source of
-  truth: `pyproject.toml`). When cutting a release, **only `pyproject.toml`
-  needs the version bump** — `src/rif_runtime/__init__.py` has no hardcoded
-  version string to sync. Use `scripts/bump-version.sh X.Y.Z` to update
-  `pyproject.toml`, then run `pip install -e .` to refresh the installed
-  metadata before committing. The version consistency test
-  (`tests/test_version.py`) will catch any drift when the package is
-  installed (as CI always does via `pip install -e .` before `pytest`).
-- Tests that instantiate `RIFRuntime()` write real records into
-  `data/decisions.jsonl` and `data/posture_history.jsonl` (gitignored) as a
-  side effect — there's no fixture isolating this. `tests/test_policy_store.py`
-  is the one place that uses `tmp_path` correctly; follow that pattern for new
-  tests that touch persistent storage where isolation matters.
-- `data/policies.json` is checked into git (it's the seed/default state);
-  `data/*.jsonl` files are gitignored. Don't flip that.
+Posture can survive restart. Do not assume a new runtime instance means a clean posture when persisted state exists.
 
-## API surface (from `src/rif_runtime/api.py`)
+## Security boundary
 
-```text
-GET  /
-GET  /\nGET  /health\nGET  /v1/environments\nPOST /v1/environment/{name}\nPOST /v1/policy/evaluate\nPOST /v1/posture/{posture}\nPOST /v1/posture/reset\nGET  /v1/graph/summary\nGET  /v1/telemetry/summary\nGET  /v1/persistence/summary\nGET  /v1/recovered-state\nGET  /v1/audit\nPOST /v1/mcp/invoke\nGET  /v1/mcp/metasploit/capabilities\nPOST /v1/mcp/metasploit/evaluate\nPOST /v1/mcp/metasploit/token\nGET  /v1/policies\nPUT  /v1/policies/{rule_id}\nDELETE /v1/policies/{rule_id}
-```
+Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured.
+
+Never promote model output into authority. An external provider credential is configuration, not a RIF authorization decision.
+
+## Documentation discipline
+
+Use `docs/README.md` for documentation authority and status conventions. Keep claims tied to code, tests, configuration, or verified workflow results. Mark unsupported status `[UNVERIFIED]`.
+
+Do not introduce performance numbers, compliance claims, "enterprise-grade" guarantees, or security properties without current evidence.
+
+When changing a cross-domain contract, stop and inspect the specification-review state before implementing a competing interpretation.

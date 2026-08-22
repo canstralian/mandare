@@ -1,51 +1,16 @@
 # CLI Reference
 
-## Binary
+The canonical current CLI reference is [`docs/cli-reference.md`](docs/cli-reference.md).
 
-```bash
-rif
+The implementation source of truth is `src/rif_runtime/cli.py`.
+
+Current commands:
+
+```text
+rif serve
+rif check <actor> <action> <target>
+rif replay [decisions_path]
+rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
 ```
 
-## Execute
-
-```bash
-rif execute --intent "hello"
-```
-
-## Replay
-
-```bash
-rif replay exec_123
-```
-
-## Evidence
-
-```bash
-rif evidence export exec_123 bundle.zip
-```
-
-## Telemetry
-
-```bash
-rif telemetry tail
-```
-
-## Validate
-
-```bash
-rif validate config runtime.yaml
-```
-
-## Policy
-
-```bash
-rif policy check request.json
-```
-
-## Global Flags
-
-- --config
-- --json
-- --verbose
-- --profile
-- --offline
+Older `rif execute`, `rif evidence`, `rif telemetry`, `rif validate`, and `rif policy` examples are historical/planned and are not current commands.

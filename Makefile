@@ -229,8 +229,10 @@ lock-upgrade:
 	pip-compile $(PIP_COMPILE_ARGS) --upgrade \
 		--extra dev --output-file requirements/dev.txt pyproject.toml
 
-# Install exactly what CI installs.
+# Install exactly what CI installs — including the pip upgrade the CI jobs do,
+# so a local `make sync` and a CI run start from the same pip.
 sync:
+	python -m pip install --upgrade pip
 	python -m pip install --require-hashes -r requirements/dev.txt
 	python -m pip install -e . --no-deps
 

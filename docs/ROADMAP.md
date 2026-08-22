@@ -2,79 +2,128 @@
 
 ## North star
 
-RIF Runtime is a governed execution substrate for agents and tools. Natural-language intent becomes a visible, policy-evaluated command object before any capability is invoked. Every decision should be explainable through evidence, posture, policy precedence, and execution outcome.
+RIF Runtime aims to make the boundary between **intent** and **authority** explicit, testable, and reviewable.
 
-RIF is not an autonomous agent framework; it is a governance and execution substrate for agents.
+The model may propose. The runtime evaluates. A governed system records what decision was made and why.
 
-## Status
+This is a roadmap, not a statement that every item below exists today.
 
-| Area | Status |
-| --- | --- |
-| Policy Engine | In Progress |
-| Explainability | In Progress |
-| Evidence Layer | Planned |
-| Reflexive Healing | Planned |
-| Controlled Evolution | Planned |
-| HF Space | Planned |
+## Current state
 
-## Current foundation
+| Area | Current status |
+|---|---|
+| Policy evaluation | Implemented, still evolving |
+| Runtime posture | Implemented |
+| Graph and telemetry views | Implemented |
+| Local decision/posture persistence | Implemented |
+| Replay/recovery of local runtime state | Implemented |
+| Audit hash-chain primitives | Implemented as a library surface |
+| MCP governance surfaces | Implemented in current scope |
+| Capability identity/admission contract | Implemented first vertical slice |
+| Governed capability execution | Implemented through `RIFRuntime.execute_capability()` |
+| Remote provider authorization seam | Specification work / gated |
+| Unified EvidenceRecord contract | Specification/design |
+| Signed skill/artifact verification | Planned |
+| Skill/static security inspection | Planned |
+| Benchmark/regression evidence ingestion | Planned |
+| Reflexive repair | Planned |
+| Controlled evolution | Planned |
+| Distributed evidence / enterprise storage | Planned |
+| SBOM / signed releases / reproducible builds | Planned |
 
-- governance runtime and reflexive loop;
-- persistence primitives and durable decision history;
-- MCP interception boundary;
-- policy, posture, graph, telemetry, and audit surfaces;
-- explainability regression tests;
-- CI, release, secret scanning, dependency review, code-quality, and security-scanning workflows.
+## Near-term engineering priorities
 
-## Milestone 1 — Deterministic governance core
+### 1. Capability supply-chain evidence
 
-**Goal:** make every runtime decision reconstructable.
+The first capability-governance slice now separates executable adapters from their governance identity and requires integrity plus passing evaluation evidence before admission. The next increment should make that evidence durable and independently verifiable.
 
-- Stabilize the causal-path/explainability contract.
-- Define policy precedence and frozen environment snapshots.
-- Normalize audit, posture, and decision records.
-- Add regression coverage for deny-by-default, fallback, and policy-conflict behavior.
+- persist capability records rather than keeping them only in process memory;
+- ingest artifact digests and signatures;
+- represent source commit/version and retrieval provenance;
+- add static inspection and dependency findings;
+- ingest regression/benchmark results;
+- keep admission decisions replayable.
 
-## Milestone 2 — Evidence and retrieval
+### 2. Specification integrity
 
-**Goal:** attach relevant history and policy context without making retrieval authoritative.
+Keep implementation and contract work synchronized without allowing parallel interpretations of the same boundary.
 
-- Introduce an EvidenceRecord schema.
-- Add pluggable embedding and reranking adapters.
-- Build cited retrieval with source metadata.
-- Keep retrieval read-only in the initial runtime.
+- close or update open specification reviews;
+- inventory fixtures before schema changes;
+- keep identity, capability, evidence, and replay contracts explicit;
+- make contract tests executable where practical.
 
-## Milestone 3 — Reflexive healing
+### 3. Governed provider egress
 
-**Goal:** diagnose and test bounded repairs.
+The next provider-inference seam is a **Specification Review**, not an implementation shortcut.
 
-- Define `FailureEvent`, `Diagnosis`, `RepairProposal`, and `VerificationResult` schemas.
-- Add scanner/SARIF and GitHub Actions adapters.
-- Add sandbox execution contracts and rollback semantics.
-- Implement L0-L3 autonomy only: observe, diagnose, propose, sandbox-test.
+The intended architecture is:
 
-## Milestone 4 — Controlled evolution
+```text
+Decision
+   |
+   v
+Egress authorization
+   |
+   v
+Redaction
+   |
+   v
+Inference adapter
+   |
+   v
+Advisory output
+   |
+   v
+Evidence
+```
 
-**Goal:** make architecture and policy changes reviewable promotions, not silent drift.
+Provider credentials must never become implicit authority. This work is subject to the repository's existing Track-B governance and must not bypass an open cross-domain review.
 
-- Define `EvolutionProposal` and promotion criteria.
-- Require threat model, evaluation, rollback plan, and approval metadata.
-- Track post-deployment observation windows.
-- Keep merge and policy mutation human-approved.
+### 4. Evidence contract
 
-## Milestone 5 — Reference Space
+Define what an EvidenceRecord means, which events are authoritative, how provenance is represented, and what replay can and cannot prove.
 
-**Goal:** publish a reproducible demonstration of RIF's governance thesis.
+The goal is stronger than "we wrote a log": evidence should have a clear owner, schema, retention model, integrity story, and verification procedure.
 
-- Deploy a Hugging Face Space with a Gradio interface.
-- Demonstrate intent evaluation, explainability, Diagnosis, RepairProposal, and EvidenceRecord visualization.
-- Run without production credentials or privileged write tools.
-- Treat the Space as a demo boundary, not a production control plane.
+### 5. Enterprise release assurance
 
-## Non-goals for the MVP
+Future release hardening should add, in a deliberate sequence:
 
-- autonomous protected-branch merges;
-- automatic policy changes based on model output;
-- unrestricted shell, GitHub, or MCP execution;
-- credential storage in public demo infrastructure;
-- treating model confidence as approval.
+- SBOM generation;
+- signed artefacts and/or provenance attestations;
+- reproducible-build verification;
+- release verification documentation;
+- tested upgrade and rollback procedures.
+
+These are not current guarantees.
+
+## Longer-term directions
+
+### Bounded reflexive repair
+
+Introduce explicit schemas for failure observation, diagnosis, repair proposal, and verification. Keep model-generated diagnosis and proposals subordinate to deterministic policy and human-controlled promotion.
+
+### Controlled evolution
+
+Architecture and policy changes should be promoted through reviewable proposals with threat models, evaluation evidence, rollback plans, and observation windows.
+
+### Reference demonstration
+
+A public demonstration can show the governance thesis without becoming a production control plane. Demo infrastructure should use no privileged production credentials and should not imply production assurance.
+
+## Non-goals
+
+The roadmap does not seek to make RIF:
+
+- an autonomous agent framework;
+- an implicit approval layer for model output;
+- an unrestricted shell/MCP execution broker;
+- a credential vault;
+- a compliance certification;
+- a tamper-proof distributed ledger by assertion;
+- a replacement for enterprise identity, network, or incident-response systems.
+
+## Planning rule
+
+A roadmap item moves into implementation only when its authority boundary, contract, fixtures/tests, and rollback implications are sufficiently specified.

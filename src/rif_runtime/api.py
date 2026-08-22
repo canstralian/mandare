@@ -101,14 +101,14 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
+    # set_posture(), not a bare assignment: the transition has to reach
+    # posture_history.jsonl or the next restart restores the old posture.
+    return {"posture": runtime.set_posture(Posture.normal).value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
-    return {"posture": runtime.posture}
+    return {"posture": runtime.set_posture(posture)}
 
 
 @app.get("/")
@@ -210,8 +210,9 @@ def persistence_summary() -> dict[str, Any]:
 @app.get("/v1/recovered-state")
 def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
-    # the response is meaningful after a restart.
-    return asdict(ReplayEngine().recover())
+    # the response is meaningful after a restart. Reads the runtime's own
+    # configured path so the two can't diverge under RIF_DATA_DIR.
+    return asdict(ReplayEngine(runtime.decisions_path).recover())
 
 
 @app.get("/v1/policies")

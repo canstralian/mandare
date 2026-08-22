@@ -283,6 +283,16 @@ on any single deduction.
 - **OD-5 (carried).** Providers layer (§8) overlaps DIE subsystems 0.1–0.2.
   Ruling applied: reference DIE as normative, keep §8 distinct but non-
   duplicating. Revisit only on genuine divergence.
+- **OD-6.** Registration-time pinning (§8) versus run-time capability
+  observation. MCP `2026-07-28` removes protocol-level sessions and makes tool
+  catalogs cacheable (`ttlMs`, `cacheScope`) with no stability guarantee, so a
+  manifest fixed at registration is not the same artifact as the catalog observed
+  when a decision is made. Whether the registration manifest *is* the first
+  snapshot, or is a separate T2 admission artifact that snapshots reference, is
+  open — tracked as OD-C4 in
+  `docs/spec-review-capability-snapshot-authority.md`, which holds the normative
+  treatment of capability-snapshot binding. Proposed there: keep them separate,
+  since conflating them would make re-observation imply re-admission.
 
 ## 14. Conformance status of the reference implementation
 
@@ -301,7 +311,7 @@ where the runtime stands.
 | §4.3 injection quarantine | **Partial** — `scan_for_injection` covers `intent.text`, `intent.untrusted_context`, and recursed `params`. It does **not** scan tool descriptions, server metadata, or returned tool results. |
 | §4.4 read-only fast-path | **Implemented** — third check, not fourth (no egress lane precedes it in the governor). |
 | §4.5 consequential authority | **Divergent shape** — realised as three `GovernanceMode` lanes (`read_only_firewall`, `shadow`, `lab_broker`) that this spec does not model. |
-| §5 `destructive` class | **Not implemented.** `CapabilityClass` has exactly three members: `read_only`, `consequential`, `unknown`. `classify()` can never return `destructive`; severity is the orthogonal `is_severe()` predicate over `SEVERE_CAPABILITIES`. The §4.7 / §6 hard gate therefore has no class to key off. **Open decision — see OD-6.** |
+| §5 `destructive` class | **Not implemented.** `CapabilityClass` has exactly three members: `read_only`, `consequential`, `unknown`. `classify()` can never return `destructive`; severity is the orthogonal `is_severe()` predicate over `SEVERE_CAPABILITIES`. The §4.7 / §6 hard gate therefore has no class to key off. **Open decision — see OD-7.** |
 | §5 `unknown` class | **Implemented but unmodelled** — `classify()` returns `unknown` for unrecognised tools, which the broker treats as consequential (satisfying C7's deny-by-default intent). This spec's three-class model has no slot for it. |
 | §6.1 approval present | **Implemented** — `msf.broker.approval_absent`. |
 | §6.2 signature valid | **Implemented** — HMAC via `hmac.compare_digest`. |
@@ -336,15 +346,15 @@ index, so the mapping is load-bearing for replay:
 
 Renaming the emitted identifiers is a breaking change to historical evidence;
 whether the framework adopts `mcp.*` or retains `msf.*` as the reference lane's
-namespace is **OD-7**.
+namespace is **OD-8**.
 
 ### Additional open decisions
 
-- **OD-6.** Does `destructive` become a fourth `CapabilityClass` member (with
+- **OD-7.** Does `destructive` become a fourth `CapabilityClass` member (with
   `SEVERE_CAPABILITIES` promoted into it), or is it defined as
   `consequential ∧ is_severe()`? §4.7 and §11's GREENLIGHT criteria are
   unreachable as literally written until this is settled.
-- **OD-7.** Deny-reason namespace: rename to `mcp.*` (breaks replay queries over
+- **OD-8.** Deny-reason namespace: rename to `mcp.*` (breaks replay queries over
   existing evidence) or keep `msf.*` per-lane under a framework scheme.
-- **OD-8.** TTL default: tighten the code to the spec's 300 s, or record 600 s
+- **OD-9.** TTL default: tighten the code to the spec's 300 s, or record 600 s
   as the intended default.

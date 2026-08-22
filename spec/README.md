@@ -1,49 +1,58 @@
-# spec/
+# Specification and Contract Tree
 
-Versioned contracts for AgentOS/RIF. Everything here defines a boundary that any
-runtime (this Python implementation, or a future Rust/Go/.NET one) must conform to.
-The runtime under `src/rif_runtime/` implements these contracts; it does not define
-them — schema and contract changes land here first, then flow into the
-implementation.
+`spec/` contains versioned contract material for RIF/AgentOS. Specifications are **not automatically implementation guarantees**. A schema may be seeded, drafted, placeholder, approved, or implemented only in part.
 
-Per ADR-0008 (`docs/adr-0008-agentos-rif-v1-architecture.md`), the six contract
-domains are:
+The Python runtime under `src/rif_runtime/` is the source of truth for shipped behaviour. A specification becomes an implementation contract only when its status, tests, and integration path make that relationship explicit.
 
-| Domain | Status | Contents |
-| --- | --- | --- |
-| `capability/` | seeded | Capability manifest schema (copied from `contracts/rif_familiar/`) |
-| `governance/` | seeded | Posture decision schema (copied from `contracts/rif_familiar/`) |
-| `evidence/` | seeded | Observation event schema (copied from `contracts/rif_familiar/`) |
-| `replay/` | placeholder | Replay contract not yet extracted from `src/rif_runtime/replay.py` |
-| `skill/` | placeholder | Skill package format (`SKILL.md` + `skill.yaml` + tests) not yet formalized |
-| `state/` | placeholder | Structured runtime state contract not yet extracted (no `runtime_state.json` exists — see `spec/state/README.md`) |
+## Contract domains
 
-Beyond the six original domains, governed-integration contracts also live here:
+| Domain | Current status | Meaning |
+|---|---|---|
+| `capability/` | Seeded | Capability contract material; verify implementation coverage before relying on it |
+| `governance/` | Seeded | Governance/posture contract material |
+| `evidence/` | Seeded | Evidence/observation contract material |
+| `replay/` | Placeholder | Replay contract not yet fully extracted as a normative schema |
+| `skill/` | Placeholder | Skill package format not yet formalized |
+| `state/` | Placeholder | Structured runtime-state contract not yet formalized |
+| `mcp/` | Drafted | MCP governance contract material |
 
-| Domain | Status | Contents |
-| --- | --- | --- |
-| `mcp/` | drafted | MCP server framework governance contract (`SPEC.md`): authority tiers, ordered decision procedure, destructive-action hard gate, evaluation scorecard — generalizes `src/rif_runtime/mcp/metasploit.py` |
+> **Known gap — the seeded domains are duplicates, not migrations.** ADR-0008 calls
+> for the `contracts/rif_familiar/` schemas to be *migrated rather than duplicated*.
+> What is in the tree today is duplication: the three schemas are byte-identical
+> between `contracts/rif_familiar/` and `spec/`, and
+> `tests/test_rif_familiar_contracts.py` validates only the `contracts/` copies — so
+> the `spec/` copies carry no test coverage and can drift silently. Until the
+> re-export-vs-retire question is settled, treat `contracts/rif_familiar/` as the
+> tested copy. See `docs/SPECS_DOCS_AUDIT.md` (H3).
 
-`contracts/rif_familiar/` is left in place unchanged for this slice — it is the
-device-facing (RIF Familiar / Field Observer) contract set and is the origin of the
-schemas seeded into `capability/`, `governance/`, and `evidence/` above. A later
-slice should decide whether `contracts/rif_familiar/` re-exports from `spec/` or is
-retired in favor of it; that decision is out of scope here.
+## Specification-review rule
 
-> **Known gap — duplication, not migration.** ADR-0008 calls for these schemas to be
-> *migrated rather than duplicated*. What is in the tree today is duplication: the
-> three schemas are byte-identical between `contracts/rif_familiar/` and `spec/`, and
-> `tests/test_rif_familiar_contracts.py` validates only the `contracts/` copies —
-> so the `spec/` copies carry no test coverage and can drift silently. Until the
-> re-export-vs-retire question above is settled, treat `contracts/rif_familiar/` as
-> the tested copy. See `docs/SPECS_DOCS_AUDIT.md` (H3).
+Cross-domain contract changes should be reviewed before implementation when they affect authority, identity, capability scope, evidence, replay, provider egress, or another shared boundary.
 
-## Next slices
-- Extract a `replay/` contract from `src/rif_runtime/replay.py`.
-- Extract a `state/` contract. Note that no `runtime_state.json` exists in this
-  repository — the name comes from ADR-0008's description of the shape to decompose,
-  not from a file on disk. The concrete state the runtime tracks today lives in
-  `data/decisions.jsonl` and `data/posture_history.jsonl`.
-- Define the `skill/` package format contract (see `spec/skill/README.md` for the
-  manifest filename question).
-- Close the duplication gap noted above.
+The purpose is to avoid two individually plausible implementations that disagree at the seam.
+
+## Open reviews
+
+| Review | Governs | Status |
+|---|---|---|
+| `docs/spec-review-identity-spine-migration.md` | Identity hierarchy and run/aggregate semantics | Check document for current approval state |
+| `docs/spec-review-capability-snapshot-authority.md` | Capability observation, replay, MCP authority | Draft / review required before conflicting implementation |
+
+The review documents themselves are authoritative for their review status; this index should not be treated as a substitute for reading them.
+
+## Contract-change checklist
+
+Before changing a contract:
+
+- identify all current consumers;
+- inventory fixtures and persisted examples;
+- define compatibility and migration semantics;
+- define replay/recovery impact;
+- define security/authority impact;
+- update tests;
+- update implementation-backed documentation;
+- close or supersede conflicting specification reviews.
+
+## Vocabulary discipline
+
+Use **specification** for an intended contract, **implementation** for shipped code, and **evidence** for a verified observation. Do not use one as a synonym for another.

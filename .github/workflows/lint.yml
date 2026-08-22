@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -43,13 +47,16 @@ jobs:
       # merge-gate.yml, where the count is visible instead of being one more
       # red X nobody can distinguish from a real regression.
       - name: Type check with mypy
+        # Match ci.yml / quality.yml. Strict mypy over tests/ is not green
+        # (150+ errors, mostly no-untyped-def) and is out of scope for this job.
         run: |
           mypy src/rif_runtime --ignore-missing-imports
 
       - name: Security check with Bandit
         run: |
-          bandit -r src/ -ll -f json -o bandit-report.json || true
-          cat bandit-report.json | python -m json.tool
+          bandit -r src/ -ll -f json -o bandit-report.json; BANDIT_EXIT=$?
+          python -m json.tool bandit-report.json
+          exit $BANDIT_EXIT
 
       # Dependency auditing moved to the `dependency-security` job in
       # merge-gate.yml, where it runs against the hash-pinned locks and is
@@ -60,11 +67,12 @@ jobs:
       - name: Check for unused imports
         run: |
           pip install autoflake
-          autoflake --recursive --check src/ tests/
+          # Class bodies that are only a docstring still need `pass` under some
+          # styles; ignore those so autoflake does not false-positive.
+          autoflake --recursive --check --ignore-pass-after-docstring src/ tests/
 
       - name: Check docstring coverage
         run: |
-          pip install interrogate
           interrogate -vv src/ -m 60 -p -I -n -s || true
 
   test-quality:
@@ -146,7 +154,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
