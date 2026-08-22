@@ -1,3 +1,5 @@
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from rif_runtime.api import app
@@ -249,3 +251,60 @@ def test_public_route_allowlist_has_no_stale_entries():
     assert not stale, (
         f"PUBLIC_ROUTES lists route(s) that no longer exist: {sorted(stale)}"
     )
+
+
+def test_a_non_ascii_configured_key_does_not_break_the_guard(monkeypatch):
+    """The configured side is arbitrary operator text.
+
+    hmac.compare_digest raises TypeError on a `str` holding non-ASCII
+    characters, so the comparison operates on UTF-8 bytes. Comparing str would
+    turn every request into a 500 for an operator whose key is not ASCII.
+    (The presented side cannot carry non-ASCII at all -- HTTP header values are
+    ASCII, and the client rejects it before the guard is reached.)
+    """
+    monkeypatch.setenv(ENV_VAR, "clé-de-contrôle")
+    response = _call("post", "/v1/posture/normal", headers={"X-API-Key": "guess"})
+    assert response.status_code == 401
+
+
+def test_a_non_ascii_candidate_reaches_the_guard_without_raising():
+    """Same property at the unit boundary, where HTTP encoding cannot mask it."""
+    import os
+
+    from rif_runtime.auth import require_api_key
+
+    os.environ[ENV_VAR] = "clé-de-contrôle"
+    try:
+        with pytest.raises(HTTPException) as rejected:
+            require_api_key("kéy")
+        assert rejected.value.status_code == 401
+        assert require_api_key("clé-de-contrôle") == "clé-de-contrôle"
+    finally:
+        del os.environ[ENV_VAR]
+
+
+def test_api_keys_are_not_run_through_a_fast_hash(monkeypatch):
+    """Pins the fix for CodeQL py/weak-sensitive-data-hashing (high).
+
+    RIF_CONTROL_PLANE_API_KEYS flowed into hashlib.sha256, which reads as
+    password hashing with a fast hash. The digest was there to equalise
+    comparison lengths, on the mistaken premise that compare_digest raises on a
+    length mismatch -- it does not. Comparing the secrets directly is what
+    compare_digest is for, and it keeps the flow from existing at all.
+    """
+    import ast
+    import inspect
+
+    from rif_runtime import auth
+
+    tree = ast.parse(inspect.getsource(auth))
+    hashing = {"hashlib", "md5", "sha1", "sha256", "sha512", "blake2b"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names = {alias.name.split(".")[0] for alias in node.names}
+            assert not (names & hashing), f"auth.py imports {names & hashing}"
+        elif isinstance(node, ast.ImportFrom):
+            module = (node.module or "").split(".")[0]
+            names = {alias.name for alias in node.names}
+            assert module not in hashing, f"auth.py imports from {module}"
+            assert not (names & hashing), f"auth.py imports {names & hashing}"
