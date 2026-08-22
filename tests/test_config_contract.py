@@ -21,6 +21,7 @@ import pytest
 from rif_runtime.config import (
     ConfigError,
     RifSettings,
+    get_settings,
     load_settings,
     reset_settings,
 )
@@ -598,3 +599,35 @@ def test_vercel_config_ships_the_environments_file() -> None:
         (REPO_ROOT / "config" / "environments.yaml").read_text(encoding="utf-8")
     )["environments"]
     assert vercel["env"]["RIF_ENVIRONMENT"] in environments
+
+
+def test_a_blank_environment_is_treated_as_unset(monkeypatch):
+    """RIF_ENVIRONMENT= must not be read as an environment named "".
+
+    load_config's fallback took a blank value as unset (`or "production"`)
+    while RIFRuntime._configured_environment tested `is None` and so treated it
+    as a configured name. With no environments.yaml on disk the fallback
+    invented "production" and the runtime then refused to start against the
+    empty string, so a container spec with a blank RIF_ENVIRONMENT crashed on
+    cold start.
+    """
+    for blank in ("", "   "):
+        monkeypatch.setenv("RIF_ENVIRONMENT", blank)
+        reset_settings()
+        assert get_settings().runtime.environment is None
+
+    monkeypatch.setenv("RIF_ENVIRONMENT", "  RIF_Runtime  ")
+    reset_settings()
+    assert get_settings().runtime.environment == "RIF_Runtime"
+
+
+def test_a_blank_environment_still_starts_the_runtime(tmp_path, monkeypatch):
+    """The end-to-end shape of the same defect: cold start with no config dir."""
+    from rif_runtime.runtime import RIFRuntime
+
+    monkeypatch.setenv("RIF_ENVIRONMENT", "")
+    monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path / "absent"))
+    reset_settings()
+
+    runtime = RIFRuntime(data_dir=tmp_path / "data")
+    assert runtime.environment_name in runtime.config.environments

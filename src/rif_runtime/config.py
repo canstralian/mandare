@@ -67,6 +67,24 @@ class RuntimeSection(BaseModel):
     environment: str | None = None
     cloud_egress: bool = False
 
+    @field_validator("environment", mode="before")
+    @classmethod
+    def _blank_environment_is_unset(cls, value: object) -> object:
+        """Treat a blank ``RIF_ENVIRONMENT`` as absent, not as a name.
+
+        ``RIF_ENVIRONMENT=`` in a .env or a container spec yields "", which two
+        readers disagreed about: ``load_config``'s fallback took it as unset
+        (``or "production"``), while ``RIFRuntime._configured_environment``
+        tested ``is None`` and so treated it as a configured name. With no
+        environments.yaml on disk the fallback invented "production" and the
+        runtime then refused to start against the empty string it had been
+        handed. Normalising here is what keeps the two in agreement, rather
+        than repeating the same falsiness check at each reader.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
+
 
 class ServerSection(BaseModel):
     """HTTP server configuration."""
