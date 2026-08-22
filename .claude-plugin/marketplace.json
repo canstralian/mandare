@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "rif-runtime-marketplace",
-  "description": "RIF Runtime plugins for governed AI execution, architecture review, governance, knowledge, replay analysis, documentation, provider review, and release operations.",
+  "description": "RIF Runtime plugins for governed AI execution, architecture, governance, security, knowledge, replay, documentation, provider analysis, and release operations.",
   "version": "1.0.0",
   "owner": {
     "name": "canstralian",
@@ -11,22 +11,9 @@
     {
       "name": "rif-runtime",
       "displayName": "RIF Runtime",
-      "description": "A governed Claude Code skill suite for working with the RIF Runtime architecture, including architecture review, constitutional governance, documentation, knowledge, provider analysis, release management, replay analysis, and runtime execution.",
+      "description": "A governed Claude Code plugin for working with RIF Runtime architecture, constitutional governance, documentation, knowledge, provider analysis, release management, replay analysis, and runtime execution.",
       "version": "1.0.0",
       "source": "./.claude",
-      "strict": false,
-      "skills": [
-        "./skills/architecture-review",
-        "./skills/constitution-guardian",
-        "./skills/documentation-engine",
-        "./skills/governance-review",
-        "./skills/knowledge-engine",
-        "./skills/provider-review",
-        "./skills/release-manager",
-        "./skills/replay-analysis",
-        "./skills/rif-runtime",
-        "./skills/run-rif-runtime"
-      ],
       "category": "development",
       "tags": [
         "rif-runtime",
@@ -34,6 +21,7 @@
         "ai-agents",
         "architecture",
         "security",
+        "observability",
         "replay",
         "documentation",
         "release-management",
