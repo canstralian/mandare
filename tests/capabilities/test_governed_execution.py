@@ -1,3 +1,5 @@
+import pytest
+
 from rif_runtime.capabilities.echo import EchoCapability
 from rif_runtime.capabilities.models import (
     CapabilityEvaluation,
@@ -7,6 +9,7 @@ from rif_runtime.capabilities.models import (
     CapabilityRecord,
     CapabilityStatus,
 )
+from rif_runtime.execution.exceptions import PolicyViolationError
 from rif_runtime.execution.manifest import ExecutionManifest
 from rif_runtime.execution.result import ExecutionStatus
 from rif_runtime.runtime import RIFRuntime
@@ -78,9 +81,5 @@ def test_registry_rejects_unverified_capability(tmp_path) -> None:
     record.integrity.verified = False
     runtime.register_capability(EchoCapability(), record)
 
-    try:
+    with pytest.raises(PolicyViolationError, match="integrity not verified"):
         runtime.capability_registry.admit("echo")
-    except Exception as exc:
-        assert "integrity not verified" in str(exc)
-    else:
-        raise AssertionError("unverified capability was admitted")
