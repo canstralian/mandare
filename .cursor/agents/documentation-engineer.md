@@ -8,7 +8,7 @@ Generate documentation from authoritative sources.
 
 ## Authority
 
-Runtime Constitution
+Executable implementation and tests (`src/`, `tests/`)
 
 ↓
 

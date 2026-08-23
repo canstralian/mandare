@@ -17,7 +17,19 @@ request
   -> replay / inspection
 ```
 
-Do not describe future execution, evidence, provider-inference, or autonomous-evolution architecture as shipped behaviour.
+Do not describe provider-inference or autonomous-evolution architecture as shipped behaviour.
+
+Capability execution *is* shipped, but narrowly. `RIFRuntime.execute_capability` (`src/rif_runtime/runtime.py:179`) evaluates policy, records evidence on both the denied and completed paths, admits the capability, and executes it. It is reachable from the Python API only — there is no HTTP route and no CLI command for it. Planner and receipt stages appear in design material and do not exist in `src/`.
+
+Note where the boundary actually sits: `ExecutionKernel.execute` (`src/rif_runtime/execution/kernel.py:20`) performs no policy evaluation. Governance is enforced by the caller, so route new execution paths through `execute_capability`.
+
+## Instruction authority
+
+[`AGENTS.md`](AGENTS.md) carries the cross-tool instruction-precedence ladder; this file and `AGENTS.md` are peers and must not contradict each other. Tool-local files (`.codex/`, `.cursor/`, `.claude/skills/`) may add detail but may not weaken a rule set here. Tool-generated hint files (`.claude/homunculus/instincts/`, `.claude/identity.json`, `.agents/skills/`) are not authoritative.
+
+Executable code and tests outrank every instruction file, including this one. An instruction that contradicts current code is stale — fix the instruction and say so.
+
+There is no `Runtime Constitution` document in this repository; the authority ladder in `docs/README.md` is the real one.
 
 ## Important source-of-truth files
 
@@ -62,11 +74,13 @@ rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
 ## Validation
 
 ```bash
-ruff check src tests
-ruff format --check src tests
+ruff check .
+ruff format --check .
 mypy src/rif_runtime --ignore-missing-imports
 pytest -q
 ```
+
+This is the merge gate's `verify` job order and scope. CI lints the whole tree (`.`), so a narrower `ruff check src tests` can pass while the gate fails. `mypy src/ tests/` under strict settings is the separate advisory `typecheck-tests` job — it carries known typing debt and does not block a merge.
 
 Security/dependency checks:
 
@@ -86,7 +100,9 @@ Posture can survive restart. Do not assume a new runtime instance means a clean 
 
 ## Security boundary
 
-Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured.
+Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured. Inspection routes use `ReadPlaneAuth`; `POST /v1/runs` uses Supabase JWT identity. `POST /v1/mcp/invoke` is deliberately unauthenticated *and* dry-run (`runtime.evaluate(req, record=False)`) — making it recording, or adding another unauthenticated route that records, is a security-boundary change.
+
+The shipped default policy is deny-by-default: the `deny_unknown_by_default` catch-all in `data/policies.json` is enforced (`tests/test_policy_store.py:105`). Wildcard rules are not inert. First-party actions must stay enumerated — deleting `allow_run_create` silently 403s `POST /v1/runs`.
 
 Never promote model output into authority. An external provider credential is configuration, not a RIF authorization decision.
 

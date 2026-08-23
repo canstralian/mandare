@@ -17,7 +17,7 @@ Documentation never becomes authoritative.
 
 ## Authority Ladder
 
-Runtime Constitution
+Executable implementation and tests (`src/`, `tests/`)
 
 ↓
 
