@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from .agents.auditor import AuditorAgent
 from .auth import ControlPlaneAuth
 from .configuration.policies import PolicyRule
+from .governance.drift import recommend_correction
 from .integrations import supabase as sb
 from .mcp.capabilities import capability_catalog
 from .mcp.metasploit import (
@@ -213,6 +214,26 @@ def recovered_state() -> dict[str, Any]:
     # the response is meaningful after a restart. Reads the runtime's own
     # configured path so the two can't diverge under RIF_DATA_DIR.
     return asdict(ReplayEngine(runtime.decisions_path).recover())
+
+
+@app.get("/v1/drift/recommend")
+def drift_recommend() -> dict[str, Any]:
+    """Report the current drift vector and the posture it recommends.
+
+    Read-only: this surfaces the recommendation for a caller to act on and
+    never mutates posture itself.
+    """
+    vector = runtime.drift_vector()
+    correction = recommend_correction(vector)
+    return {
+        "drift_vector": {
+            "denial_rate": vector.denial_rate,
+            "adversarial_score": vector.adversarial_score,
+            "action_entropy": vector.action_entropy,
+            "target_entropy": vector.target_entropy,
+        },
+        "recommended_correction": correction.value,
+    }
 
 
 @app.get("/v1/policies")
