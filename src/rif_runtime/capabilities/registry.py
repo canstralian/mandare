@@ -83,8 +83,8 @@ class CapabilityRegistry:
             CapabilityStatus.available,
         }:
             raise PolicyViolationError(
-                f"Capability admission denied: lifecycle="
-                f"{record.lifecycle.status}: {name}"
+                "Capability admission denied: "
+                f"lifecycle={record.lifecycle.status}: {name}"
             )
         record.lifecycle.status = CapabilityStatus.admitted
         return record
