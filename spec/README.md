@@ -16,6 +16,15 @@ The Python runtime under `src/rif_runtime/` is the source of truth for shipped b
 | `state/` | Placeholder | Structured runtime-state contract not yet formalized |
 | `mcp/` | Drafted | MCP governance contract material |
 
+> **Known gap — the seeded domains are duplicates, not migrations.** ADR-0008 calls
+> for the `contracts/rif_familiar/` schemas to be *migrated rather than duplicated*.
+> What is in the tree today is duplication: the three schemas are byte-identical
+> between `contracts/rif_familiar/` and `spec/`, and
+> `tests/test_rif_familiar_contracts.py` validates only the `contracts/` copies — so
+> the `spec/` copies carry no test coverage and can drift silently. Until the
+> re-export-vs-retire question is settled, treat `contracts/rif_familiar/` as the
+> tested copy. See `docs/SPECS_DOCS_AUDIT.md` (H3).
+
 ## Specification-review rule
 
 Cross-domain contract changes should be reviewed before implementation when they affect authority, identity, capability scope, evidence, replay, provider egress, or another shared boundary.
