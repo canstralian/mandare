@@ -44,7 +44,7 @@ The same file described the runtime as having no external service. `src/rif_runt
 
 ### F4 — Validation command drift (fixed)
 
-Four different command sets were in circulation. The merge gate's `verify` job (`.github/workflows/merge-gate.yml`) runs `ruff check .` → `ruff format --check .` → `mypy src/rif_runtime --ignore-missing-imports` → `pytest -q`. `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md` listed `ruff check src tests`, which lints a narrower tree and can pass while the gate fails; the quality-gate skill listed a fourth ordering. `AGENTS.md`, `CLAUDE.md`, and the skill now carry the gate's own order and scope, and note that `typecheck-tests` is advisory. `CONTRIBUTING.md` is left as-is: it describes useful local checks for humans, not the gate.
+Four different command sets were in circulation. The merge gate's `verify` job (`.github/workflows/merge-gate.yml`) runs `ruff check .` → `ruff format --check .` → `mypy src/rif_runtime --ignore-missing-imports` → `pytest -q`. `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md` listed `ruff check src tests`, which lints a narrower tree and can pass while the gate fails; the quality-gate skill listed a fourth ordering. `AGENTS.md`, `CLAUDE.md`, `.cursor/agents/rif-quality-gate.md`, and `.claude/skills/run-rif-runtime/skill.md` now carry the gate's own order and scope, and note that `typecheck-tests` is advisory. `CONTRIBUTING.md` is left as-is: it describes useful local checks for humans, not the gate.
 
 ### F5 — Phantom "Runtime Constitution" (fixed)
 

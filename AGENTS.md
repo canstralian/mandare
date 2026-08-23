@@ -151,7 +151,7 @@ Posture escalates on denials (normal → elevated → restricted → locked) and
 - `ReadPlaneAuth` — inspection (`/v1/graph/summary`, `/v1/telemetry/summary`, `/v1/audit`, `/v1/persistence/summary`, `/v1/recovered-state`, `/v1/drift/recommend`, `/v1/policies`).
 - `IdentityId` (`api.py:84`) — Supabase JWT identity, used by `POST /v1/runs`.
 
-A new route with none of these is a finding unless it is deliberately public and the diff says why. Two existing routes are deliberately open: `/v1/mcp/invoke` is a **dry-run simulation** (`runtime.evaluate(req, record=False)`) so it cannot mutate posture or write the decision log — a change that makes it recording, or that adds another unauthenticated route which records, is blocking. Control-plane operations fail closed when no keys are configured; do not add a fallback that opens them.
+A new route with none of these is a finding unless it is deliberately public and the diff says why. Existing unauthenticated routes include `/health`, `/`, `/v1/environments`, and the MCP simulation surface (`POST /v1/mcp/invoke`, `GET /v1/mcp/metasploit/capabilities`, `POST /v1/mcp/metasploit/evaluate`). The invoke/evaluate routes are **dry-run** (`record=False`) so they cannot mutate posture or write the decision log — a change that makes them recording, or that adds another unauthenticated route which records, is blocking. Control-plane operations fail closed when no keys are configured; do not add a fallback that opens them.
 
 ### 5. Persistence goes through the helpers
 
