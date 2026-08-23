@@ -15,6 +15,7 @@ The HTTP route definitions in `src/rif_runtime/api.py` are the source of truth. 
 | `GET` | `/v1/recovered-state` | Recovered runtime state | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
 | `GET` | `/v1/audit` | Audit/decision view | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
 | `GET` | `/v1/policies` | List policy rules | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
+| `GET` | `/v1/drift/recommend` | Drift vector and recommended posture correction | `X-API-Key` if `RIF_REQUIRE_READ_AUTH=true` |
 
 ## Governance operations
 
@@ -106,6 +107,7 @@ recovered state, and counters:
 | `GET` | `/v1/persistence/summary` | Persisted decision/posture counters |
 | `GET` | `/v1/telemetry/summary` | Recent denial counters |
 | `GET` | `/v1/graph/summary` | Governance graph summary |
+| `GET` | `/v1/drift/recommend` | Drift vector and the posture it recommends |
 
 They are **open by default**. Setting `RIF_REQUIRE_READ_AUTH=true` guards them
 with the same `X-API-Key` check as the mutable operations, including the same

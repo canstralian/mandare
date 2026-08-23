@@ -10,6 +10,7 @@ from .configuration.policies import PolicyStore
 from .execution.kernel import ExecutionKernel
 from .execution.manifest import ExecutionManifest
 from .execution.result import ExecutionResult, ExecutionStatus
+from .governance.drift import DriftVector
 from .governance.posture import at_least_posture, escalate_posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
@@ -288,6 +289,11 @@ class RIFRuntime:
         the file can rewrite a shorter valid chain.
         """
         return self.decisions_store.verify(decisions).as_dict()
+
+    def drift_vector(self) -> DriftVector:
+        """Summarise the last 60 minutes of telemetry as a drift vector."""
+        events = self.reflexive.telemetry.recent(minutes=60)
+        return DriftVector.from_events(events)
 
     def audit_summary(self) -> dict[str, Any]:
         # GET /v1/audit previously re-read and re-hashed decisions.jsonl five
