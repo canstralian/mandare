@@ -79,6 +79,16 @@ def test_entropy_grows_with_diversity():
         "/binary/shipping",
         "cabin/shed",
         "powershellish",
+        # REST path nouns that share SQL/timing keyword spellings — must not
+        # match without SQL-like trailing whitespace or call parentheses.
+        "/api/select",
+        "/users/delete",
+        "/api/update",
+        "/api/sleep",
+        "/api/benchmark",
+        "/drop",
+        "/union",
+        "/items/insert",
     ],
 )
 def test_adversarial_patterns_no_false_positive(safe: str):
@@ -107,6 +117,11 @@ def test_adversarial_patterns_no_false_positive(safe: str):
         "1 | cat /etc/shadow",
         "EXEC xp_cmdshell('whoami')",
         "1 UNION SELECT null,null",
+        # Timing / blind-injection call forms
+        "sleep(5)",
+        "benchmark(1000000,MD5(1))",
+        "pg_sleep(1)",
+        "waitfor delay '0:0:5'",
     ],
 )
 def test_adversarial_patterns_detects_payloads(payload: str):
@@ -191,6 +206,41 @@ def test_adversarial_score_encoded_sql_in_target():
     # Percent-encoded SELECT must be decoded before matching
     events = [_decision(target="https://db.internal/q?x=%53ELECT%20*%20FROM%20users")]
     assert _adversarial_score(events) == 1.0
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://api.example.com/api/select",
+        "https://api.example.com/users/delete",
+        "https://api.example.com/api/update",
+        "https://api.example.com/api/sleep",
+        "https://api.example.com/api/benchmark",
+        "https://api.example.com/drop",
+        "https://api.example.com/union",
+        "https://api.example.com/items/insert",
+    ],
+)
+def test_adversarial_score_rest_path_nouns_no_false_positive(url: str):
+    # Benign REST path segments that share SQL/timing spellings must not
+    # inflate adversarial_score or escalate posture with zero denials.
+    events = [_decision(target=url)]
+    vector = DriftVector.from_events(events)
+    assert vector.adversarial_score == 0.0
+    assert recommend_correction(vector) == Posture.normal
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "sleep(5)",
+        "benchmark(1000000,MD5(1))",
+        "pg_sleep(1)",
+        "waitfor delay '0:0:5'",
+    ],
+)
+def test_adversarial_score_timing_injection_true_positives(target: str):
+    assert _adversarial_score([_decision(target=target)]) == 1.0
 
 
 # ── DriftVector.from_events ──────────────────────────────────────────────────

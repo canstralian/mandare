@@ -34,14 +34,22 @@ from rif_runtime.schemas import PolicyDecision, Posture
 # target.  The reason field is deliberately not scanned — see
 # _adversarial_score.  Keyword alternatives use \b so substrings inside longer
 # identifiers (e.g. "elasticsearch", "selectAll", "executor") are not flagged.
+# SQL keywords also require trailing whitespace so bare REST path nouns
+# (/api/select, /users/delete) are not scored as injections.
 _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
-    # SQL injection keywords
+    # SQL injection keywords — require whitespace after the keyword so path
+    # segments like /api/select or /items/insert are not false positives.
     re.compile(
-        r"\b(select|insert|update|delete|drop|union|exec|execute|truncate)\b",
+        r"\b(select|insert|update|delete|drop|union|exec|execute|truncate)\b\s+",
         re.IGNORECASE,
     ),
-    # Timing / blind-injection helpers
-    re.compile(r"\b(sleep|benchmark|pg_sleep|waitfor\s+delay)\b", re.IGNORECASE),
+    # Timing / blind-injection helpers — sleep/benchmark/pg_sleep require an
+    # opening '(' (injection call form); waitfor delay keeps its SQL phrasing.
+    # Bare /api/sleep or /api/benchmark path nouns must not match.
+    re.compile(
+        r"\b(?:sleep|benchmark|pg_sleep)\s*\(|\bwaitfor\s+delay\b",
+        re.IGNORECASE,
+    ),
     # Path traversal — two or more ../ or ..\ sequences anywhere in the string
     # (consecutive *or* separated by a path segment, e.g. ../segment/../)
     re.compile(r"(\.\.[\\/]).*(\.\.[\\/])"),
