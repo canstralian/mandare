@@ -21,6 +21,7 @@ contain the risk.  It incorporates:
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from collections import Counter
@@ -29,6 +30,34 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlparse
 
 from rif_runtime.schemas import PolicyDecision, Posture
+
+# #region agent log
+_DEBUG_LOG = "/opt/cursor/logs/debug.log"
+
+
+def _agent_log(
+    hypothesis_id: str, location: str, message: str, data: dict[str, object]
+) -> None:
+    try:
+        with open(_DEBUG_LOG, "a", encoding="utf-8") as fh:
+            fh.write(
+                json.dumps(
+                    {
+                        "hypothesisId": hypothesis_id,
+                        "location": location,
+                        "message": message,
+                        "data": data,
+                        "timestamp": __import__("time").time_ns() // 1_000_000,
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+
+
+# #endregion
 
 # Word-boundary-anchored patterns for detecting adversarial payload in the
 # target.  The reason field is deliberately not scanned — see
@@ -73,7 +102,28 @@ def _extract_payload(target: str) -> str:
             payload += ";" + parsed.params
         if parsed.query:
             payload += "?" + parsed.query
-        return unquote(payload)
+        payload = unquote(payload)
+        # #region agent log
+        _agent_log(
+            "A",
+            "drift.py:_extract_payload",
+            "extracted URL payload",
+            {
+                "target": target[:200],
+                "payload": payload[:200],
+                "netloc": parsed.netloc,
+            },
+        )
+        # #endregion
+        return payload
+    # #region agent log
+    _agent_log(
+        "A",
+        "drift.py:_extract_payload",
+        "non-URL target passthrough",
+        {"target": target[:200]},
+    )
+    # #endregion
     return target
 
 
@@ -87,12 +137,46 @@ def _adversarial_score(events: Sequence[PolicyDecision]) -> float:
     """
     if not events:
         return 0.0
-    hits = sum(
-        1
-        for e in events
-        if any(p.search(_extract_payload(e.target)) for p in _ADVERSARIAL_PATTERNS)
+    hits = 0
+    for e in events:
+        payload = _extract_payload(e.target)
+        matched: list[dict[str, object]] = []
+        for idx, p in enumerate(_ADVERSARIAL_PATTERNS):
+            m = p.search(payload)
+            if m:
+                matched.append(
+                    {
+                        "patternIndex": idx,
+                        "pattern": p.pattern[:80],
+                        "match": m.group(0)[:80],
+                    }
+                )
+        if matched:
+            hits += 1
+        # #region agent log
+        _agent_log(
+            "B",
+            "drift.py:_adversarial_score",
+            "per-event pattern scan",
+            {
+                "target": e.target[:200],
+                "payload": payload[:200],
+                "decision": str(e.decision),
+                "hit": bool(matched),
+                "matches": matched,
+            },
+        )
+        # #endregion
+    score = hits / len(events)
+    # #region agent log
+    _agent_log(
+        "D",
+        "drift.py:_adversarial_score",
+        "score computed",
+        {"hits": hits, "n": len(events), "adversarial_score": score},
     )
-    return hits / len(events)
+    # #endregion
+    return score
 
 
 def _entropy(values: Sequence[str]) -> float:
@@ -142,14 +226,62 @@ def recommend_correction(vector: DriftVector) -> Posture:
     elevated   – moderate denial rate (>20 %)
     normal     – no significant drift detected
     """
+    # #region agent log
+    _agent_log(
+        "D",
+        "drift.py:recommend_correction",
+        "entry",
+        {
+            "adversarial_score": vector.adversarial_score,
+            "denial_rate": vector.denial_rate,
+            "action_entropy": vector.action_entropy,
+            "target_entropy": vector.target_entropy,
+        },
+    )
+    # #endregion
     if vector.adversarial_score > 0.3 or vector.denial_rate > 0.8:
+        # #region agent log
+        _agent_log(
+            "D",
+            "drift.py:recommend_correction",
+            "branch locked",
+            {
+                "via_adversarial": vector.adversarial_score > 0.3,
+                "via_denial": vector.denial_rate > 0.8,
+            },
+        )
+        # #endregion
         return Posture.locked
 
     focused_probe = vector.target_entropy < 0.5 and vector.denial_rate > 0.3
     if vector.adversarial_score > 0.1 or vector.denial_rate > 0.5 or focused_probe:
+        # #region agent log
+        _agent_log(
+            "D",
+            "drift.py:recommend_correction",
+            "branch restricted",
+            {"focused_probe": focused_probe},
+        )
+        # #endregion
         return Posture.restricted
 
     if vector.denial_rate > 0.2:
+        # #region agent log
+        _agent_log(
+            "D",
+            "drift.py:recommend_correction",
+            "branch elevated",
+            {},
+        )
+        # #endregion
         return Posture.elevated
 
+    # #region agent log
+    _agent_log(
+        "D",
+        "drift.py:recommend_correction",
+        "branch normal",
+        {},
+    )
+    # #endregion
     return Posture.normal
