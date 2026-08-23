@@ -171,7 +171,7 @@ Environment behaviour comes from `config/environments.yaml`. Branching on an env
 
 ### 9. Surface documentation tracks the surface
 
-`src/rif_runtime/api.py` is the source of truth for the HTTP surface and `src/rif_runtime/cli.py` for commands. A route or command change that does not update `docs/API.md`, `docs/cli-reference.md`, and `README.md` in the same diff is incomplete.
+`src/rif_runtime/api.py` is the source of truth for the HTTP surface and `src/rif_runtime/cli.py` for commands. A route change that does not update `docs/API.md`, `README.md`, and `docs/RIF_RUNTIME_MVP.md` in the same diff is incomplete. A command change that does not update `docs/cli-reference.md` and `README.md` in the same diff is incomplete.
 
 ### 10. Version has one source
 
