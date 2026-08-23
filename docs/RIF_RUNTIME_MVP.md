@@ -28,6 +28,7 @@ See [`API.md`](API.md) for the complete current route index. The most useful sta
 - `GET /v1/telemetry/summary`
 - `GET /v1/persistence/summary`
 - `GET /v1/recovered-state`
+- `GET /v1/drift/recommend`
 - `GET /v1/audit`
 - `POST /v1/mcp/invoke`
 - `GET /v1/mcp/metasploit/capabilities`
@@ -39,6 +40,7 @@ See [`API.md`](API.md) for the complete current route index. The most useful sta
 - `POST /v1/runs`
 
 Mutable control-plane routes require `X-API-Key` authentication.
+`POST /v1/runs` requires a Supabase Bearer JWT.
 
 ## Local state
 

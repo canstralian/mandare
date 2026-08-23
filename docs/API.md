@@ -13,6 +13,7 @@ The HTTP route definitions in `src/rif_runtime/api.py` are the source of truth. 
 | `GET` | `/v1/telemetry/summary` | Telemetry summary | None |
 | `GET` | `/v1/persistence/summary` | Persistence summary | None |
 | `GET` | `/v1/recovered-state` | Recovered runtime state | None |
+| `GET` | `/v1/drift/recommend` | Drift vector and recommended posture correction | None |
 | `GET` | `/v1/audit` | Audit/decision view | None |
 
 ## Governance operations
