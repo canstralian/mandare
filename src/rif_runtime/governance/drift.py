@@ -63,14 +63,22 @@ def _agent_log(
 # target.  The reason field is deliberately not scanned — see
 # _adversarial_score.  Keyword alternatives use \b so substrings inside longer
 # identifiers (e.g. "elasticsearch", "selectAll", "executor") are not flagged.
+# SQL keywords also require trailing whitespace so REST path segments like
+# /users/delete/123 or /v1/union/members are not scored as injection.
+# Timing helpers: bare sleep/benchmark need trailing whitespace or '(' (function
+# call form) so /api/sleep and /api/benchmark path nouns stay clean; pg_sleep
+# and waitfor delay remain word-boundary signals.
 _ADVERSARIAL_PATTERNS: list[re.Pattern[str]] = [
-    # SQL injection keywords
+    # SQL injection keywords (keyword + whitespace → statement shape, not path noun)
     re.compile(
-        r"\b(select|insert|update|delete|drop|union|exec|execute|truncate)\b",
+        r"\b(select|insert|update|delete|drop|union|exec|execute|truncate)\b\s+",
         re.IGNORECASE,
     ),
     # Timing / blind-injection helpers
-    re.compile(r"\b(sleep|benchmark|pg_sleep|waitfor\s+delay)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:(?:sleep|benchmark)(?:\s+|\()|pg_sleep\b|waitfor\s+delay\b)",
+        re.IGNORECASE,
+    ),
     # Path traversal — two or more ../ or ..\ sequences anywhere in the string
     # (consecutive *or* separated by a path segment, e.g. ../segment/../)
     re.compile(r"(\.\.[\\/]).*(\.\.[\\/])"),
@@ -159,6 +167,7 @@ def _adversarial_score(events: Sequence[PolicyDecision]) -> float:
             "drift.py:_adversarial_score",
             "per-event pattern scan",
             {
+                "runId": "post-fix",
                 "target": e.target[:200],
                 "payload": payload[:200],
                 "decision": str(e.decision),

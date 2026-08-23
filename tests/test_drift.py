@@ -79,6 +79,14 @@ def test_entropy_grows_with_diversity():
         "/binary/shipping",
         "cabin/shed",
         "powershellish",
+        # REST path nouns that look like SQL/timing keywords but lack
+        # statement/function shape (no trailing whitespace / '(').
+        "/users/delete/123",
+        "/user/update/profile",
+        "/api/drop/item",
+        "/v1/union/members",
+        "/api/sleep",
+        "/api/benchmark",
     ],
 )
 def test_adversarial_patterns_no_false_positive(safe: str):
@@ -107,6 +115,11 @@ def test_adversarial_patterns_no_false_positive(safe: str):
         "1 | cat /etc/shadow",
         "EXEC xp_cmdshell('whoami')",
         "1 UNION SELECT null,null",
+        # Timing / blind-injection true positives
+        "1' AND SLEEP(5)--",
+        "BENCHMARK(1000000,SHA1('test'))",
+        "SELECT pg_sleep(5)",
+        "WAITFOR DELAY '00:00:05'",
     ],
 )
 def test_adversarial_patterns_detects_payloads(payload: str):
@@ -190,6 +203,43 @@ def test_adversarial_score_semicolon_separators_do_not_escalate_correction():
 def test_adversarial_score_encoded_sql_in_target():
     # Percent-encoded SELECT must be decoded before matching
     events = [_decision(target="https://db.internal/q?x=%53ELECT%20*%20FROM%20users")]
+    assert _adversarial_score(events) == 1.0
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "https://api.example.com/users/delete/123",
+        "https://api.example.com/user/update/profile",
+        "https://api.example.com/api/drop/item",
+        "https://api.example.com/v1/union/members",
+        "https://api.example.com/api/sleep",
+        "https://api.example.com/api/benchmark",
+        "https://api.example.com/users/123",
+    ],
+)
+def test_adversarial_score_rest_path_nouns_no_false_positive(target: str):
+    """Benign REST path nouns must not inflate adversarial_score or lock posture."""
+    events = [_decision(target=target)]
+    assert _adversarial_score(events) == 0.0
+    vector = DriftVector.from_events(events)
+    assert vector.adversarial_score == 0.0
+    assert recommend_correction(vector) == Posture.normal
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "https://db.internal/q?x=1 UNION SELECT 1,2",
+        "https://db.internal/q?id=1'; DROP TABLE users",
+        "https://db.internal/q?x=1'%20AND%20SLEEP(5)--",
+        "https://db.internal/q?x=BENCHMARK(1000000,MD5(1))",
+        "https://db.internal/q?x=SELECT%20pg_sleep(5)",
+        "https://db.internal/q?x=WAITFOR%20DELAY%20'00:00:05'",
+    ],
+)
+def test_adversarial_score_sql_and_timing_injection_true_positives(target: str):
+    events = [_decision(target=target)]
     assert _adversarial_score(events) == 1.0
 
 
