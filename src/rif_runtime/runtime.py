@@ -10,6 +10,7 @@ from .configuration.policies import PolicyStore
 from .execution.kernel import ExecutionKernel
 from .execution.manifest import ExecutionManifest
 from .execution.result import ExecutionResult, ExecutionStatus
+from .governance.drift import DriftVector
 from .governance.posture import escalate_posture
 from .governance.reflexive import ReflexiveLoop
 from .graph.memory import GovernanceGraph
@@ -214,6 +215,11 @@ class RIFRuntime:
             "decisions_by_result": self.decisions_store.count_by("decision"),
             "decisions_by_rule": self.decisions_store.count_by("matched_rule"),
         }
+
+    def drift_vector(self) -> DriftVector:
+        """Summarise the last 60 minutes of telemetry as a drift vector."""
+        events = self.reflexive.telemetry.recent(minutes=60)
+        return DriftVector.from_events(events)
 
     def audit_summary(self) -> dict[str, Any]:
         return {
