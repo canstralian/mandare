@@ -100,6 +100,18 @@ class ServerSection(BaseModel):
     port: int = 8000
     root_path: str = ""
 
+    @field_validator("host", mode="before")
+    @classmethod
+    def _blank_host_uses_default(cls, value: object) -> object:
+        """Treat a blank ``RIF_SERVER_HOST`` as absent, not as an empty bind.
+
+        ``RIF_SERVER_HOST=`` yields "", which is not a useful listen address.
+        Fall back to the loopback default so blank env matches an unset var.
+        """
+        if isinstance(value, str) and not value.strip():
+            return "127.0.0.1"
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("port")
     @classmethod
     def _port_range(cls, v: int) -> int:
@@ -125,6 +137,28 @@ class PathsSection(BaseModel):
 
     data_dir: str = "data"
     config_dir: str = "config"
+
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def _blank_data_dir_uses_default(cls, value: object) -> object:
+        """Treat blank ``RIF_DATA_DIR`` as unset, not as CWD.
+
+        ``Path("")`` is ``Path(".")``, so a container spec with
+        ``RIF_DATA_DIR=`` would write runtime state into the working directory.
+        Mirror blank-``RIF_ENVIRONMENT`` normalisation: empty means the field
+        default (``data``), not an empty path.
+        """
+        if isinstance(value, str) and not value.strip():
+            return "data"
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("config_dir", mode="before")
+    @classmethod
+    def _blank_config_dir_uses_default(cls, value: object) -> object:
+        """Treat blank ``RIF_CONFIG_DIR`` as unset, not as CWD."""
+        if isinstance(value, str) and not value.strip():
+            return "config"
+        return value.strip() if isinstance(value, str) else value
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +195,11 @@ class RifSettings(BaseModel):
 # Env-var override mapping
 # ---------------------------------------------------------------------------
 
+
+class ConfigError(Exception):
+    """Raised when configuration is invalid or cannot be loaded."""
+
+
 # Maps RIF_<NAME> env var to (section, key) path in the settings dict.
 _ENV_MAP: dict[str, tuple[str, str]] = {
     "RIF_POSTURE": ("runtime", "posture"),
@@ -188,23 +227,30 @@ def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _coerce_env_value(raw: str, section: str, key: str) -> str | int | bool:
-    """Best-effort coercion so env vars match expected TOML types."""
+    """Best-effort coercion so env vars match expected TOML types.
+
+    Integer coercion failures (including a blank ``RIF_SERVER_PORT``) raise
+    ``ConfigError`` here so callers see the same diagnostic path as pydantic
+    validation failures, rather than a bare ``ValueError`` from ``int("")``.
+    """
     # Boolean fields
     if key == "cloud_egress":
         return raw.lower() in ("1", "true", "yes")
     # Integer fields
     if key == "port":
-        return int(raw)
+        try:
+            return int(raw.strip())
+        except ValueError as exc:
+            raise ConfigError(
+                f"invalid {section}.{key} from environment: {raw!r} "
+                "(expected an integer between 1 and 65535)"
+            ) from exc
     return raw
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
-
-
-class ConfigError(Exception):
-    """Raised when configuration is invalid or cannot be loaded."""
 
 
 def load_settings(
