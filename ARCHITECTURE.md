@@ -36,7 +36,50 @@ RIFRuntime.evaluate()
   +--> telemetry / audit / recovery surfaces
 ```
 
-The exact behaviour of this path is defined by the Python implementation and its tests. The API route definitions in `src/rif_runtime/api.py` are the source of truth for the HTTP surface.
+## Governed capability execution
+
+The runtime now has a first vertical slice for capability governance. An executable adapter and its governance identity are separate objects. The adapter is never treated as trusted merely because it is registered.
+
+```text
+ExecutionManifest
+      |
+      v
+RIFRuntime.execute_capability()
+      |
+      +--> PolicyEngine
+      |       |
+      |       +---- deny ---> evidence ---> DENIED
+      |       |
+      |       +---- allow
+      |             |
+      |             v
+      +------> CapabilityRegistry
+                    |
+                    +--> integrity verified?
+                    +--> passing evaluation?
+                    +--> lifecycle evaluated/admitted?
+                    |
+                    +---- fail ---> admission denied
+                    |
+                    +---- pass
+                          |
+                          v
+                    ExecutionKernel
+                          |
+                          v
+                    Capability adapter
+                          |
+                          v
+                  capability_evidence.jsonl
+```
+
+The important boundary is:
+
+> **Availability is not authorization. Admission is not execution. Policy authorization and capability admission are both required before the governed runtime path invokes an adapter.**
+
+Capability governance records currently capture identity, provenance, integrity, permissions, dependencies, lifecycle state, and evaluation evidence. This is intentionally a small contract that can later absorb signed artifacts, SkillSpector-style inspection, benchmark evidence, and richer provenance without coupling those concerns to the executable adapter interface.
+
+The existing `ExecutionKernel` remains capability-specificity-free: it resolves an already-selected adapter and executes it. `RIFRuntime.execute_capability()` is the governed orchestration path that performs policy evaluation and capability admission before invoking the kernel.
 
 ## Major components
 
@@ -44,7 +87,7 @@ The exact behaviour of this path is defined by the Python implementation and its
 |---|---|---|---|
 | API | `src/rif_runtime/api.py` | FastAPI HTTP surface | Implemented |
 | CLI | `src/rif_runtime/cli.py` | Local operator/developer commands | Implemented |
-| Runtime | `src/rif_runtime/runtime.py` | Wires policy, posture, graph, telemetry and persistence | Implemented |
+| Runtime | `src/rif_runtime/runtime.py` | Wires policy, posture, graph, telemetry, persistence, and governed capability execution | Implemented |
 | Policy | `src/rif_runtime/policy.py` | Evaluates policy requests and constraints | Implemented |
 | Configuration | `src/rif_runtime/config.py`, `rif.toml`, `config/` | Runtime/environment configuration | Implemented |
 | Posture | `src/rif_runtime/governance/` | Tracks and escalates runtime posture | Implemented |
@@ -52,10 +95,25 @@ The exact behaviour of this path is defined by the Python implementation and its
 | Persistence | `src/rif_runtime/storage/` | JSONL append-oriented state storage | Implemented |
 | Replay | `src/rif_runtime/replay.py` | Reconstructs graph/posture state from decision history | Implemented |
 | Audit primitives | `src/rif_runtime/audit.py` | Hash-chain record primitives and verification | Implemented as a library surface; not equivalent to every persisted decision being hash-chained |
-| Security utilities | `src/rif_runtime/security.py` | Canonicalization, hashing, HMAC, encryption helpers and redaction | Implemented |
+| Capabilities | `src/rif_runtime/capabilities/` | Executable adapters plus governance identity/admission records | Implemented first vertical slice |
+| Execution | `src/rif_runtime/execution/` | Manifest and capability execution kernel | Implemented; governed orchestration lives in `RIFRuntime` |
 | MCP | `src/rif_runtime/mcp/` | MCP governance and Metasploit-specific evaluation | Implemented in the current scope |
 | Supabase integration | `src/rif_runtime/integrations/supabase.py` | Optional remote persistence/JWT verification | Optional |
-| Resources / runs / execution packages | `src/rif_runtime/resources/`, `runs/`, `execution/` | Supporting domain surfaces | Present; not all are on the default request path |
+
+## Capability trust model
+
+A capability record deliberately separates several claims:
+
+- **identity** — what capability is being discussed;
+- **provenance** — where it came from and which version/commit was inspected;
+- **integrity** — whether the expected artifact identity/signature was verified;
+- **evaluation** — whether an explicit evaluation suite produced passing evidence;
+- **lifecycle** — whether the capability has progressed far enough to be admitted;
+- **permissions/dependencies** — what the capability declares it may require.
+
+A signature, when present, proves an integrity relationship. It does not by itself prove that the capability is safe, useful, or policy-authorized.
+
+This deliberately mirrors the evidence-first trust model being explored from external skill ecosystems without making RIF dependent on a particular skill package format.
 
 ## Persistence model
 
@@ -65,7 +123,8 @@ Common files include:
 
 - `decisions.jsonl` — persisted policy decisions;
 - `posture_history.jsonl` — persisted posture transitions;
-- `metasploit_evidence.jsonl` — Metasploit-related evidence when that path is used.
+- `metasploit_evidence.jsonl` — Metasploit-related evidence when that path is used;
+- `capability_evidence.jsonl` — governed capability execution attempts and results.
 
 JSONL is durable local state, not a distributed database. File integrity, backup, concurrency, retention, and recovery are deployment responsibilities unless a future storage contract states otherwise.
 
@@ -89,6 +148,7 @@ The runtime contains several useful security primitives:
 - cryptographic hashing/HMAC/encryption helpers;
 - an audit hash-chain library;
 - replay and persisted-state recovery;
+- capability integrity/evaluation admission checks;
 - non-root container execution in the supplied Dockerfile;
 - dependency locks and security scanning in CI.
 
@@ -98,9 +158,12 @@ These controls should not be conflated with a complete sandbox, zero-trust deplo
 
 `spec/` and several documents under `docs/` describe contracts and architecture that are ahead of the current implementation. They are useful design inputs, but they are not automatically runtime guarantees.
 
-In particular, the following remain architectural work rather than claims about the current request path:
+Remaining architectural work includes:
 
-- a general capability router/execution adapter pipeline;
+- durable registry persistence and capability discovery;
+- signed artifact verification and provenance attestations;
+- automated static/security inspection of skill packages;
+- benchmark and regression evidence ingestion;
 - a unified EvidenceRecord contract across all runtime paths;
 - governed remote-inference authorization;
 - automated reflexive repair/evolution;
