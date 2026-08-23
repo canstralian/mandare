@@ -59,8 +59,11 @@ repo-local gotchas that are easiest to get wrong.
 - **Environments are config-driven** (`config/environments.yaml`) — add new
   environments there, never branch on environment name in code.
 - **`src/rif_runtime/api.py` is the source of truth for the API surface.** If a
-  route changes, update `docs/API.md`, `README.md`, and
-  `docs/RIF_RUNTIME_MVP.md` to match.
+  route changes, update `docs/API.md`, `docs/RIF_RUNTIME_MVP.md`, and
+  `README.md` (where the route appears there) to match. If a *command*
+  changes, the sync set is different: `docs/cli-reference.md`, the root
+  `cli-reference.md` pointer that inlines the command list, and the CLI blocks
+  in `AGENTS.md` and `CLAUDE.md`. See `AGENTS.md` Code Review Rule 9.
 
 ## Known gotchas to flag
 
