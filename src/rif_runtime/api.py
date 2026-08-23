@@ -218,6 +218,11 @@ def recovered_state() -> dict[str, Any]:
 
 @app.get("/v1/drift/recommend")
 def drift_recommend() -> dict[str, Any]:
+    """Report the current drift vector and the posture it recommends.
+
+    Read-only: this surfaces the recommendation for a caller to act on and
+    never mutates posture itself.
+    """
     vector = runtime.drift_vector()
     correction = recommend_correction(vector)
     return {
