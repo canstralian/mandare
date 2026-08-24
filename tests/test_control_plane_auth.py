@@ -121,6 +121,9 @@ READ_GUARDED_PATHS = [
     "/v1/persistence/summary",
     "/v1/telemetry/summary",
     "/v1/graph/summary",
+    # Merged from main with the drift recommend route; keep behavioural
+    # read-auth coverage in lockstep with ReadPlaneAuth dependencies.
+    "/v1/drift/recommend",
 ]
 
 
