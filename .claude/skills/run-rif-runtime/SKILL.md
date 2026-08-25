@@ -202,7 +202,7 @@ because of the reload-worker stop issue described above.
 pytest -q
 ```
 
-147 tests pass on a clean install (Python 3.12, `pip install -e .` + `requirements-dev.txt`).
+`pytest -q` is the merge-gate test command; do not hard-code a passing count in this file — it drifts. On a clean install use Python 3.12+ (`pip install -e .` + `requirements-dev.txt`).
 
 ## Gotchas
 

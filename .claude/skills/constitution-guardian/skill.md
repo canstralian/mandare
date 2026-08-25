@@ -9,101 +9,95 @@ description: Enforce the RIF Runtime Constitution by validating architectural in
 
 Protect the long-term integrity of the RIF Runtime.
 
-This skill evaluates proposed changes against the Runtime Constitution rather than implementation details.
+This skill evaluates proposed changes against the repository's architectural invariants rather than implementation details.
 
-Architecture always takes precedence over convenience.
-
----
-
-## Constitutional Principles
-
-The Runtime Constitution is the highest authority.
-
-No implementation may contradict constitutional rules.
-
-When implementation conflicts with the Constitution, the implementation must change.
+Architecture takes precedence over convenience.
 
 ---
 
-## Constitutional Invariants
+## What "Constitution" means here
 
-### Knowledge
+There is **no `Runtime Constitution` document in this repository.** The name is a shorthand for the architectural invariants listed below.
 
-Generated knowledge is derived.
+Authority in this repository is the ladder in [`docs/README.md`](../../../docs/README.md): executable implementation and tests outrank repository configuration, which outranks normative specifications (`spec/`), which outrank architecture and design documents, roadmaps, research, and historical ADRs. Cross-domain contract authority is described in [`spec/README.md`](../../../spec/README.md). Instruction precedence across tools is in [`AGENTS.md`](../../../AGENTS.md).
 
-Generated knowledge is never authoritative.
-
-Knowledge projections must be reproducible.
+Do not cite a constitution as though it were a readable artefact, and do not treat this skill's text as outranking code. When an invariant here disagrees with `src/` and `tests/`, the invariant is stale: report it, do not enforce it.
 
 ---
 
-### Governance
+## Invariant status
 
-Every effectful operation is governed.
+Each invariant below is marked with its current enforcement status, using the vocabulary in `docs/README.md`:
 
-Every write operation requires policy evaluation.
+- **Enforced** — present in executable code and covered by tests.
+- **Convention** — the codebase follows it, but nothing structurally prevents a violation.
+- **Design** — intended contract, not fully implemented.
 
-Governance decisions are explicit.
-
----
-
-### Evidence
-
-Evidence records facts.
-
-Evidence is immutable.
-
-Evidence is append-only.
-
-Evidence is replayable.
+An invariant marked Convention or Design is a review standard, not a guarantee. Do not describe it in documentation as a shipped property.
 
 ---
 
-### Replay
+## Architectural Invariants
 
-Replay verifies execution.
+### Knowledge — Convention
 
-Replay never mutates evidence.
-
-Replay is deterministic.
+Generated knowledge is derived and never authoritative. Knowledge projections should be reproducible from their sources. This includes tool-generated agent hint files (`.claude/homunculus/instincts/`, `.claude/identity.json`, `.agents/skills/`), which are inputs, not contracts.
 
 ---
 
-### Resources
+### Governance — Convention
 
-Resources model addressable state.
+`RIFRuntime.execute_capability` (`src/rif_runtime/runtime.py:179`) evaluates policy before execution, records a denial with evidence, admits the capability, and appends completion evidence. That path is **Enforced** and tested (`tests/capabilities/test_governed_execution.py`).
 
-Resources are immutable.
+The boundary is the caller, not the kernel: `ExecutionKernel.execute` (`src/rif_runtime/execution/kernel.py:20`) performs no policy evaluation, and `Capability.execute` can be called directly. So "no execution path bypasses policy" is a **Convention** this skill enforces by review, not a structural property.
 
-Resources never perform provider work.
-
-Resources remain provider-independent.
+Reject any new production caller of `ExecutionKernel.execute()` or `Capability.execute()` that does not route through `execute_capability`.
 
 ---
 
-### Providers
+### Evidence — Enforced (append-only), Convention (immutability)
 
-Providers execute interactions.
+Evidence records facts and is written append-only through `JsonlStore` (`src/rif_runtime/storage/jsonl.py`). Append-only writing is Enforced by the store.
 
-Providers never own policy.
+Immutability is a **Convention**: nothing prevents another process from rewriting a JSONL file on disk. `src/rif_runtime/audit.py` provides hash-chain primitives that make tampering detectable, not impossible. Do not document evidence as "immutable" or "tamper-proof" — `docs/README.md` bars both words without a narrowly defined, supported claim.
 
-Providers never become authoritative.
+Reject edits-in-place, truncation, or rewrites of an evidence or decision log.
 
 ---
 
-### Documentation
+### Replay — Enforced (read-only), Convention (determinism)
 
-Documentation is generated.
+`src/rif_runtime/replay.py` reconstructs state from `decisions.jsonl` without writing back; read-only replay is Enforced.
 
-Documentation follows the authority ladder.
+Determinism holds for the recorded decision log and is exercised by `tests/test_runtime_restore.py` / `tests/test_runtime_restart.py`. State the property against those tests rather than as an unqualified guarantee.
 
-Generated documentation never replaces canonical sources.
+---
+
+### Resources — Convention
+
+Resources (`src/rif_runtime/resources/`) model addressable state, are treated as value objects, do not perform provider work, and stay provider-independent. This is a review standard, not a runtime-enforced property.
+
+---
+
+### Providers — Convention
+
+Providers execute interactions. Providers never own policy and never become authoritative. A provider credential is configuration; it is not a RIF authorization decision.
+
+---
+
+### Documentation — Convention
+
+Documentation follows the authority ladder in `docs/README.md`. Generated documentation never replaces canonical sources, and a lower-tier statement is never promoted into a higher-tier guarantee.
 
 ---
 
 ## Authority Ladder
 
-Runtime Constitution
+Executable implementation and tests (`src/`, `tests/`)
+
+↓
+
+Repository configuration and workflows
 
 ↓
 
@@ -182,6 +176,8 @@ Recommended Action
 
 ## Success Criteria
 
-Approve only changes that strengthen or preserve the Runtime Constitution.
+Record a passing verdict only for changes that strengthen or preserve these invariants. "Passing" here is a review finding, never a merge approval — see below.
 
 Protect long-term architectural coherence over short-term implementation speed.
+
+An approval from this skill is a review finding, not merge authorization. Ratifying or changing the governance rules themselves is a human decision.
