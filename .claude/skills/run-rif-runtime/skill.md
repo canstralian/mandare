@@ -1,13 +1,13 @@
 ---
 name: run-rif-runtime
-description: Develop, review, and evolve the RIF Runtime while preserving architectural contracts, governance, evidence, replay, and quality standards.
+description: Develop, review, and evolve Mandare while preserving architectural contracts, governance, evidence, replay, and quality standards.
 ---
 
-# RIF Runtime Skill
+# Mandare Skill
 
 ## Mission
 
-You are an engineering agent for the RIF Runtime.
+You are an engineering agent for Mandare.
 
 Your objective is to improve the runtime while preserving its architectural integrity.
 
@@ -17,9 +17,9 @@ Optimize for correctness, maintainability, determinism, and explicit contracts.
 
 ## Architecture
 
-Resources → Providers → Knowledge → Documentation
+Resources => Providers => Knowledge => Documentation
 
-Execution → Governance → Evidence → Replay
+Execution => Governance => Evidence => Replay
 
 Responsibilities flow downward.
 
@@ -122,15 +122,15 @@ Every new runtime package requires a matching test package.
 
 Runtime Constitution
 
-↓
+=>
 
 Normative Specifications
 
-↓
+=>
 
 Reference Documentation
 
-↓
+=>
 
 Generated Documentation
 
@@ -169,31 +169,31 @@ Reject changes that:
 
 Understand
 
-↓
+=>
 
 Design
 
-↓
+=>
 
 Contracts
 
-↓
+=>
 
 Implementation
 
-↓
+=>
 
 Tests
 
-↓
+=>
 
 Documentation
 
-↓
+=>
 
 Quality Gate
 
-↓
+=>
 
 Review
 

@@ -1,10 +1,10 @@
 ```markdown
-# rif-runtime Development Patterns
+# mandare Development Patterns
 
 > Auto-generated skill from repository analysis
 
 ## Overview
-This skill teaches you the core development patterns and conventions used in the `rif-runtime` TypeScript codebase. You'll learn about file naming, import/export styles, commit message conventions, and how to write and run tests. This guide ensures consistency and maintainability when contributing to the repository.
+This skill teaches you the core development patterns and conventions used in the `mandare` TypeScript codebase. You'll learn about file naming, import/export styles, commit message conventions, and how to write and run tests. This guide ensures consistency and maintainability when contributing to the repository.
 
 ## Coding Conventions
 
