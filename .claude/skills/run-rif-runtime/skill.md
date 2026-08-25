@@ -124,6 +124,10 @@ Executable implementation and tests (`src/`, `tests/`)
 
 ↓
 
+Repository configuration and workflows
+
+↓
+
 Normative Specifications
 
 ↓

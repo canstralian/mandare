@@ -135,7 +135,7 @@ Apply these when reviewing a diff in this repository. Each rule is anchored to c
 
 Consequences a reviewer must hold:
 
-- Wildcard rules are **not** inert. The shipped `deny_unknown_by_default` catch-all in `data/policies.json` and `DEFAULT_POLICIES` (`src/rif_runtime/configuration/policies.py:27`) is enforced — the effective default is **deny**, not allow. See `tests/test_policy_store.py:105` and `:205`.
+- Wildcard rules are **not** inert. The shipped `deny_unknown_by_default` catch-all in `data/policies.json` and `DEFAULT_POLICIES` (`src/rif_runtime/configuration/policies.py:27`) is enforced, so with the shipped ruleset the effective fallback is **deny**. The engine's own built-in fallback is still `default.allow` (step 5 above) — deny-by-default is a property of the shipped `policies.json`, not of `PolicyEngine.evaluate` called with no catch-all. Deleting the catch-all therefore silently restores allow-by-default. See `tests/test_policy_store.py:105` and `:205`.
 - Because the default denies what is not enumerated, the runtime's own first-party actions must be enumerated. `allow_run_create` backs `POST /v1/runs`; a change that deletes it silently 403s that endpoint.
 - Flag any change that moves a rule class across the boundary in step 2 vs step 4 without a test, and any change that assumes non-network action names are host-checked.
 
@@ -151,7 +151,9 @@ Posture escalates on denials (normal → elevated → restricted → locked) and
 - `ReadPlaneAuth` — inspection (`/v1/graph/summary`, `/v1/telemetry/summary`, `/v1/audit`, `/v1/persistence/summary`, `/v1/recovered-state`, `/v1/drift/recommend`, `/v1/policies`).
 - `IdentityId` (`api.py:84`) — Supabase JWT identity, used by `POST /v1/runs`.
 
-A new route with none of these is a finding unless it is deliberately public and the diff says why. Two existing routes are deliberately open: `/v1/mcp/invoke` is a **dry-run simulation** (`runtime.evaluate(req, record=False)`) so it cannot mutate posture or write the decision log — a change that makes it recording, or that adds another unauthenticated route which records, is blocking. Control-plane operations fail closed when no keys are configured; do not add a fallback that opens them.
+A new route with none of these is a finding unless it is deliberately public and the diff says why. `PUBLIC_ROUTES` (`tests/test_control_plane_auth.py:178`) is the authoritative inventory and the regression gate: every unguarded route must be named there with its reason, so consult it rather than re-deriving the list here.
+
+Two of those entries are deliberately open **and** carry a governance surface: `POST /v1/mcp/invoke` and `POST /v1/mcp/metasploit/evaluate`. Both are dry-run simulations (`record=False`, `api.py:156` and `api.py:175`), so neither can mutate posture or append to the stores; minting an actual Metasploit capability token goes through the guarded `POST /v1/mcp/metasploit/token`. Making either recording, or adding another unauthenticated route that records, is blocking. Control-plane operations fail closed when no keys are configured; do not add a fallback that opens them.
 
 ### 5. Persistence goes through the helpers
 

@@ -12,7 +12,11 @@ Executable implementation and tests (`src/`, `tests/`)
 
 ↓
 
-Specifications
+Repository configuration and workflows
+
+↓
+
+Normative Specifications
 
 ↓
 

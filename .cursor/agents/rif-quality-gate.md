@@ -74,7 +74,10 @@ repo-local gotchas that are easiest to get wrong.
   (`action == "*" and target == "*"`, `policy.py:69`) are applied last, after
   those constraints, so a broad allow cannot disable the host allowlist. The
   shipped `deny_unknown_by_default` catch-all in `data/policies.json` **is
-  enforced** — the effective default is deny, not allow
+  enforced** — with the shipped ruleset the effective fallback is deny.
+  The engine itself still falls back to `default.allow` when no catch-all is
+  configured, so treat deny-by-default as a property of `policies.json`:
+  a diff that removes the catch-all restores allow-by-default silently
   (`tests/test_policy_store.py:105`, `:205`). Flag any change that treats
   wildcards as inert, and any change that deletes `allow_run_create`, which is
   what keeps `POST /v1/runs` from 403-ing under deny-by-default.

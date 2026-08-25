@@ -103,7 +103,10 @@ Providers:
 
 - perform work
 - return results
-- emit receipts
+
+Receipt emission appears in provider design material but is **not implemented**
+(see *Not implemented* above). Do not review a provider change as though it
+emits receipts today.
 
 Providers never:
 
