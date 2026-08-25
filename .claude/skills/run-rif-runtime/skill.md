@@ -144,15 +144,18 @@ Generated documentation never becomes authoritative.
 
 ## Quality Gate
 
-Before completing work:
+Before completing work, run the merge-gate `verify` job order (see
+`.github/workflows/merge-gate.yml`):
 
-python -m compileall src
+```bash
+ruff check .
+ruff format --check .
+mypy src/rif_runtime --ignore-missing-imports
+pytest -q
+```
 
-pytest
-
-mypy src
-
-ruff check src tests
+`mypy src/ tests/` under strict settings is the separate advisory
+`typecheck-tests` job — it does not block a merge.
 
 ---
 

@@ -100,7 +100,7 @@ Posture can survive restart. Do not assume a new runtime instance means a clean 
 
 ## Security boundary
 
-Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured. Inspection routes use `ReadPlaneAuth`; `POST /v1/runs` uses Supabase JWT identity. `POST /v1/mcp/invoke` is deliberately unauthenticated *and* dry-run (`runtime.evaluate(req, record=False)`) — making it recording, or adding another unauthenticated route that records, is a security-boundary change.
+Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured. Inspection routes use `ReadPlaneAuth`; `POST /v1/runs` uses Supabase JWT identity. `PUBLIC_ROUTES` (`tests/test_control_plane_auth.py:178`) is the authoritative inventory of unguarded routes. Two of those entries also carry a governance surface and are deliberately dry-run: `POST /v1/mcp/invoke` and `POST /v1/mcp/metasploit/evaluate` (`record=False`, `api.py:156` and `api.py:175`). Making either recording, or adding another unauthenticated route that records, is a security-boundary change.
 
 The shipped default policy is deny-by-default: the `deny_unknown_by_default` catch-all in `data/policies.json` is enforced (`tests/test_policy_store.py:105`). Wildcard rules are not inert. First-party actions must stay enumerated — deleting `allow_run_create` silently 403s `POST /v1/runs`.
 

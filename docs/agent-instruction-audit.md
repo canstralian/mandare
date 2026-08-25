@@ -32,7 +32,7 @@ Before this audit no file declared precedence among these. `AGENTS.md` § Instru
 
 Implementation contradicts this. `PolicyEngine.evaluate` (`src/rif_runtime/policy.py:75`) runs selective rules most-specific-first via `ordered_rules` (`policy.py:54`), then environment constraints, then catch-alls via `catch_all_rules` (`policy.py:69`). The shipped `deny_unknown_by_default` catch-all in `data/policies.json` is enforced: `tests/test_policy_store.py:105` asserts `matched_rule == "policy.deny_unknown_by_default"`, and `:205` asserts a catch-all allow does not disable the host allowlist.
 
-With the shipped `data/policies.json` ruleset the effective fallback is **deny**. The qualifier matters: `PolicyEngine.evaluate` still ends in `default.allow` (`policy.py:150`) when no catch-all is configured, so deny-by-default is a property of the shipped ruleset rather than of the engine, and removing the catch-all restores allow-by-default silently. An agent following the stale text would have mis-reviewed policy changes in the direction of weakening deny-by-default. Fixed in `.cursor/agents/rif-quality-gate.md`; restated as Code Review Rule 2 in `AGENTS.md`.
+With the shipped `data/policies.json` ruleset the effective fallback is **deny**. The qualifier matters: `PolicyEngine.evaluate` still ends in `default.allow` (`policy.py:159`) when no catch-all is configured, so deny-by-default is a property of the shipped ruleset rather than of the engine, and removing the catch-all restores allow-by-default silently. An agent following the stale text would have mis-reviewed policy changes in the direction of weakening deny-by-default. Fixed in `.cursor/agents/rif-quality-gate.md`; restated as Code Review Rule 2 in `AGENTS.md`.
 
 ### F2 — Test isolation described backwards (blocking, fixed)
 
@@ -44,7 +44,7 @@ The same file described the runtime as having no external service. `src/rif_runt
 
 ### F4 — Validation command drift (fixed)
 
-Four different command sets were in circulation. The merge gate's `verify` job (`.github/workflows/merge-gate.yml`) runs `ruff check .` → `ruff format --check .` → `mypy src/rif_runtime --ignore-missing-imports` → `pytest -q`. `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md` listed `ruff check src tests`, which lints a narrower tree and can pass while the gate fails; the quality-gate skill listed a fourth ordering. `AGENTS.md`, `CLAUDE.md`, and the skill now carry the gate's own order and scope, and note that `typecheck-tests` is advisory. `CONTRIBUTING.md` is left as-is: it describes useful local checks for humans, not the gate.
+Four different command sets were in circulation. The merge gate's `verify` job (`.github/workflows/merge-gate.yml`) runs `ruff check .` → `ruff format --check .` → `mypy src/rif_runtime --ignore-missing-imports` → `pytest -q`. `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md` listed `ruff check src tests`, which lints a narrower tree and can pass while the gate fails; the quality-gate skill listed a fourth ordering. `AGENTS.md`, `CLAUDE.md`, `.cursor/agents/rif-quality-gate.md`, and `.claude/skills/run-rif-runtime/skill.md` now carry the gate's own order and scope, and note that `typecheck-tests` is advisory. `CONTRIBUTING.md`, `DEVELOPMENT.md`, and `TESTING.md` remain narrower on purpose: they describe useful local checks for humans, not the gate.
 
 ### F5 — Phantom "Runtime Constitution" (fixed)
 
