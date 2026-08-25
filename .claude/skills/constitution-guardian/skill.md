@@ -176,7 +176,7 @@ Recommended Action
 
 ## Success Criteria
 
-Approve only changes that strengthen or preserve these invariants.
+Record a passing verdict only for changes that strengthen or preserve these invariants. "Passing" here is a review finding, never a merge approval — see below.
 
 Protect long-term architectural coherence over short-term implementation speed.
 

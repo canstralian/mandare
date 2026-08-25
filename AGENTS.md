@@ -21,7 +21,9 @@ Several tools ship their own instruction files in this repository. When two disa
 
 There is no `Runtime Constitution` document in this repository. Instruction files that name one are referring to the authority ladder in `docs/README.md`; do not cite a constitution as though it were a readable artefact.
 
-Executable code and tests outrank every instruction file, including this one. An instruction that contradicts current code is a stale instruction — fix the instruction, and say so.
+Executable code, tests, and **repository configuration** — `.github/workflows/`, `pyproject.toml`, `requirements/` — outrank every instruction file, including this one. `docs/README.md` places repository configuration directly below implementation and tests for the same reason: it is executed, not asserted.
+
+So where an instruction describes what CI runs and the workflow disagrees, the workflow is correct. That is how finding F4 was resolved: these files said `ruff check src tests` while `merge-gate.yml` runs `ruff check .`, and the workflow won. An instruction that contradicts current code or configuration is a stale instruction — fix the instruction, and say so.
 
 ## Evidence-first rule
 

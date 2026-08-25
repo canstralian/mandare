@@ -168,7 +168,7 @@ Risk Assessment
 
 ## Success Criteria
 
-Approve only implementations that preserve explicit governance, append-only evidence, and replayability, and that keep the policy decision recorded alongside every governed effect.
+Record a passing verdict only for implementations that preserve explicit governance, append-only evidence, and replayability, and that keep the policy decision recorded alongside every governed effect. "Passing" here is a review finding, never a merge approval — see below.
 
 Distinguish what the change *implements* from what it *specifies*, and use the status vocabulary in `docs/README.md`.
 
