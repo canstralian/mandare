@@ -32,7 +32,7 @@ Before this audit no file declared precedence among these. `AGENTS.md` § Instru
 
 Implementation contradicts this. `PolicyEngine.evaluate` (`src/rif_runtime/policy.py:75`) runs selective rules most-specific-first via `ordered_rules` (`policy.py:54`), then environment constraints, then catch-alls via `catch_all_rules` (`policy.py:69`). The shipped `deny_unknown_by_default` catch-all in `data/policies.json` is enforced: `tests/test_policy_store.py:105` asserts `matched_rule == "policy.deny_unknown_by_default"`, and `:205` asserts a catch-all allow does not disable the host allowlist.
 
-With the shipped `data/policies.json` ruleset the effective fallback is **deny**. The qualifier matters: `PolicyEngine.evaluate` still ends in `default.allow` (`policy.py:150`) when no catch-all is configured, so deny-by-default is a property of the shipped ruleset rather than of the engine, and removing the catch-all restores allow-by-default silently. An agent following the stale text would have mis-reviewed policy changes in the direction of weakening deny-by-default. Fixed in `.cursor/agents/rif-quality-gate.md`; restated as Code Review Rule 2 in `AGENTS.md`.
+With the shipped `data/policies.json` ruleset the effective fallback is **deny**. The qualifier matters: `PolicyEngine.evaluate` still ends in `default.allow` (`policy.py:159`) when no catch-all is configured, so deny-by-default is a property of the shipped ruleset rather than of the engine, and removing the catch-all restores allow-by-default silently. An agent following the stale text would have mis-reviewed policy changes in the direction of weakening deny-by-default. Fixed in `.cursor/agents/rif-quality-gate.md`; restated as Code Review Rule 2 in `AGENTS.md`.
 
 ### F2 — Test isolation described backwards (blocking, fixed)
 
@@ -44,7 +44,7 @@ The same file described the runtime as having no external service. `src/rif_runt
 
 ### F4 — Validation command drift (fixed)
 
-Four different command sets were in circulation. The merge gate's `verify` job (`.github/workflows/merge-gate.yml`) runs `ruff check .` → `ruff format --check .` → `mypy src/rif_runtime --ignore-missing-imports` → `pytest -q`. `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md` listed `ruff check src tests`, which lints a narrower tree and can pass while the gate fails; the quality-gate skill listed a fourth ordering. `AGENTS.md`, `CLAUDE.md`, and the skill now carry the gate's own order and scope, and note that `typecheck-tests` is advisory. `CONTRIBUTING.md` is left as-is: it describes useful local checks for humans, not the gate.
+Four different command sets were in circulation. The merge gate's `verify` job (`.github/workflows/merge-gate.yml`) runs `ruff check .` → `ruff format --check .` → `mypy src/rif_runtime --ignore-missing-imports` → `pytest -q`. `AGENTS.md`, `CLAUDE.md`, and `CONTRIBUTING.md` listed `ruff check src tests`, which lints a narrower tree and can pass while the gate fails; the quality-gate skill listed a fourth ordering. `AGENTS.md`, `CLAUDE.md`, `.cursor/agents/rif-quality-gate.md`, and `.claude/skills/run-rif-runtime/skill.md` now carry the gate's own order and scope, and note that `typecheck-tests` is advisory. `CONTRIBUTING.md` is left as-is: it describes useful local checks for humans, not the gate. The Cursor-facing twin `.claude/skills/run-rif-runtime/SKILL.md` was outside this inventory (see Open items).
 
 ### F5 — Phantom "Runtime Constitution" (fixed)
 
@@ -80,12 +80,17 @@ These are not strictly contradictory — one grants capability, the other constr
 
 `.claude/identity.json` listed `domains: ["typescript"]` for a Python-only codebase; corrected to `python`. `.claude/homunculus/instincts/inherited/rif-runtime-instincts.yaml` derives commit-style rules from a stated sample of **one commit** (`confidence: 0.85`, "1 commits analyzed"). Left in place — it is a generated artefact and rewriting it by hand would misrepresent its provenance. Instead, `AGENTS.md` places these files at the bottom of the authority ladder as non-authoritative hints, which is the correct fix for a low-evidence generated input.
 
+## Open items
+
+- **Dual `run-rif-runtime` skill files.** This directory carries both Claude-plugin `skill.md` (audited above) and Cursor-facing `SKILL.md`. The audit inventory matched `*/skill.md` only, so `SKILL.md` was not reconciled: it still quotes a stale "147 tests pass" figure and documents a direct `PolicyEngine` + `ExecutionKernel` demo path (the intentional driver in `drive_capability_layer.py`) without pointing at `RIFRuntime.execute_capability` as the production governed entry. Treat as the same class of drift as F4/F7; out of scope for the tip leftovers fixed alongside this note.
+
 ## Not changed
 
 - **Workflows, branch protection, rulesets, CODEOWNERS** — outside an instruction-cleanup change and a human decision.
 - **Any security control** — no guard, key requirement, or default was relaxed. F1's correction *strengthens* the reviewer's model of the default policy.
 - **`spec/` contracts** — F7 is the one finding that would require a contract change; it is recorded here for review rather than implemented.
 - **`CONTRIBUTING.md`** — human-facing local checks, deliberately not rewritten into the CI gate.
+- **`.cursor/agents/provider-engineer.md`** — still lists "emit receipts" as a provider rule; same Receipts contradiction class as F6, outside the files this tip touches.
 
 ## Re-verification
 
