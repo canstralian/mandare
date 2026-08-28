@@ -32,7 +32,7 @@ def _read_version() -> str:
     try:
         from importlib.metadata import PackageNotFoundError, version
 
-        return version("rif-runtime")
+        return version("mandare")
     except PackageNotFoundError:
         pass
 
@@ -47,8 +47,7 @@ def _read_version() -> str:
     import warnings
 
     warnings.warn(
-        "rif-runtime: version could not be determined. "
-        "Run `pip install -e .` to fix this.",
+        "mandare: version could not be determined. Run `pip install -e .` to fix this.",
         RuntimeWarning,
         stacklevel=2,
     )
