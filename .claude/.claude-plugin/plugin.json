@@ -1,13 +1,13 @@
 {
-  "name": "rif-runtime",
-  "description": "Governed AI execution and engineering workflows for RIF Runtime, including architecture, constitutional governance, documentation, knowledge, provider analysis, release management, replay analysis, and runtime execution.",
+  "name": "mandare",
+  "description": "Governed AI execution and engineering workflows for Mandare, including architecture, constitutional governance, documentation, knowledge, provider analysis, release management, replay analysis, and runtime execution.",
   "version": "1.0.0",
   "author": {
     "name": "canstralian",
     "url": "https://github.com/canstralian"
   },
-  "homepage": "https://github.com/canstralian/rif-runtime",
-  "repository": "https://github.com/canstralian/rif-runtime",
+  "homepage": "https://github.com/canstralian/mandare",
+  "repository": "https://github.com/canstralian/mandare",
   "license": "MIT",
   "keywords": [
     "RIF",
