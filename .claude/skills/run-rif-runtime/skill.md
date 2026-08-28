@@ -17,9 +17,9 @@ Optimize for correctness, maintainability, determinism, and explicit contracts.
 
 ## Architecture
 
-Resources => Providers => Knowledge => Documentation
+Resources → Providers → Knowledge → Documentation
 
-Execution => Governance => Evidence => Replay
+Execution → Governance → Evidence → Replay
 
 Responsibilities flow downward.
 
@@ -122,15 +122,15 @@ Every new runtime package requires a matching test package.
 
 Runtime Constitution
 
-=>
+↓
 
 Normative Specifications
 
-=>
+↓
 
 Reference Documentation
 
-=>
+↓
 
 Generated Documentation
 
@@ -169,31 +169,31 @@ Reject changes that:
 
 Understand
 
-=>
+↓
 
 Design
 
-=>
+↓
 
 Contracts
 
-=>
+↓
 
 Implementation
 
-=>
+↓
 
 Tests
 
-=>
+↓
 
 Documentation
 
-=>
+↓
 
 Quality Gate
 
-=>
+↓
 
 Review
 
