@@ -47,7 +47,7 @@ jobs:
           # load, not just build: the smoke step needs the image in the local
           # daemon. A cache-only build would leave nothing to run.
           load: true
-          tags: rif-runtime:ci
+          tags: mandare:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -62,7 +62,7 @@ jobs:
           echo "SMOKE_KEY=${key}" >> "$GITHUB_ENV"
           docker run -d --name rif-smoke -p 8000:8000 \
             -e RIF_CONTROL_PLANE_API_KEYS="${key}" \
-            rif-runtime:ci
+            mandare:ci
           # Poll rather than sleep a fixed interval: the start-up cost of the
           # image is not a constant worth guessing at.
           for attempt in $(seq 1 30); do
@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           # Guards the HEALTHCHECK added alongside the pinned install: an
           # orchestrator with no health signal only knows the process is up.
-          test "$(docker inspect --format '{{if .Config.Healthcheck}}yes{{else}}no{{end}}' rif-runtime:ci)" = "yes" \
+          test "$(docker inspect --format '{{if .Config.Healthcheck}}yes{{else}}no{{end}}' mandare:ci)" = "yes" \
             || { echo "::error::image declares no HEALTHCHECK"; exit 1; }
 
       - name: Container logs

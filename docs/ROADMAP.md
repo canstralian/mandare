@@ -1,8 +1,8 @@
-# RIF Runtime Roadmap
+# Mandare Roadmap
 
 ## North star
 
-RIF Runtime aims to make the boundary between **intent** and **authority** explicit, testable, and reviewable.
+Mandare aims to make the boundary between **intent** and **authority** explicit, testable, and reviewable.
 
 The model may propose. The runtime evaluates. A governed system records what decision was made and why.
 
@@ -20,7 +20,7 @@ This is a roadmap, not a statement that every item below exists today.
 | Audit hash-chain primitives | Implemented as a library surface |
 | MCP governance surfaces | Implemented in current scope |
 | Capability identity/admission contract | Implemented first vertical slice |
-| Governed capability execution | Implemented through `RIFRuntime.execute_capability()` |
+| Governed capability execution | Implemented through `MandareRuntime.execute_capability()` |
 | Remote provider authorization seam | Specification work / gated |
 | Unified EvidenceRecord contract | Specification/design |
 | Signed skill/artifact verification | Planned |
@@ -114,7 +114,7 @@ A public demonstration can show the governance thesis without becoming a product
 
 ## Non-goals
 
-The roadmap does not seek to make RIF:
+The roadmap does not seek to make Mandare:
 
 - an autonomous agent framework;
 - an implicit approval layer for model output;

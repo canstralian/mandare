@@ -1,13 +1,13 @@
-from rif_runtime.config import reset_settings
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import PolicyRequest, Posture
+from mandare.config import reset_settings
+from mandare.runtime import MandareRuntime
+from mandare.schemas import PolicyRequest, Posture
 
 
 def test_locked_posture_survives_restart(tmp_path, monkeypatch):
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
     reset_settings()
     try:
-        r1 = RIFRuntime()
+        r1 = MandareRuntime()
         req = PolicyRequest(
             actor="agent:test",
             action="http.request",
@@ -20,7 +20,7 @@ def test_locked_posture_survives_restart(tmp_path, monkeypatch):
         # Simulate a restart: clear the settings cache and build a fresh runtime
         # backed by the same data directory.
         reset_settings()
-        r2 = RIFRuntime()
+        r2 = MandareRuntime()
         assert r2.posture == Posture.locked
     finally:
         reset_settings()

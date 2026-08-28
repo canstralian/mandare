@@ -1,6 +1,6 @@
 ---
 name: documentation-engine
-description: Generate, validate, and maintain RIF documentation from canonical sources while preserving authority, provenance, and evidence.
+description: Generate, validate, and maintain Mandare documentation from canonical sources while preserving authority, provenance, and evidence.
 ---
 
 # Documentation Engine

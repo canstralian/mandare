@@ -1,4 +1,4 @@
-# RIF Runtime — Data Model Proposal
+# Mandare — Data Model Proposal
 
 > **Status: draft design.** This document describes a possible relational/Supabase persistence model. It is **not** the schema of the current default runtime and must not be used as evidence that the proposed tables, RLS policies, migrations, or invariants are implemented.
 

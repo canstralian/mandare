@@ -2,16 +2,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from rif_runtime.governance.posture import escalate_posture
-from rif_runtime.mcp.capabilities import CapabilityClass, classify, contract_hash
-from rif_runtime.mcp.corpus import run_benchmark
-from rif_runtime.mcp.metasploit import (
+from mandare.governance.posture import escalate_posture
+from mandare.mcp.capabilities import CapabilityClass, classify, contract_hash
+from mandare.mcp.corpus import run_benchmark
+from mandare.mcp.metasploit import (
     CapabilityToken,
     GovernanceMode,
     MetasploitGovernor,
     MetasploitIntent,
 )
-from rif_runtime.schemas import Posture
+from mandare.schemas import Posture
 
 
 @pytest.fixture

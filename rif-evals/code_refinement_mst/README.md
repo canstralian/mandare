@@ -1,23 +1,23 @@
 # code_refinement_mst
 
-This evaluation measures how long an agent preserves functional correctness while RIF governs repeated refinement instructions against a solution.
+This evaluation measures how long an agent preserves functional correctness while Mandare governs repeated refinement instructions against a solution.
 
 The evaluation treats refinement as a governed loop rather than a one-shot generation task:
 
 ```text
 generation
-  -> RIF policy evaluation
+  -> Mandare policy evaluation
   -> candidate verification
   -> regression classification
   -> recorded governance result
   -> next turn / stop
 ```
 
-## Metric: MST-RIF
+## Metric: MST-Mandare
 
 **Mean Sustainable Turns before the first verified regression.**
 
-Higher MST-RIF means the evaluated agent preserved the task's tested behaviour for more refinement turns before the first verified regression.
+Higher MST-Mandare means the evaluated agent preserved the task's tested behaviour for more refinement turns before the first verified regression.
 
 Any numeric result in generated reports is an experiment result, not a project-wide model-quality claim. Do not copy sample results into release or marketing documentation without identifying the exact task set, model, harness version, and run.
 
@@ -36,7 +36,7 @@ reports/              generated reports (gitignored)
 ```text
 task
   -> agent generates/refines candidate
-  -> RIFRuntime evaluates refinement request
+  -> MandareRuntime evaluates refinement request
   -> sandbox runner verifies candidate
   -> regression becomes a recorded governance result
   -> score_session()
@@ -56,7 +56,7 @@ For harness-only testing, `ScriptedAgent` is used by the repository's tests to e
 
 ## Required policy
 
-The harness gates every refinement turn through `RIFRuntime.evaluate()` with
+The harness gates every refinement turn through `MandareRuntime.evaluate()` with
 `action="code.refine"`. The default policy denies by default, so the runtime you
 hand the harness must carry a rule permitting that action, or every turn is
 returned as `blocked`:

@@ -1,6 +1,6 @@
-# Cursor CLI hardening for RIF Runtime
+# Cursor CLI hardening for Mandare
 
-This directory documents the **RIF-optimized local Cursor Agent CLI** baseline.
+This directory documents the **Mandare-optimized local Cursor Agent CLI** baseline.
 Project-scoped files live under `.cursor/`; the global template is copied to the
 operator's machine.
 
@@ -41,7 +41,7 @@ cp docs/cursor/cli-config.json.example ~/.cursor/cli-config.json
    enabled with network limited to config + defaults).
 
 4. Default CLI mode is Agent (`defaultBehavior: agent` is implicit). Prefer
-   Plan/Ask when exploring; keep Max Mode off for routine RIF work.
+   Plan/Ask when exploring; keep Max Mode off for routine Mandare work.
 
 ## Schema mapping notes
 

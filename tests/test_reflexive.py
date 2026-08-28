@@ -1,9 +1,9 @@
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import PolicyRequest
+from mandare.runtime import MandareRuntime
+from mandare.schemas import PolicyRequest
 
 
 def test_reflexive_escalates_after_three_denials():
-    r = RIFRuntime()
+    r = MandareRuntime()
     for i in range(3):
         r.evaluate(
             PolicyRequest(
@@ -16,7 +16,7 @@ def test_reflexive_escalates_after_three_denials():
 
 
 def test_graph_records_decisions():
-    r = RIFRuntime()
+    r = MandareRuntime()
     r.evaluate(
         PolicyRequest(
             actor="agent:test",

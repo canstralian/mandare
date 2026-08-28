@@ -10,4 +10,4 @@ For the generated request/response schemas, run the service and use:
 - `/redoc` — ReDoc;
 - `/openapi.json` — OpenAPI document.
 
-Do not infer that a route exists from a specification, roadmap, or historical example. `src/rif_runtime/api.py` is the implementation source of truth.
+Do not infer that a route exists from a specification, roadmap, or historical example. `src/mandare/api.py` is the implementation source of truth.

@@ -8,7 +8,7 @@ action to be independently verifiable later.
 privacy-redacted, chained passive observation event, and is the seed contract for
 this directory.
 
-Runtime implementation: `src/rif_runtime/audit.py`.
+Runtime implementation: `src/mandare/audit.py`.
 
 ## Next slice
 Per ADR-0008, evidence should become a system (ledger, recorder, validators,

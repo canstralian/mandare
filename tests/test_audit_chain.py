@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from rif_runtime.audit import GENESIS_HASH, append_record, verify_chain
-from rif_runtime.configuration.policies import PolicyRule
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import PolicyRequest
-from rif_runtime.storage.jsonl import CHAIN_KEY, HashChainedJsonlStore, JsonlStore
+from mandare.audit import GENESIS_HASH, append_record, verify_chain
+from mandare.configuration.policies import PolicyRule
+from mandare.runtime import MandareRuntime
+from mandare.schemas import PolicyRequest
+from mandare.storage.jsonl import CHAIN_KEY, HashChainedJsonlStore, JsonlStore
 
 
 def test_empty_chain_is_valid():
@@ -105,8 +105,8 @@ def _decision(target: str = "https://api.anthropic.com") -> PolicyRequest:
     return PolicyRequest(actor="agent:test", action="http.request", target=target)
 
 
-def _allowing_runtime(tmp_path) -> RIFRuntime:
-    runtime = RIFRuntime(data_dir=tmp_path)
+def _allowing_runtime(tmp_path) -> MandareRuntime:
+    runtime = MandareRuntime(data_dir=tmp_path)
     runtime.policy_store.upsert(
         PolicyRule(
             id="allow_test_traffic",
@@ -251,7 +251,9 @@ def test_tampering_with_a_recorded_decision_is_detected(tmp_path):
     rows[0]["actor"] = "agent:someone-else"
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
 
-    assert RIFRuntime(data_dir=tmp_path).verify_decision_chain()["verified"] is False
+    assert (
+        MandareRuntime(data_dir=tmp_path).verify_decision_chain()["verified"] is False
+    )
 
 
 def test_audit_summary_reports_chain_state(tmp_path):
@@ -265,16 +267,16 @@ def test_audit_summary_reports_chain_state(tmp_path):
 
 # --- concurrent writers ------------------------------------------------------
 #
-# `rif check` builds its own RIFRuntime against the same RIF_DATA_DIR as a
+# `rif check` builds its own MandareRuntime against the same RIF_DATA_DIR as a
 # running `rif serve`, so two processes appending to one decision log is
 # ordinary use. Caching the tail hash for an object's lifetime forked the chain
 # the moment that happened, and a forked chain reads as tampering forever.
 
 
 def test_two_runtimes_interleaving_appends_keep_one_chain(tmp_path):
-    """The in-process case: two RIFRuntime objects over the same directory."""
+    """The in-process case: two MandareRuntime objects over the same directory."""
     first = _allowing_runtime(tmp_path)
-    second = RIFRuntime(data_dir=tmp_path)
+    second = MandareRuntime(data_dir=tmp_path)
 
     first.evaluate(_decision("https://a.example.com"))
     second.evaluate(_decision("https://b.example.com"))
@@ -316,7 +318,7 @@ def test_separate_processes_appending_concurrently_keep_one_chain(tmp_path):
     writer.write_text(
         "import sys\n"
         "sys.path.insert(0, sys.argv[3])\n"
-        "from rif_runtime.storage.jsonl import HashChainedJsonlStore\n"
+        "from mandare.storage.jsonl import HashChainedJsonlStore\n"
         "store = HashChainedJsonlStore(sys.argv[1])\n"
         "for i in range(40):\n"
         "    store.append({'writer': sys.argv[2], 'i': i})\n",
@@ -529,7 +531,7 @@ def test_readers_never_observe_a_half_written_row(tmp_path):
     writer = textwrap.dedent(f"""
         import sys
         sys.path.insert(0, {str(Path(__file__).resolve().parents[1] / "src")!r})
-        from rif_runtime.storage.jsonl import HashChainedJsonlStore
+        from mandare.storage.jsonl import HashChainedJsonlStore
 
         store = HashChainedJsonlStore({str(path)!r})
         for index in range(40):

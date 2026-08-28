@@ -8,8 +8,8 @@ and what a decision record must contain to be auditable.
 posture-decision shape (allow/deny/adapt + rationale) and is the seed contract for
 this directory.
 
-Runtime implementation: `src/rif_runtime/governance/posture.py`,
-`src/rif_runtime/governance/reflexive.py`, `src/rif_runtime/policy.py`.
+Runtime implementation: `src/mandare/governance/posture.py`,
+`src/mandare/governance/reflexive.py`, `src/mandare/policy.py`.
 
 ## Next slice
 Extract `admission`, `permissions`, `approvals`, `trust`, `signatures`, `sandbox`,

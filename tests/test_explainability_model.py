@@ -1,5 +1,5 @@
-from rif_runtime.explainability import DecisionExplanation
-from rif_runtime.schemas import Decision, PolicyDecision, PolicyRequest, Posture
+from mandare.explainability import DecisionExplanation
+from mandare.schemas import Decision, PolicyDecision, PolicyRequest, Posture
 
 
 def test_decision_explanation_captures_causal_path():
@@ -13,7 +13,7 @@ def test_decision_explanation_captures_causal_path():
         actor=request.actor,
         action=request.action,
         target=request.target,
-        environment="RIF_Runtime",
+        environment="Mandare",
         posture=Posture.normal,
         reason="host denied: blocked.example.com",
         matched_rule="network.host.denied",

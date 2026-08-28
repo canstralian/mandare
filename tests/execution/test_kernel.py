@@ -1,8 +1,8 @@
-from rif_runtime.capabilities.echo import EchoCapability
-from rif_runtime.capabilities.registry import CapabilityRegistry
-from rif_runtime.execution.kernel import ExecutionKernel
-from rif_runtime.execution.manifest import ExecutionManifest
-from rif_runtime.execution.result import ExecutionStatus
+from mandare.capabilities.echo import EchoCapability
+from mandare.capabilities.registry import CapabilityRegistry
+from mandare.execution.kernel import ExecutionKernel
+from mandare.execution.manifest import ExecutionManifest
+from mandare.execution.result import ExecutionStatus
 
 
 def test_execution_kernel_executes_echo_capability() -> None:

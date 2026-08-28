@@ -1,4 +1,4 @@
-"""MST-RIF scoring: mean sustainable turns before the first verified regression."""
+"""MST-Mandare scoring: mean sustainable turns before the first verified regression."""
 
 from __future__ import annotations
 

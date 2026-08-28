@@ -2,8 +2,8 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from rif_runtime.api import app
-from rif_runtime.auth import ENV_VAR, READ_AUTH_ENV_VAR
+from mandare.api import app
+from mandare.auth import ENV_VAR, READ_AUTH_ENV_VAR
 
 client = TestClient(app)
 
@@ -202,7 +202,7 @@ PUBLIC_ROUTES = {
 
 
 def _declared_routes():
-    from rif_runtime.api import app as api_app
+    from mandare.api import app as api_app
 
     seen = set()
     for route in api_app.routes:
@@ -217,8 +217,8 @@ def _declared_routes():
 def _guarded_routes():
     from fastapi.routing import APIRoute
 
-    from rif_runtime.api import app as api_app
-    from rif_runtime.auth import require_api_key, require_read_api_key
+    from mandare.api import app as api_app
+    from mandare.auth import require_api_key, require_read_api_key
 
     guards = {require_api_key, require_read_api_key}
     seen = set()
@@ -272,7 +272,7 @@ def test_a_non_ascii_configured_key_does_not_break_the_guard(monkeypatch):
 
 def test_a_non_ascii_candidate_reaches_the_guard_without_raising(monkeypatch):
     """Same property at the unit boundary, where HTTP encoding cannot mask it."""
-    from rif_runtime.auth import require_api_key
+    from mandare.auth import require_api_key
 
     # monkeypatch, not os.environ: setting it directly and deleting in a finally
     # clears any RIF_CONTROL_PLANE_API_KEYS the test process already had, for
@@ -296,7 +296,7 @@ def test_api_keys_are_not_run_through_a_fast_hash(monkeypatch):
     import ast
     import inspect
 
-    from rif_runtime import auth
+    from mandare import auth
 
     tree = ast.parse(inspect.getsource(auth))
     hashing = {"hashlib", "md5", "sha1", "sha256", "sha512", "blake2b"}

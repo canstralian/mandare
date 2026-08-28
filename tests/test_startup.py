@@ -12,8 +12,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from rif_runtime.config import ConfigError, RifSettings
-from rif_runtime.startup import config_lifespan
+from mandare.config import ConfigError, RifSettings
+from mandare.startup import config_lifespan
 
 
 def _app() -> FastAPI:
@@ -39,7 +39,7 @@ def test_startup_aborts_on_invalid_configuration(monkeypatch: pytest.MonkeyPatch
     def _raise() -> RifSettings:
         raise ConfigError("unknown key: rif_totally_made_up")
 
-    monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)
+    monkeypatch.setattr("mandare.startup.get_settings", _raise)
 
     with pytest.raises(ConfigError, match="rif_totally_made_up"):
         with TestClient(_app()):
@@ -50,7 +50,7 @@ def test_failed_startup_leaves_no_settings_on_state(monkeypatch: pytest.MonkeyPa
     def _raise() -> RifSettings:
         raise ConfigError("bad config")
 
-    monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)
+    monkeypatch.setattr("mandare.startup.get_settings", _raise)
     app = _app()
 
     with pytest.raises(ConfigError):
@@ -66,9 +66,9 @@ def test_startup_failure_is_logged_critical(
     def _raise() -> RifSettings:
         raise ConfigError("bad config")
 
-    monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)
+    monkeypatch.setattr("mandare.startup.get_settings", _raise)
 
-    with caplog.at_level("CRITICAL", logger="rif_runtime.startup"):
+    with caplog.at_level("CRITICAL", logger="mandare.startup"):
         with pytest.raises(ConfigError):
             with TestClient(_app()):
                 pass
@@ -89,7 +89,7 @@ def test_startup_logs_a_secret_safe_summary():
 
 def test_startup_runs_for_the_real_api_app():
     """The wiring in api.py is what actually matters."""
-    from rif_runtime.api import app as api_app
+    from mandare.api import app as api_app
 
     with TestClient(api_app):
         assert isinstance(api_app.state.settings, RifSettings)
@@ -107,7 +107,7 @@ def test_no_module_calls_the_deprecated_on_event_hook():
 
     root = Path(__file__).resolve().parent.parent
     offenders = []
-    for path in (root / "src" / "rif_runtime").rglob("*.py"):
+    for path in (root / "src" / "mandare").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if (
@@ -124,12 +124,12 @@ def test_no_module_calls_the_deprecated_on_event_hook():
 #
 # The tests above exercise a bare FastAPI app or a monkeypatched get_settings.
 # Neither covers the path that actually runs in production: api.py builds a
-# module-level RIFRuntime(), which loads configuration, so an invalid rif.toml
+# module-level MandareRuntime(), which loads configuration, so an invalid rif.toml
 # raises during *import* and no lifespan handler ever runs.
 
 
 def test_validate_config_returns_settings_when_valid():
-    from rif_runtime.startup import validate_config
+    from mandare.startup import validate_config
 
     assert isinstance(validate_config(), RifSettings)
 
@@ -137,14 +137,14 @@ def test_validate_config_returns_settings_when_valid():
 def test_validate_config_logs_critical_and_reraises(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ):
-    from rif_runtime.startup import validate_config
+    from mandare.startup import validate_config
 
     def _raise() -> RifSettings:
         raise ConfigError("unknown key: rif_totally_made_up")
 
-    monkeypatch.setattr("rif_runtime.startup.get_settings", _raise)
+    monkeypatch.setattr("mandare.startup.get_settings", _raise)
 
-    with caplog.at_level("CRITICAL", logger="rif_runtime.startup"):
+    with caplog.at_level("CRITICAL", logger="mandare.startup"):
         with pytest.raises(ConfigError):
             validate_config()
 
@@ -154,17 +154,17 @@ def test_validate_config_logs_critical_and_reraises(
 
 
 def test_api_module_validates_config_before_building_the_runtime():
-    """Order matters: RIFRuntime() loads config, so validation must precede it.
+    """Order matters: MandareRuntime() loads config, so validation must precede it.
 
     Asserted structurally rather than by importing under a broken config, which
     would need a subprocess and a temporary cwd. The call has to come before
-    `runtime = RIFRuntime()` or it reports nothing.
+    `runtime = MandareRuntime()` or it reports nothing.
     """
     import ast
     from pathlib import Path
 
     source = (
-        Path(__file__).resolve().parent.parent / "src" / "rif_runtime" / "api.py"
+        Path(__file__).resolve().parent.parent / "src" / "mandare" / "api.py"
     ).read_text(encoding="utf-8")
 
     # ast.walk, not a scan of module.body: the runtime construction lives
@@ -186,6 +186,6 @@ def test_api_module_validates_config_before_building_the_runtime():
     assert validate_line is not None, "api.py does not call validate_config() at import"
     assert runtime_line is not None, "api.py no longer builds a module-level runtime"
     assert validate_line < runtime_line, (
-        "validate_config() must run before RIFRuntime() is constructed, "
+        "validate_config() must run before MandareRuntime() is constructed, "
         "otherwise config errors surface as a bare traceback from config.py"
     )

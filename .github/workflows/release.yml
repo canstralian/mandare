@@ -37,7 +37,7 @@ jobs:
       # declares. Without it a v0.4.0 tag can ship a 0.3.0 artefact.
       - name: Assert tag matches package version
         run: |
-          version="$(python -c 'import importlib.metadata as m; print(m.version("rif-runtime"))')"
+          version="$(python -c 'import importlib.metadata as m; print(m.version("mandare"))')"
           tag="${GITHUB_REF_NAME#v}"
           echo "tag=${tag} package=${version}"
           if [ "$tag" != "$version" ]; then
@@ -48,7 +48,7 @@ jobs:
       - name: Verify
         run: |
           ruff check src tests
-          mypy src/rif_runtime --ignore-missing-imports
+          mypy src/mandare --ignore-missing-imports
           pytest -q
           rif replay
 

@@ -1,6 +1,6 @@
 # Specification Review — Capability Snapshot Authority
 
-**Repository:** canstralian/rif-runtime
+**Repository:** canstralian/mandare
 **Governs:** the binding between an observed external capability catalog and an authorized run
 **Status:** `Draft` — open for review. No implementation is authorized by this document.
 **Document Lifecycle:** `Draft` (current) → `Approved Pending Governance Completion` → `Ratified` → `Superseded`
@@ -18,7 +18,7 @@ artifacts carrying `ttlMs` and `cacheScope`, with a deterministic order. Nothing
 in the specification guarantees that a server's advertised capabilities — or the
 implementation behind a stable capability name — remain fixed over time.
 
-RIF's guarantee is that a decision is explainable and replayable. That guarantee
+Mandare's guarantee is that a decision is explainable and replayable. That guarantee
 is only meaningful if we can say *what the decision was made against*. Today we
 cannot, for any remotely-sourced capability.
 
@@ -32,7 +32,7 @@ This review exists to answer one question normatively:
 
 The gap is concrete, not hypothetical.
 
-`PolicyEngine.evaluate()` (`src/rif_runtime/policy.py:40`) has this signature:
+`PolicyEngine.evaluate()` (`src/mandare/policy.py:40`) has this signature:
 
 ```text
 evaluate(req, env_name, profile, posture, policy_rules) -> PolicyDecision
@@ -41,7 +41,7 @@ evaluate(req, env_name, profile, posture, policy_rules) -> PolicyDecision
 **No capability observation is an input.** A decision is computed entirely from
 the request, local environment config, posture, and locally-stored rules. There
 is presently no parameter through which a remote catalog observation *could*
-bind, and `PolicyDecision` (`src/rif_runtime/schemas.py:29`) carries no field
+bind, and `PolicyDecision` (`src/mandare/schemas.py:29`) carries no field
 referencing one — `matched_rule` identifies the rule, not the observed world the
 rule was applied to.
 
@@ -133,7 +133,7 @@ and
 A capability catalog change *is* a change of authority. Therefore it produces a
 new `Decision` by the already-ratified rule, with no new machinery.
 
-**A new authorization epoch is a new `Decision`. RIF should not introduce
+**A new authorization epoch is a new `Decision`. Mandare should not introduce
 "epoch" as a distinct term.**
 
 ### 3.2 The brief's hard case, resolved
@@ -190,16 +190,16 @@ This makes snapshot-id stability load-bearing, which raises §4.3.
 ### 4.3 Canonicalization MUST NOT depend on server-supplied ordering
 
 MCP `2026-07-28` specifies deterministic list ordering. That is a *specification
-requirement on servers*, not a property RIF can verify, and RIF's threat model
+requirement on servers*, not a property Mandare can verify, and Mandare's threat model
 already treats server-supplied metadata as untrusted.
 
 - [x] **Resolved — Normative.** Snapshot canonicalization MUST be order-independent
-  on the RIF side: entries are sorted by RIF before hashing, using
+  on the Mandare side: entries are sorted by Mandare before hashing, using
   **RFC8785-JCS** canonicalization, consistent with the existing `integrity` block
   in `spec/capability/capability_manifest.schema.json` and with the sorted-set
   hashing already used by `mcp/capabilities.py:contract_hash()`.
 
-If RIF hashed the server's ordering directly, a server could force spurious
+If Mandare hashed the server's ordering directly, a server could force spurious
 re-authorizations — or, worse, a benign reordering could mask a material change
 by producing churn that operators learn to ignore.
 
@@ -214,7 +214,7 @@ by producing churn that operators learn to ignore.
   | Field | In hash? | Why |
   | --- | --- | --- |
   | Tool/resource name, description, input schema, annotations | **Yes** | This *is* the capability being authorized against. |
-  | `generated_at` / observation timestamp | **No** | Records when RIF observed, not what was observed; including it would make every re-observation produce a new id even with no change. |
+  | `generated_at` / observation timestamp | **No** | Records when Mandare observed, not what was observed; including it would make every re-observation produce a new id even with no change. |
   | `ttlMs` | **No** | Freshness metadata (§4.1) — a re-observation trigger, not part of identity. |
   | `cacheScope` | **No** | Governs *reuse eligibility* of the snapshot (§4.4), not its content. Recorded as sibling metadata on the snapshot record. |
   | `content_hash` (existing `ResourceSnapshot` field) | N/A | This table defines what feeds *into* that hash for a capability snapshot specifically. |
@@ -236,8 +236,8 @@ by producing churn that operators learn to ignore.
   hint: it bears on whether one observation may be reused as the authorization
   basis for a different actor, environment, or identity. Proposed default —
   **snapshots are never shared across environment profiles**, and a `cacheScope`
-  narrower than the reuse RIF intends MUST force re-observation. Needs a concrete
-  mapping from the spec's `cacheScope` values to RIF's environment/identity model
+  narrower than the reuse Mandare intends MUST force re-observation. Needs a concrete
+  mapping from the spec's `cacheScope` values to Mandare's environment/identity model
   before ratification.
 
 ### 4.5 Absent observation
@@ -281,7 +281,7 @@ a second probabilistic subsystem. If a score could re-enter execution, replay
 would stop being a function of recorded history.
 
 This section defines **vocabulary and a prohibition**. It does not authorize an
-evaluation subsystem, and RIF has none. Its purpose is to make a future
+evaluation subsystem, and Mandare has none. Its purpose is to make a future
 evaluation layer unable to contaminate execution replay by construction, and to
 give reviewers a citable line when one is proposed.
 
@@ -298,7 +298,7 @@ Replay   = reconstruct history      (read-only, deterministic, no effects)
 Recovery = continue execution       (may produce new Executions and new effects)
 ```
 
-Current state: `src/rif_runtime/replay.py` rebuilds graph and posture from
+Current state: `src/mandare/replay.py` rebuilds graph and posture from
 `decisions.jsonl` and is correctly read-only. Nothing presently documents that
 this is a *requirement* rather than an implementation detail, which is exactly
 how such boundaries erode — a future "resume from replay" convenience would look
@@ -352,7 +352,7 @@ A conforming implementation of this contract MUST:
 
 ## 9. Open decisions
 
-- **OD-C1.** `cacheScope` → RIF environment/identity mapping (§4.4). The floor
+- **OD-C1.** `cacheScope` → Mandare environment/identity mapping (§4.4). The floor
   rule (no cross-actor/cross-environment reuse) is already normative and binds
   regardless of how this resolves; only the precise mapping is open.
 - **OD-C2.** Snapshot scope granularity: one snapshot per MCP server, or one

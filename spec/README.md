@@ -1,8 +1,8 @@
 # Specification and Contract Tree
 
-`spec/` contains versioned contract material for RIF/AgentOS. Specifications are **not automatically implementation guarantees**. A schema may be seeded, drafted, placeholder, approved, or implemented only in part.
+`spec/` contains versioned contract material for Mandare/AgentOS. Specifications are **not automatically implementation guarantees**. A schema may be seeded, drafted, placeholder, approved, or implemented only in part.
 
-The Python runtime under `src/rif_runtime/` is the source of truth for shipped behaviour. A specification becomes an implementation contract only when its status, tests, and integration path make that relationship explicit.
+The Python runtime under `src/mandare/` is the source of truth for shipped behaviour. A specification becomes an implementation contract only when its status, tests, and integration path make that relationship explicit.
 
 ## Contract domains
 

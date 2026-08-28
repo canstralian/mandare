@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "rif-runtime-marketplace",
-  "description": "RIF Runtime plugins for governed AI execution, architecture, governance, security, knowledge, replay, documentation, provider analysis, and release operations.",
+  "name": "mandare-marketplace",
+  "description": "Mandare plugins for governed AI execution, architecture, governance, security, knowledge, replay, documentation, provider analysis, and release operations.",
   "version": "1.0.0",
   "owner": {
     "name": "canstralian",
@@ -9,14 +9,14 @@
   },
   "plugins": [
     {
-      "name": "rif-runtime",
-      "displayName": "RIF Runtime",
-      "description": "A governed Claude Code plugin for working with RIF Runtime architecture, constitutional governance, documentation, knowledge, provider analysis, release management, replay analysis, and runtime execution.",
+      "name": "mandare",
+      "displayName": "Mandare",
+      "description": "A governed Claude Code plugin for working with Mandare architecture, constitutional governance, documentation, knowledge, provider analysis, release management, replay analysis, and runtime execution.",
       "version": "1.0.0",
       "source": "./.claude",
       "category": "development",
       "tags": [
-        "rif-runtime",
+        "mandare",
         "governance",
         "ai-agents",
         "architecture",
@@ -28,7 +28,7 @@
         "knowledge"
       ],
       "keywords": [
-        "RIF",
+        "Mandare",
         "runtime",
         "governance",
         "AI agents",
@@ -37,8 +37,8 @@
         "observability",
         "replay"
       ],
-      "homepage": "https://github.com/canstralian/rif-runtime",
-      "repository": "https://github.com/canstralian/rif-runtime",
+      "homepage": "https://github.com/canstralian/mandare",
+      "repository": "https://github.com/canstralian/mandare",
       "license": "MIT",
       "author": {
         "name": "canstralian",

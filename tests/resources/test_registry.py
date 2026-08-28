@@ -1,15 +1,15 @@
 import pytest
 
-from rif_runtime.resources.descriptor import (
+from mandare.resources.descriptor import (
     ResourceCapabilityDescriptor,
     ResourceEffect,
 )
-from rif_runtime.resources.exceptions import (
+from mandare.resources.exceptions import (
     DuplicateResourceCapabilityError,
     UnknownResourceCapabilityError,
 )
-from rif_runtime.resources.identity import ResourceKind
-from rif_runtime.resources.registry import ResourceCapabilityRegistry
+from mandare.resources.identity import ResourceKind
+from mandare.resources.registry import ResourceCapabilityRegistry
 
 
 def descriptor(name: str) -> ResourceCapabilityDescriptor:

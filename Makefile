@@ -1,7 +1,7 @@
 .PHONY: help install dev test lint format clean build push docs serve deploy logs lock lock-upgrade sync requirements-freeze requirements-check
 
 help:
-	@echo "RIF Runtime Development Makefile"
+	@echo "Mandare Development Makefile"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install              Install dependencies"
@@ -45,7 +45,7 @@ dev:
 
 # Development targets
 serve:
-	uvicorn 'src.rif_runtime.api:app' --host=0.0.0.0 --port=8000 --reload
+	uvicorn 'src.mandare.api:app' --host=0.0.0.0 --port=8000 --reload
 
 test:
 	pytest -v
@@ -60,7 +60,7 @@ test-e2e:
 	pytest -v tests/e2e/
 
 coverage:
-	pytest --cov=src/rif_runtime --cov-report=html --cov-report=term tests/
+	pytest --cov=src/mandare --cov-report=html --cov-report=term tests/
 	@echo "Coverage report: htmlcov/index.html"
 
 # Code quality targets
@@ -85,14 +85,14 @@ security:
 
 # Docker targets
 docker-build:
-	docker build -t rif-runtime-server:latest .
+	docker build -t mandare-server:latest .
 
 docker-run: docker-build
 	docker run -p 8000:8000 \
 		-e RIF_LOG_LEVEL=INFO \
 		-v $(PWD)/data:/app/data \
 		-v $(PWD)/config:/app/config \
-		rif-runtime-server:latest
+		mandare-server:latest
 
 docker-up:
 	docker compose up --build
@@ -136,7 +136,7 @@ clean:
 	rm -rf htmlcov .coverage
 
 info:
-	@echo "RIF Runtime Project Info"
+	@echo "Mandare Project Info"
 	@echo "========================"
 	@python --version
 	@echo ""
@@ -175,20 +175,20 @@ profile:
 
 # Database targets (if using PostgreSQL)
 db-init:
-	docker compose exec postgres psql -U rif_user -d rif_runtime -f config/init.sql
+	docker compose exec postgres psql -U rif_user -d mandare -f config/init.sql
 
 db-backup:
 	@mkdir -p backups
-	docker compose exec postgres pg_dump -U rif_user rif_runtime | gzip > backups/db-$$(date +%Y%m%d_%H%M%S).sql.gz
+	docker compose exec postgres pg_dump -U rif_user mandare | gzip > backups/db-$$(date +%Y%m%d_%H%M%S).sql.gz
 	@echo "Database backed up to backups/"
 
 db-restore:
 	@read -p "Enter backup file path: " filepath; \
-	gunzip < $$filepath | docker compose exec -T postgres psql -U rif_user rif_runtime
+	gunzip < $$filepath | docker compose exec -T postgres psql -U rif_user mandare
 
 # Release targets
 version:
-	@grep version src/rif_runtime/_version.py | head -1
+	@grep version src/mandare/_version.py | head -1
 
 bump-patch:
 	bump2version patch

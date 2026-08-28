@@ -5,7 +5,7 @@ or model-dependent) to verify behavior, diff against a prior run, or produce an
 audit timeline.
 
 **Placeholder** — no schema yet. Current replay logic lives in
-`src/rif_runtime/replay.py` without a standalone contract; extracting one is the
+`src/mandare/replay.py` without a standalone contract; extracting one is the
 next concrete step for this directory, per ADR-0008.
 
 ## Normative constraint (pending extraction)
@@ -13,7 +13,7 @@ next concrete step for this directory, per ADR-0008.
 `docs/spec-review-capability-snapshot-authority.md` §6 states normatively that
 **replay is not recovery**: replay reconstructs history and MUST be side-effect
 free; recovery continues execution and may produce new Executions and effects.
-The two MUST NOT share an API surface. `src/rif_runtime/replay.py` satisfies this
+The two MUST NOT share an API surface. `src/mandare/replay.py` satisfies this
 today, but only incidentally — the constraint is not yet expressed as a contract
 here. Extracting it is part of this directory's next slice.
 
@@ -34,6 +34,6 @@ it from the append-only store proposed in OD-C3
 (`docs/spec-review-capability-snapshot-authority.md`) — plus retention and
 the replay outcome when the referenced snapshot is unavailable (fail closed,
 per the same deny-by-default posture as an absent observation, §4.5 of that
-review). Undefined today: `src/rif_runtime/replay.py` rebuilds state from
+review). Undefined today: `src/mandare/replay.py` rebuilds state from
 `decisions.jsonl` rows alone and does not load or validate a capability
 snapshot as part of that reconstruction.

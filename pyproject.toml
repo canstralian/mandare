@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rif-runtime"
+name = "mandare"
 version = "0.3.0rc2"
 description = "Governed execution substrate for intelligent systems."
 readme = "README.md"
@@ -82,7 +82,7 @@ dev = [
 ]
 
 [project.scripts]
-rif = "rif_runtime.cli:app"
+rif = "mandare.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -90,7 +90,7 @@ where = ["src"]
 # Vercel FastAPI builder looks for app in default locations; src/ layout needs
 # an explicit entrypoint (see https://vercel.com/docs/frameworks/backend/fastapi).
 [tool.vercel]
-entrypoint = "src.rif_runtime.api:app"
+entrypoint = "src.mandare.api:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

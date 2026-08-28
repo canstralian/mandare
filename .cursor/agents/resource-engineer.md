@@ -10,7 +10,7 @@ Resources never perform work.
 
 ## Owns
 
-src/rif_runtime/resources/
+src/mandare/resources/
 
 ---
 

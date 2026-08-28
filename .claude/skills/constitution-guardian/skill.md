@@ -1,13 +1,13 @@
 ---
 name: constitution-guardian
-description: Enforce the RIF Runtime Constitution by validating architectural invariants, governance rules, and authority boundaries before implementation or merge.
+description: Enforce the Mandare Constitution by validating architectural invariants, governance rules, and authority boundaries before implementation or merge.
 ---
 
 # Constitution Guardian
 
 ## Mission
 
-Protect the long-term integrity of the RIF Runtime.
+Protect the long-term integrity of the Mandare.
 
 This skill evaluates proposed changes against the Runtime Constitution rather than implementation details.
 

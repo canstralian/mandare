@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from rif_runtime.api import app
+from mandare.api import app
 
 client = TestClient(app)
 

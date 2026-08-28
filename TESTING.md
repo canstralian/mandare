@@ -1,6 +1,6 @@
 # Testing Strategy
 
-Testing in RIF is primarily about proving governance boundaries, persistence behaviour, and compatibility. The current suite is the source of truth for what is actually tested.
+Testing in Mandare is primarily about proving governance boundaries, persistence behaviour, and compatibility. The current suite is the source of truth for what is actually tested.
 
 ## Test layers
 
@@ -19,7 +19,7 @@ The main validation path is:
 ```bash
 ruff check src tests
 ruff format --check src tests
-mypy src/rif_runtime --ignore-missing-imports
+mypy src/mandare --ignore-missing-imports
 pytest -q
 ```
 
@@ -49,7 +49,7 @@ The test should demonstrate the security property, not merely the current implem
 
 ## Persistence isolation
 
-Tests that instantiate `RIFRuntime()` should use isolated data directories. The repository's test configuration is designed to avoid contaminating the working `data/` directory.
+Tests that instantiate `MandareRuntime()` should use isolated data directories. The repository's test configuration is designed to avoid contaminating the working `data/` directory.
 
 For ad hoc experiments:
 

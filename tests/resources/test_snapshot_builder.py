@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rif_runtime.resources import (
+from mandare.resources import (
     RepositoryResource,
     RepositoryScanner,
     RepositorySnapshotBuilder,
@@ -15,7 +15,7 @@ def make_resource() -> RepositoryResource:
         id=ResourceId(
             kind=ResourceKind.REPOSITORY,
             namespace="canstralian",
-            name="rif-runtime",
+            name="mandare",
         ),
         uri="file://.",
     )
@@ -36,7 +36,7 @@ def test_snapshot_preserves_resource_identity() -> None:
     )
 
     assert snapshot.resource.reference.id.namespace == "canstralian"
-    assert snapshot.resource.reference.id.name == "rif-runtime"
+    assert snapshot.resource.reference.id.name == "mandare"
 
 
 def test_snapshot_counts_match_inventory() -> None:

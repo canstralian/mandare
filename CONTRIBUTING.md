@@ -1,6 +1,6 @@
-# Contributing to RIF Runtime
+# Contributing to Mandare
 
-RIF is intentionally a small project with a sharp boundary: intelligent systems may propose actions, but governance decides what the runtime will accept. Contributions are welcome when they make that boundary clearer, safer, easier to test, or easier to use.
+Mandare is intentionally a small project with a sharp boundary: intelligent systems may propose actions, but governance decides what the runtime will accept. Contributions are welcome when they make that boundary clearer, safer, easier to test, or easier to use.
 
 ## Before you start
 
@@ -11,8 +11,8 @@ For cross-domain contract changes, check `spec/README.md` for open specification
 ## Local setup
 
 ```bash
-git clone https://github.com/canstralian/rif-runtime.git
-cd rif-runtime
+git clone https://github.com/canstralian/mandare.git
+cd mandare
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
@@ -39,7 +39,7 @@ Useful local checks are:
 ```bash
 ruff check src tests
 ruff format --check src tests
-mypy src/rif_runtime --ignore-missing-imports
+mypy src/mandare --ignore-missing-imports
 pytest -q
 pip-audit --requirement requirements/runtime.txt --disable-pip
 pip-audit --requirement requirements/dev.txt --disable-pip
@@ -119,7 +119,7 @@ See [`SECURITY.md`](SECURITY.md) for reporting expectations.
 
 ## Good places to contribute
 
-RIF has particularly useful work at the seams between implementation and specification:
+Mandare has particularly useful work at the seams between implementation and specification:
 
 - executable policy semantics;
 - replay and evidence contracts;

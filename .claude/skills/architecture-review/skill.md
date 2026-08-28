@@ -1,6 +1,6 @@
 ---
 name: architecture-review
-description: Review proposed changes against the RIF Runtime architecture, invariants, dependency rules, and long-term evolution.
+description: Review proposed changes against the Mandare architecture, invariants, dependency rules, and long-term evolution.
 ---
 
 # Architecture Review Skill

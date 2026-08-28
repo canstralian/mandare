@@ -1,18 +1,18 @@
 {
-  "name": "RIF Runtime",
+  "name": "Mandare",
   "install": "bash scripts/cloud-agent-install.sh",
   "start": "true",
   "ports": [
     {
-      "name": "RIF API",
+      "name": "Mandare API",
       "port": 8000
     }
   ],
   "terminals": [
     {
-      "name": "rif-api",
-      "command": "source .venv/bin/activate && python -m uvicorn rif_runtime.api:app --host 127.0.0.1 --port 8000",
-      "description": "RIF Runtime API on :8000 (Swagger at /docs). Prefer this over `rif serve` so the process is a single killable PID."
+      "name": "mandare-api",
+      "command": "source .venv/bin/activate && python -m uvicorn mandare.api:app --host 127.0.0.1 --port 8000",
+      "description": "Mandare API on :8000 (Swagger at /docs). Prefer this over `rif serve` so the process is a single killable PID."
     }
   ]
 }

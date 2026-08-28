@@ -1,6 +1,6 @@
 # CLI Reference
 
-The current Typer CLI is implemented in `src/rif_runtime/cli.py`.
+The current Typer CLI is implemented in `src/mandare/cli.py`.
 
 ## `rif serve`
 

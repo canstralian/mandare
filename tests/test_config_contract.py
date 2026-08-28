@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from rif_runtime.config import (
+from mandare.config import (
     ConfigError,
     RifSettings,
     get_settings,
@@ -32,7 +32,7 @@ def _reset_singleton(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, N
     """Clear the settings singleton and ambient RIF_* overrides per test.
 
     These are loader contract tests, so they must see declared defaults. The
-    suite-wide RIF_DATA_DIR set in conftest.py (state isolation for RIFRuntime)
+    suite-wide RIF_DATA_DIR set in conftest.py (state isolation for MandareRuntime)
     would otherwise leak in as an override; tests that exercise overrides set
     their own env vars in the test body, after this fixture has run.
     """
@@ -330,9 +330,9 @@ def test_data_dir_setting_relocates_persistent_state(
 ) -> None:
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
     reset_settings()
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
-    assert RIFRuntime().decisions_path == tmp_path / "decisions.jsonl"
+    assert MandareRuntime().decisions_path == tmp_path / "decisions.jsonl"
 
 
 def test_config_dir_setting_selects_the_environments_file(
@@ -351,7 +351,7 @@ def test_config_dir_setting_selects_the_environments_file(
     )
     monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path))
     reset_settings()
-    from rif_runtime.config import load_config
+    from mandare.config import load_config
 
     assert load_config().default_environment == "OnlyHere"
 
@@ -362,9 +362,9 @@ def test_environment_setting_selects_the_active_profile(
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("RIF_ENVIRONMENT", "RIF_CI")
     reset_settings()
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
-    assert RIFRuntime().environment_name == "RIF_CI"
+    assert MandareRuntime().environment_name == "RIF_CI"
 
 
 def test_unknown_environment_setting_raises_rather_than_falling_back(
@@ -374,10 +374,10 @@ def test_unknown_environment_setting_raises_rather_than_falling_back(
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("RIF_ENVIRONMENT", "no_such_environment")
     reset_settings()
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
     with pytest.raises(ValueError, match="no_such_environment"):
-        RIFRuntime()
+        MandareRuntime()
 
 
 def test_posture_setting_reaches_the_runtime(
@@ -386,9 +386,9 @@ def test_posture_setting_reaches_the_runtime(
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("RIF_POSTURE", "restricted")
     reset_settings()
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
-    assert RIFRuntime().posture == "restricted"
+    assert MandareRuntime().posture == "restricted"
 
 
 def test_server_host_and_port_settings_reach_uvicorn(
@@ -399,13 +399,13 @@ def test_server_host_and_port_settings_reach_uvicorn(
 
     from typer.testing import CliRunner
 
-    from rif_runtime.cli import app as cli_app
+    from mandare.cli import app as cli_app
 
     monkeypatch.setenv("RIF_SERVER_HOST", "10.1.2.3")
     monkeypatch.setenv("RIF_SERVER_PORT", "9123")
     reset_settings()
 
-    with patch("rif_runtime.cli.uvicorn.run") as run:
+    with patch("mandare.cli.uvicorn.run") as run:
         CliRunner().invoke(cli_app, ["serve"])
 
     assert run.call_args.kwargs["host"] == "10.1.2.3"
@@ -433,7 +433,7 @@ def test_server_root_path_setting_reaches_the_asgi_app(tmp_path: Path) -> None:
         [
             sys.executable,
             "-c",
-            "import json; from rif_runtime.api import app; "
+            "import json; from mandare.api import app; "
             "print(json.dumps(app.root_path))",
         ],
         capture_output=True,
@@ -468,7 +468,7 @@ def test_every_mapped_setting_is_covered_here_or_declared_recorded_only() -> Non
     _ENV_MAP without either proving it does something or declaring that it does
     not fails here.
     """
-    from rif_runtime.config import _ENV_MAP
+    from mandare.config import _ENV_MAP
 
     covered = {
         "RIF_DATA_DIR",
@@ -489,7 +489,7 @@ def test_every_mapped_setting_is_covered_here_or_declared_recorded_only() -> Non
 
 def test_env_example_documents_every_mapped_setting():
     """Every RIF_* name in config._ENV_MAP is discoverable in .env.example."""
-    from rif_runtime.config import _ENV_MAP
+    from mandare.config import _ENV_MAP
 
     documented = _documented_env_vars()
     missing = sorted(name for name in _ENV_MAP if name not in documented)
@@ -516,7 +516,7 @@ def test_env_example_documents_the_auth_and_supabase_variables():
 
 # --- serverless / missing-config cold start ----------------------------------
 #
-# The Vercel entrypoint (api/index.py) imports rif_runtime.api from a CWD that
+# The Vercel entrypoint (api/index.py) imports mandare.api from a CWD that
 # may not contain config/environments.yaml, with RIF_ENVIRONMENT set. Raising on
 # an unknown environment name is right when the file exists and omits it; it is
 # wrong when there is no file at all, because the fallback config invents its
@@ -527,15 +527,15 @@ def test_missing_environments_file_adopts_the_configured_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path))  # no environments.yaml
-    monkeypatch.setenv("RIF_ENVIRONMENT", "RIF_Runtime")
+    monkeypatch.setenv("RIF_ENVIRONMENT", "Mandare")
     reset_settings()
-    from rif_runtime.config import load_config
+    from mandare.config import load_config
 
     config = load_config()
 
-    assert config.default_environment == "RIF_Runtime"
-    assert "RIF_Runtime" in config.environments
-    assert config.environments["RIF_Runtime"].networking_type == "limited", (
+    assert config.default_environment == "Mandare"
+    assert "Mandare" in config.environments
+    assert config.environments["Mandare"].networking_type == "limited", (
         "the fallback profile must stay restrictive"
     )
 
@@ -546,13 +546,13 @@ def test_runtime_starts_with_no_environments_file(
     """The cold-start path: RIF_ENVIRONMENT set, config/ absent."""
     monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path / "absent"))
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("RIF_ENVIRONMENT", "RIF_Runtime")
+    monkeypatch.setenv("RIF_ENVIRONMENT", "Mandare")
     reset_settings()
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
-    runtime = RIFRuntime()
+    runtime = MandareRuntime()
 
-    assert runtime.environment_name == "RIF_Runtime"
+    assert runtime.environment_name == "Mandare"
     assert runtime.profile.networking_type == "limited"
 
 
@@ -575,10 +575,10 @@ def test_unknown_environment_still_raises_when_the_file_exists(
     monkeypatch.setenv("RIF_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("RIF_ENVIRONMENT", "NotInThatFile")
     reset_settings()
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
     with pytest.raises(ValueError, match="NotInThatFile"):
-        RIFRuntime()
+        MandareRuntime()
 
 
 def test_vercel_config_ships_the_environments_file() -> None:
@@ -605,7 +605,7 @@ def test_a_blank_environment_is_treated_as_unset(monkeypatch):
     """RIF_ENVIRONMENT= must not be read as an environment named "".
 
     load_config's fallback took a blank value as unset (`or "production"`)
-    while RIFRuntime._configured_environment tested `is None` and so treated it
+    while MandareRuntime._configured_environment tested `is None` and so treated it
     as a configured name. With no environments.yaml on disk the fallback
     invented "production" and the runtime then refused to start against the
     empty string, so a container spec with a blank RIF_ENVIRONMENT crashed on
@@ -616,20 +616,20 @@ def test_a_blank_environment_is_treated_as_unset(monkeypatch):
         reset_settings()
         assert get_settings().runtime.environment is None
 
-    monkeypatch.setenv("RIF_ENVIRONMENT", "  RIF_Runtime  ")
+    monkeypatch.setenv("RIF_ENVIRONMENT", "  Mandare  ")
     reset_settings()
-    assert get_settings().runtime.environment == "RIF_Runtime"
+    assert get_settings().runtime.environment == "Mandare"
 
 
 def test_a_blank_environment_still_starts_the_runtime(tmp_path, monkeypatch):
     """The end-to-end shape of the same defect: cold start with no config dir."""
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
     monkeypatch.setenv("RIF_ENVIRONMENT", "")
     monkeypatch.setenv("RIF_CONFIG_DIR", str(tmp_path / "absent"))
     reset_settings()
 
-    runtime = RIFRuntime(data_dir=tmp_path / "data")
+    runtime = MandareRuntime(data_dir=tmp_path / "data")
     assert runtime.environment_name in runtime.config.environments
 
 

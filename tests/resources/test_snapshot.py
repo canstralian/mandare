@@ -1,6 +1,6 @@
-from rif_runtime.resources.identity import ResourceId, ResourceKind
-from rif_runtime.resources.resource import ResourceReference
-from rif_runtime.resources.snapshot import ResourceSnapshot
+from mandare.resources.identity import ResourceId, ResourceKind
+from mandare.resources.resource import ResourceReference
+from mandare.resources.snapshot import ResourceSnapshot
 
 
 def test_snapshot_preserves_reference() -> None:
@@ -8,9 +8,9 @@ def test_snapshot_preserves_reference() -> None:
         id=ResourceId(
             kind=ResourceKind.REPOSITORY,
             namespace="canstralian",
-            name="rif-runtime",
+            name="mandare",
         ),
-        uri="https://github.com/canstralian/rif-runtime",
+        uri="https://github.com/canstralian/mandare",
     )
 
     snapshot = ResourceSnapshot(

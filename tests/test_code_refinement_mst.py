@@ -2,11 +2,11 @@ from run_session import ScriptedAgent, run_session
 from sandbox_exec import run_in_sandbox
 from score import score_session
 
-from rif_runtime.configuration.policies import PolicyRule
-from rif_runtime.runtime import RIFRuntime
+from mandare.configuration.policies import PolicyRule
+from mandare.runtime import MandareRuntime
 
 
-def refinement_runtime(tmp_path) -> RIFRuntime:
+def refinement_runtime(tmp_path) -> MandareRuntime:
     """A runtime that permits the harness's own `code.refine` action.
 
     The default policy denies by default, so a governed consumer has to
@@ -14,7 +14,7 @@ def refinement_runtime(tmp_path) -> RIFRuntime:
     this rule every turn is blocked, `tests_passed` is None for all of them,
     and the session scores as if nothing regressed (see `score_session`).
     """
-    runtime = RIFRuntime(data_dir=tmp_path)
+    runtime = MandareRuntime(data_dir=tmp_path)
     runtime.policy_store.upsert(
         PolicyRule(
             id="allow_eval_code_refine",
@@ -127,7 +127,9 @@ def test_run_session_blocks_every_turn_without_a_permitting_rule(tmp_path):
         name="static-regresses",
         states=[CORRECT_V1, CORRECT_V2, BROKEN_V1, BROKEN_V1, BROKEN_V1],
     )
-    session = run_session(ADD_ONE_TASK, agent, runtime=RIFRuntime(data_dir=tmp_path))
+    session = run_session(
+        ADD_ONE_TASK, agent, runtime=MandareRuntime(data_dir=tmp_path)
+    )
 
     result = session["result"]
     events = result["events"]

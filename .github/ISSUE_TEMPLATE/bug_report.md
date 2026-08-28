@@ -16,7 +16,7 @@ assignees: ""
 Commands / request:
 Configuration:
 Python version:
-RIF version or commit:
+Mandare version or commit:
 ```
 
 ## Evidence

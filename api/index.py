@@ -1,1 +1,1 @@
-from rif_runtime.api import app  # noqa: F401
+from mandare.api import app  # noqa: F401

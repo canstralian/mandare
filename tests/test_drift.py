@@ -10,15 +10,15 @@ from datetime import UTC, datetime
 
 import pytest
 
-from rif_runtime.agents.orchestrator import OrchestratorAgent
-from rif_runtime.governance.drift import (
+from mandare.agents.orchestrator import OrchestratorAgent
+from mandare.governance.drift import (
     _ADVERSARIAL_PATTERNS,
     DriftVector,
     _adversarial_score,
     _entropy,
     recommend_correction,
 )
-from rif_runtime.schemas import Decision, PolicyDecision, Posture
+from mandare.schemas import Decision, PolicyDecision, Posture
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 

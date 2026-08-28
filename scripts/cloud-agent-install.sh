@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent Cloud Agent bootstrap for RIF Runtime.
+# Idempotent Cloud Agent bootstrap for Mandare.
 #
 # Why this exists: `python3 -m venv` requires the `python3.12-venv` / ensurepip
 # system packages. Some Cursor Cloud images omit them, and restricted egress
@@ -42,7 +42,7 @@ venv_structurally_ok() {
 
 # Full acceptance: project and runtime deps importable.
 venv_acceptance_ok() {
-  .venv/bin/python -c 'import fastapi, uvicorn, pydantic, yaml, networkx, typer, rif_runtime'
+  .venv/bin/python -c 'import fastapi, uvicorn, pydantic, yaml, networkx, typer, mandare'
 }
 
 write_bootstrap_marker() {

@@ -4,13 +4,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Isolate persistent runtime state into a throwaway directory. RIFRuntime now
+# Isolate persistent runtime state into a throwaway directory. MandareRuntime now
 # restores its posture from posture_history.jsonl / decisions.jsonl at startup,
 # so a shared data/ would let one test's escalation decide the posture every
-# later RIFRuntime() — in this run and in the next one — starts in.
+# later MandareRuntime() — in this run and in the next one — starts in.
 #
-# Set at import time, before any test module (and therefore rif_runtime.api's
-# module-level RIFRuntime) is imported, and before config caches its settings.
+# Set at import time, before any test module (and therefore mandare.api's
+# module-level MandareRuntime) is imported, and before config caches its settings.
 # That rules out a fixture, so the directory is cleaned up via atexit rather
 # than by pytest — otherwise every local run would leak a rif-test-data-* dir.
 if "RIF_DATA_DIR" not in os.environ:

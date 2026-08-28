@@ -1,11 +1,11 @@
 # Specification Review — Identity Spine Migration
 
-**Repository:** canstralian/rif-runtime
+**Repository:** canstralian/mandare
 **Governs:** ADR-0010 (Run as sole aggregate root)
 **Status:** Approved Pending Governance Completion (architecture review score: 9.95/10 — no remaining architectural unknowns; remaining items are implementation-governance tasks, not design decisions)
 **Document Lifecycle:** `Draft` → `Approved Pending Governance Completion` (current) → `Ratified` (upon completion of Section 11's governance checklist and sign-off) → `Superseded` (only upon an explicit future ADR that replaces this document). From `Ratified` onward, any proposal changing the aggregate root, identity hierarchy, replay model, correlation semantics, or the Architectural Invariants (Section 13) is an amendment to this specification, not an implementation detail — it re-enters at Specification Review (Track B), not Builder.
 **Track:** B (Specification) — Builder work on this domain is held until this document is approved
-**Related findings:** RIF Architectural Conformance Analysis; ADR-0008, ADR-0010, ADR-0012, ADR-0015
+**Related findings:** Mandare Architectural Conformance Analysis; ADR-0008, ADR-0010, ADR-0012, ADR-0015
 
 ---
 
@@ -17,7 +17,7 @@ A secondary, coupled defect: Decisions (intent and policy evaluation) are not st
 
 Both defects trace back to the same unresolved question, which this review exists to answer normatively:
 
-> **What is the immutable identity of a "thing" in RIF?**
+> **What is the immutable identity of a "thing" in Mandare?**
 
 ---
 
@@ -127,7 +127,7 @@ This table is the primary deliverable evidence for the Traceability Report. The 
 
 - [x] **Resolved (per Section 4):** this review does not block PR #31 — the `run_id` re-key sequences on top of PR #31 as a subsequent migration, and PR #31 proceeds independently.
 - [x] **Resolved:** rollback refers to migration execution only — it restores the pre-migration schema and data state. It does **not** revoke the architectural decision establishing `Run` as the aggregate root (ADR-0010 itself is not subject to migration rollback; a failed migration is retried or re-planned, not treated as grounds to reopen the ratified specification).
-- [ ] Test strategy: golden-test contract updates required (RIF-COMP-001) — enumerate which fixtures need regeneration vs. which can be left as frozen legacy cases.
+- [ ] Test strategy: golden-test contract updates required (Mandare-COMP-001) — enumerate which fixtures need regeneration vs. which can be left as frozen legacy cases.
 
 ---
 
@@ -186,7 +186,7 @@ These invariants are mechanically verifiable by reviewers and, where feasible, s
 
 ## 14. Next Actions
 
-1. **Adopt governance artifact** — the companion `RIF Fast-Path Routing Checklist` is adopted into repository review guidelines and applied to all future Track A/B classification decisions.
+1. **Adopt governance artifact** — the companion `Mandare Fast-Path Routing Checklist` is adopted into repository review guidelines and applied to all future Track A/B classification decisions.
 2. **Execute Track A now, independent of this review's ratification:**
    - Complete review and merge **PR #41** (control-plane auth, fail-closed reversal, constant-time comparison, template-injection fix).
    - Complete review and merge a **standalone `GovernanceLedger` advisory-lock PR** (`SERIALIZABLE` isolation / advisory lock) — scoped separately from the ledger re-key, which remains Track B.

@@ -1,0 +1,44 @@
+name: run-mandare
+
+kind: claude-skill
+
+description: Primary engineering orchestrator for the Mandare.
+
+owns:
+  - src/
+  - tests/
+  - docs/
+
+responsibilities:
+  - architecture
+  - implementation
+  - testing
+  - documentation
+  - review
+
+inputs:
+  - runtime source
+  - architecture
+  - specifications
+
+outputs:
+  - code
+  - tests
+  - documentation
+  - ADR recommendations
+
+depends_on: []
+
+blocks: []
+
+quality_gates:
+  - compileall
+  - pytest
+  - mypy
+  - ruff
+
+invariants:
+  - Resources never depend on Providers.
+  - Generated knowledge is derived.
+  - Evidence is immutable.
+  - Replay is deterministic.

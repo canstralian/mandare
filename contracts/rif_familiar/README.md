@@ -14,11 +14,11 @@ It is not permitted to perform active RF transmission, packet injection, HID exe
 | --- | --- |
 | `capability_manifest.schema.json` | Declares the complete device authority set, relay pinning, and budgets. |
 | `observation_event.schema.json` | Defines privacy-redacted, chained passive observation events. |
-| `posture_decision.schema.json` | Defines RIF-runtime posture responses consumed by the handheld. |
+| `posture_decision.schema.json` | Defines Mandare posture responses consumed by the handheld. |
 
 ## Runtime mapping
 
-`rif_runtime.schemas.Posture` remains the sole core posture vocabulary:
+`mandare.schemas.Posture` remains the sole core posture vocabulary:
 
 - `normal`
 - `elevated`

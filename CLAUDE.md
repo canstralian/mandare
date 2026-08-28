@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-Guidance for AI coding assistants working in RIF Runtime.
+Guidance for AI coding assistants working in Mandare.
 
 ## What this repository is
 
-RIF Runtime is a governed Python runtime with a FastAPI HTTP surface and Typer CLI. The default persistence model is local JSON/JSONL, with an optional Supabase integration for run/evidence persistence and JWT verification.
+Mandare is a governed Python runtime with a FastAPI HTTP surface and Typer CLI. The default persistence model is local JSON/JSONL, with an optional Supabase integration for run/evidence persistence and JWT verification.
 
 The central trust model is:
 
@@ -21,16 +21,16 @@ Do not describe future execution, evidence, provider-inference, or autonomous-ev
 
 ## Important source-of-truth files
 
-- `src/rif_runtime/api.py` — current HTTP route definitions
-- `src/rif_runtime/cli.py` — current CLI commands
-- `src/rif_runtime/runtime.py` — runtime orchestration
-- `src/rif_runtime/policy.py` — policy decision logic
-- `src/rif_runtime/schemas.py` — API/domain schemas
-- `src/rif_runtime/replay.py` — local state reconstruction
-- `src/rif_runtime/auth.py` — control-plane API-key guard
-- `src/rif_runtime/security.py` — cryptographic/redaction utilities
-- `src/rif_runtime/audit.py` — audit hash-chain primitives
-- `src/rif_runtime/integrations/supabase.py` — optional remote persistence/JWT integration
+- `src/mandare/api.py` — current HTTP route definitions
+- `src/mandare/cli.py` — current CLI commands
+- `src/mandare/runtime.py` — runtime orchestration
+- `src/mandare/policy.py` — policy decision logic
+- `src/mandare/schemas.py` — API/domain schemas
+- `src/mandare/replay.py` — local state reconstruction
+- `src/mandare/auth.py` — control-plane API-key guard
+- `src/mandare/security.py` — cryptographic/redaction utilities
+- `src/mandare/audit.py` — audit hash-chain primitives
+- `src/mandare/integrations/supabase.py` — optional remote persistence/JWT integration
 
 For architecture interpretation, read `ARCHITECTURE.md`. For security work, read `SECURITY.md`. For specification boundaries, read `spec/README.md` and open specification reviews.
 
@@ -64,7 +64,7 @@ rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
 ```bash
 ruff check src tests
 ruff format --check src tests
-mypy src/rif_runtime --ignore-missing-imports
+mypy src/mandare --ignore-missing-imports
 pytest -q
 ```
 
@@ -88,7 +88,7 @@ Posture can survive restart. Do not assume a new runtime instance means a clean 
 
 Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured.
 
-Never promote model output into authority. An external provider credential is configuration, not a RIF authorization decision.
+Never promote model output into authority. An external provider credential is configuration, not a Mandare authorization decision.
 
 ## Documentation discipline
 

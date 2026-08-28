@@ -1,9 +1,9 @@
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import PolicyRequest
+from mandare.runtime import MandareRuntime
+from mandare.schemas import PolicyRequest
 
 
 def test_decision_written():
-    r = RIFRuntime()
+    r = MandareRuntime()
     r.evaluate(
         PolicyRequest(
             actor="agent:test",

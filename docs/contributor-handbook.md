@@ -13,7 +13,7 @@ question
   -> merge
 ```
 
-A good RIF contribution makes the system easier to reason about after the change than before it.
+A good Mandare contribution makes the system easier to reason about after the change than before it.
 
 ## Change classification
 
@@ -74,6 +74,6 @@ The goal is one authoritative contract rather than two individually reasonable i
 
 ## Contributor mindset
 
-The most valuable RIF contributions are often not larger features. They are small pieces of engineering that make the governance boundary more explicit:
+The most valuable Mandare contributions are often not larger features. They are small pieces of engineering that make the governance boundary more explicit:
 
 > **If we cannot point to the code, test, configuration, or recorded run that proves a claim, the claim belongs in the proposal column, not the product column.**

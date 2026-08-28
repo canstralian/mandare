@@ -1,7 +1,7 @@
-from rif_runtime.governance.posture import PostureManager, posture_for_denials
-from rif_runtime.replay import ReplayEngine
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import PolicyRequest, Posture
+from mandare.governance.posture import PostureManager, posture_for_denials
+from mandare.replay import ReplayEngine
+from mandare.runtime import MandareRuntime
+from mandare.schemas import PolicyRequest, Posture
 
 
 def test_posture_for_denials_thresholds():
@@ -40,9 +40,9 @@ def test_replay_posture_from_denials_matches_shared_helper(tmp_path):
 
 
 def test_restored_locked_stays_locked_after_three_denials(tmp_path):
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.locked)
-    restarted = RIFRuntime(data_dir=tmp_path)
+    restarted = MandareRuntime(data_dir=tmp_path)
     assert restarted.posture == Posture.locked
     for i in range(3):
         restarted.evaluate(
@@ -56,9 +56,9 @@ def test_restored_locked_stays_locked_after_three_denials(tmp_path):
 
 
 def test_restored_restricted_stays_restricted_after_three_denials(tmp_path):
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.restricted)
-    restarted = RIFRuntime(data_dir=tmp_path)
+    restarted = MandareRuntime(data_dir=tmp_path)
     assert restarted.posture == Posture.restricted
     for i in range(3):
         restarted.evaluate(
@@ -72,7 +72,7 @@ def test_restored_restricted_stays_restricted_after_three_denials(tmp_path):
 
 
 def test_operator_set_posture_still_deescalates(tmp_path):
-    runtime = RIFRuntime(data_dir=tmp_path)
+    runtime = MandareRuntime(data_dir=tmp_path)
     runtime.set_posture(Posture.locked)
     runtime.set_posture(Posture.normal)
     assert runtime.posture == Posture.normal

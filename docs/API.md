@@ -1,6 +1,6 @@
 # HTTP API Reference
 
-The HTTP route definitions in `src/rif_runtime/api.py` are the source of truth. This document is a concise human-readable index; the running service's `/docs` and `/openapi.json` provide the generated schema.
+The HTTP route definitions in `src/mandare/api.py` are the source of truth. This document is a concise human-readable index; the running service's `/docs` and `/openapi.json` provide the generated schema.
 
 ## Public/runtime inspection
 
@@ -151,7 +151,7 @@ curl -X POST http://127.0.0.1:8000/v1/policy/evaluate \
   -d '{"actor":"agent:test","action":"http.request","target":"https://example.com"}'
 ```
 
-The exact response schema is defined by the Pydantic models in `src/rif_runtime/schemas.py` and exposed through the generated OpenAPI document.
+The exact response schema is defined by the Pydantic models in `src/mandare/schemas.py` and exposed through the generated OpenAPI document.
 
 ## Important boundary
 

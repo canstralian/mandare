@@ -2,7 +2,7 @@
 
 The canonical current CLI reference is [`docs/cli-reference.md`](docs/cli-reference.md).
 
-The implementation source of truth is `src/rif_runtime/cli.py`.
+The implementation source of truth is `src/mandare/cli.py`.
 
 Current commands:
 

@@ -1,6 +1,6 @@
-# RIF Runtime Configuration
+# Mandare Configuration
 # =========================
-# This is the canonical configuration file for the RIF runtime.
+# This is the canonical configuration file for the Mandare runtime.
 # All keys shown below are the supported set; unknown keys will cause
 # a startup validation error.
 #
@@ -31,7 +31,7 @@ posture = "normal"
 #
 # Was "production", which environments.yaml does not define. That was harmless
 # only while this key was unread; the shipped config now names a real profile.
-environment = "RIF_Runtime"
+environment = "Mandare"
 
 # Allow outbound network calls to cloud services. Defaults to false (air-gapped).
 cloud_egress = false

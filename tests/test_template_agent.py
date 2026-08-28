@@ -1,6 +1,6 @@
-from rif_runtime.agents.template import TemplateAgent
-from rif_runtime.policy import PolicyEngine
-from rif_runtime.schemas import Decision, EnvironmentProfile, Posture
+from mandare.agents.template import TemplateAgent
+from mandare.policy import PolicyEngine
+from mandare.schemas import Decision, EnvironmentProfile, Posture
 
 
 def make_agent():

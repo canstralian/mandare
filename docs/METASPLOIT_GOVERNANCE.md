@@ -1,8 +1,8 @@
 # Metasploit MCP Governance
 
-> **Scope:** governance/evaluation. This document does not claim that RIF provides a general-purpose Metasploit execution service.
+> **Scope:** governance/evaluation. This document does not claim that Mandare provides a general-purpose Metasploit execution service.
 
-RIF treats a Metasploit MCP integration as a high-risk capability boundary. The core invariant is:
+Mandare treats a Metasploit MCP integration as a high-risk capability boundary. The core invariant is:
 
 > **Intent is not authority.**
 
@@ -10,7 +10,7 @@ The current subsystem classifies requested MCP capabilities, applies ordered gov
 
 ## Capability classes
 
-`src/rif_runtime/mcp/capabilities.py` classifies known methods into:
+`src/mandare/mcp/capabilities.py` classifies known methods into:
 
 - **read-only** — information-oriented methods such as module metadata/options/references and selected reconnaissance/context queries;
 - **consequential** — execution or state-changing methods;
@@ -44,7 +44,7 @@ The ordering matters because the first applicable boundary determines the record
 
 ## Capability tokens
 
-The broker path can issue a `CapabilityToken` bound to the approved capability/target/intent and a configured expiry. Token verification checks the fields implemented by `src/rif_runtime/mcp/metasploit.py`.
+The broker path can issue a `CapabilityToken` bound to the approved capability/target/intent and a configured expiry. Token verification checks the fields implemented by `src/mandare/mcp/metasploit.py`.
 
 The token-minting API is a control-plane operation and therefore requires the configured `X-API-Key` guard.
 

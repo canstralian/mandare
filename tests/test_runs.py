@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from rif_runtime.api import app
-from rif_runtime.integrations import supabase as sb
+from mandare.api import app
+from mandare.integrations import supabase as sb
 
 client = TestClient(app)
 

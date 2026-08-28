@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rif_runtime.resources import RepositoryScanner
+from mandare.resources import RepositoryScanner
 
 
 def test_repository_exists() -> None:

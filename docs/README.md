@@ -25,7 +25,7 @@ A documentation page must not promote a lower-tier statement into a higher-tier 
 | `ROADMAP.md` | Planned work | Planning |
 | `REFLEXIVE_EVOLUTION.md` | Reflexive architecture/design | Design |
 | `DATA_MODEL.md` | Future persistence model | Specification/design |
-| `RIF_RUNTIME_MVP.md` | Current runtime summary | Maintained summary |
+| `MANDARE_MVP.md` | Current runtime summary | Maintained summary |
 | `METASPLOIT_GOVERNANCE.md` | Metasploit governance boundary | Implementation-backed with deployment limitations |
 | `mcp-integration-guide.md` | Generic MCP integration proposal | Planned/design |
 | `plugin-capability-sdk-guide.md` | Future plugin SDK | Planned/design |

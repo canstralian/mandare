@@ -12,7 +12,7 @@ Governance authorizes.
 
 ## Owns
 
-src/rif_runtime/providers/
+src/mandare/providers/
 
 ---
 

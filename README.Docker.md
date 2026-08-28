@@ -15,7 +15,7 @@ The API is exposed on port `8000` by the supplied configuration.
 ## Build the image
 
 ```bash
-docker build -t rif-runtime:local .
+docker build -t mandare:local .
 ```
 
 The supplied Dockerfile runs the application as a non-root user. That is a useful baseline, not a complete container security profile.

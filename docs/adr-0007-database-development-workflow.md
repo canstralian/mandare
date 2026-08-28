@@ -12,7 +12,7 @@ project — must be avoided.
 Database and schema work follows this pipeline:
 
 1. **Specify** — the canonical schema lives as documentation first:
-   `docs/DATA_MODEL.md` (mirrored to the RIF Runtime Notion hub). Data-model
+   `docs/DATA_MODEL.md` (mirrored to the Mandare Notion hub). Data-model
    changes start as edits to the spec.
 2. **Author migrations** — each accepted spec change becomes a SQL migration
    file (e.g. `supabase/migrations/`), reviewed like any other code.

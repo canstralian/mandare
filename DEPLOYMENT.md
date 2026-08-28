@@ -36,7 +36,7 @@ Inspect `docker-compose.prod.yml` before deployment. Treat it as a baseline, not
 
 ## Configuration
 
-RIF configuration is primarily file- and environment-driven. Review `rif.toml`, `config/`, and the runtime configuration models before changing defaults.
+Mandare configuration is primarily file- and environment-driven. Review `rif.toml`, `config/`, and the runtime configuration models before changing defaults.
 
 Control-plane authentication uses:
 
@@ -44,7 +44,7 @@ Control-plane authentication uses:
 RIF_CONTROL_PLANE_API_KEYS=<comma-separated API keys>
 ```
 
-Optional Supabase-backed run/evidence features use the environment variables documented in `src/rif_runtime/integrations/supabase.py`. Supabase is optional and is not the default local persistence mechanism.
+Optional Supabase-backed run/evidence features use the environment variables documented in `src/mandare/integrations/supabase.py`. Supabase is optional and is not the default local persistence mechanism.
 
 ## Persistence and backups
 
@@ -66,7 +66,7 @@ The application listens for HTTP traffic. Production deployments should terminat
 
 Restrict inbound access to the required API surface. Restrict outbound access according to the actual capabilities and integrations enabled in the deployment.
 
-RIF's application-level policy checks are not a substitute for network-layer egress controls.
+Mandare's application-level policy checks are not a substitute for network-layer egress controls.
 
 ## Container security
 

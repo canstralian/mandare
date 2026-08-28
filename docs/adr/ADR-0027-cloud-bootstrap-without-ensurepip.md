@@ -2,14 +2,14 @@
 
 ## Status
 
-**Proposed** (implements [#55](https://github.com/canstralian/rif-runtime/pull/55);
-supersedes [#54](https://github.com/canstralian/rif-runtime/pull/54)).
+**Proposed** (implements [#55](https://github.com/canstralian/mandare/pull/55);
+supersedes [#54](https://github.com/canstralian/mandare/pull/54)).
 
 After merge of #55: set to **Accepted**.
 
 ## Context
 
-Cursor Cloud Agents for `rif-runtime` failed setup with `INSTALL_FAILED`.
+Cursor Cloud Agents for `mandare` failed setup with `INSTALL_FAILED`.
 Setup logs showed the user install command aborting at:
 
 ```text
@@ -121,8 +121,8 @@ After merge, verification is objective when all of the following hold on a
 - [ ] `import ensurepip` fails on the image (constraint still present)
 - [ ] Ubuntu apt is not required for success
 - [ ] `.venv/.rif-bootstrap-ok` exists
-- [ ] Required imports succeed (`fastapi`, `rif_runtime`, …)
-- [ ] Editable install present (`importlib.metadata.version("rif-runtime")`)
+- [ ] Required imports succeed (`fastapi`, `mandare`, …)
+- [ ] Editable install present (`importlib.metadata.version("mandare")`)
 - [ ] Warm re-run logs structural reuse and still passes acceptance
 - [ ] Corrupted (python-symlink-only) `.venv` is recreated, then accepted
 

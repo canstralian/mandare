@@ -1,6 +1,6 @@
 # Support
 
-RIF Runtime is an actively developed open-source project. Support is primarily community- and repository-based rather than an SLA-backed service.
+Mandare is an actively developed open-source project. Support is primarily community- and repository-based rather than an SLA-backed service.
 
 ## Where to ask
 
@@ -13,7 +13,7 @@ RIF Runtime is an actively developed open-source project. Support is primarily c
 
 Please include:
 
-- the exact RIF version or commit;
+- the exact Mandare version or commit;
 - Python version and operating environment;
 - the smallest useful reproduction;
 - relevant configuration (with secrets removed);

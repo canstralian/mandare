@@ -44,7 +44,7 @@ jobs:
           python -m pip install -e . --no-deps
 
       - name: Run tests with coverage
-        run: pytest --cov=rif_runtime --cov-report=xml --cov-report=term
+        run: pytest --cov=mandare --cov-report=xml --cov-report=term
 
       - uses: codecov/codecov-action@v5
         with:

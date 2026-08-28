@@ -5,7 +5,7 @@ kind: cursor-agent
 description: Owns immutable resource contracts.
 
 owns:
-  - src/rif_runtime/resources
+  - src/mandare/resources
 
 responsibilities:
   - resources

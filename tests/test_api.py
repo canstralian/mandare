@@ -2,10 +2,10 @@ import json
 
 from fastapi.testclient import TestClient
 
-from rif_runtime import api
-from rif_runtime.api import app
-from rif_runtime.auth import ENV_VAR
-from rif_runtime.replay import ReplayEngine
+from mandare import api
+from mandare.api import app
+from mandare.auth import ENV_VAR
+from mandare.replay import ReplayEngine
 
 client = TestClient(app)
 
@@ -74,7 +74,7 @@ def test_recovered_state(tmp_path, monkeypatch):
 def test_mcp_invoke_is_dry_run_no_side_effects():
     # /v1/mcp/invoke is unauthenticated, so it must simulate only: a would-be
     # denial must not persist a decision or drive posture escalation.
-    from rif_runtime import api
+    from mandare import api
 
     before = api.runtime.decisions_store.count()
     r = client.post(

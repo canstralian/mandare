@@ -1,4 +1,4 @@
-# RIF Fast-Path Routing Checklist
+# Mandare Fast-Path Routing Checklist
 
 **Purpose:** Codify the Track A / Track B classification test so routing is a repeatable check, not a judgment call made fresh for each PR.
 

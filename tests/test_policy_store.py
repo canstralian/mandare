@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from rif_runtime.configuration.policies import PolicyRule, PolicyStore
-from rif_runtime.policy import PolicyEngine
-from rif_runtime.schemas import EnvironmentProfile, PolicyRequest, Posture
+from mandare.configuration.policies import PolicyRule, PolicyStore
+from mandare.policy import PolicyEngine
+from mandare.schemas import EnvironmentProfile, PolicyRequest, Posture
 
 
 def test_policy_store_upsert_and_delete(tmp_path):
@@ -32,9 +32,7 @@ def test_custom_policy_rule_overrides_engine_default():
     rule = PolicyRule(
         id="block_example", effect="deny", action="http.request", target="example.com"
     )
-    decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", profile, Posture.normal, [rule]
-    )
+    decision = PolicyEngine().evaluate(req, "Mandare", profile, Posture.normal, [rule])
 
     assert decision.decision == "deny"
     assert decision.matched_rule == "policy.block_example"
@@ -70,9 +68,7 @@ def test_custom_rule_matches_full_url_target():
         action="http.request",
         target="https://example.com",
     )
-    decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", profile, Posture.normal, [rule]
-    )
+    decision = PolicyEngine().evaluate(req, "Mandare", profile, Posture.normal, [rule])
 
     assert decision.decision == "deny"
     assert decision.matched_rule == "policy.block_example"
@@ -97,7 +93,7 @@ def _open_profile() -> EnvironmentProfile:
 
 
 def _shipped_rules() -> list[PolicyRule]:
-    from rif_runtime.configuration.policies import DEFAULT_POLICIES
+    from mandare.configuration.policies import DEFAULT_POLICIES
 
     return [PolicyRule.model_validate(row) for row in DEFAULT_POLICIES["rules"]]
 
@@ -109,7 +105,7 @@ def test_shipped_catch_all_denies_unknown_target():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, _shipped_rules()
+        req, "Mandare", _open_profile(), Posture.normal, _shipped_rules()
     )
 
     assert decision.decision == "deny"
@@ -123,7 +119,7 @@ def test_shipped_specific_allow_survives_the_catch_all():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, _shipped_rules()
+        req, "Mandare", _open_profile(), Posture.normal, _shipped_rules()
     )
 
     assert decision.decision == "allow"
@@ -139,7 +135,7 @@ def test_action_wildcard_rule_matches_any_action_on_target():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, [rule]
+        req, "Mandare", _open_profile(), Posture.normal, [rule]
     )
 
     assert decision.decision == "deny"
@@ -155,7 +151,7 @@ def test_target_wildcard_rule_matches_any_target_for_action():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, [rule]
+        req, "Mandare", _open_profile(), Posture.normal, [rule]
     )
 
     assert decision.decision == "deny"
@@ -176,7 +172,7 @@ def test_more_specific_rule_wins_regardless_of_configured_order():
 
     for rules in ([broad, narrow], [narrow, broad]):
         decision = PolicyEngine().evaluate(
-            req, "RIF_Runtime", _open_profile(), Posture.normal, list(rules)
+            req, "Mandare", _open_profile(), Posture.normal, list(rules)
         )
         assert decision.matched_rule == "policy.narrow_allow", (
             f"specificity ignored for order {[r.id for r in rules]}"
@@ -196,7 +192,7 @@ def test_equal_specificity_keeps_configured_order():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, [first, second]
+        req, "Mandare", _open_profile(), Posture.normal, [first, second]
     )
 
     assert decision.matched_rule == "policy.first"
@@ -227,7 +223,7 @@ def test_locked_posture_still_precedes_every_rule():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.locked, [rule]
+        req, "Mandare", _open_profile(), Posture.locked, [rule]
     )
 
     assert decision.decision == "deny"
@@ -241,7 +237,7 @@ def test_no_rules_falls_back_to_default_allow():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, []
+        req, "Mandare", _open_profile(), Posture.normal, []
     )
 
     assert decision.decision == "allow"
@@ -291,7 +287,7 @@ def test_run_create_is_allowed_by_the_shipped_policy():
     )
 
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", _open_profile(), Posture.normal, _shipped_rules()
+        req, "Mandare", _open_profile(), Posture.normal, _shipped_rules()
     )
 
     assert decision.decision == "allow"
@@ -309,7 +305,7 @@ def test_legacy_policies_missing_allow_run_create_are_upgraded(tmp_path):
     """
     import json
 
-    from rif_runtime.runtime import RIFRuntime
+    from mandare.runtime import MandareRuntime
 
     legacy = {
         "rules": [
@@ -324,7 +320,7 @@ def test_legacy_policies_missing_allow_run_create_are_upgraded(tmp_path):
     }
     (tmp_path / "policies.json").write_text(json.dumps(legacy), encoding="utf-8")
 
-    runtime = RIFRuntime(data_dir=tmp_path)
+    runtime = MandareRuntime(data_dir=tmp_path)
     rule_ids = [rule.id for rule in runtime.policy_store.list()]
     assert "allow_run_create" in rule_ids
     assert "allow_known_model_hosts" not in rule_ids
@@ -351,7 +347,7 @@ def test_shipped_data_policies_matches_default_policies():
     import json
     from pathlib import Path
 
-    from rif_runtime.configuration.policies import DEFAULT_POLICIES
+    from mandare.configuration.policies import DEFAULT_POLICIES
 
     shipped = json.loads(
         (Path(__file__).resolve().parent.parent / "data" / "policies.json").read_text(
@@ -383,7 +379,7 @@ def test_mcp_invoke_simulation_reports_the_denial_rather_than_bypassing_it():
         networking_type="open", allow_mcp_server_network_access=False
     )
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", egress_off, Posture.normal, _shipped_rules()
+        req, "Mandare", egress_off, Posture.normal, _shipped_rules()
     )
     assert decision.decision == "deny"
     assert decision.matched_rule == "mcp.egress.disabled"
@@ -394,7 +390,7 @@ def test_mcp_invoke_simulation_reports_the_denial_rather_than_bypassing_it():
         networking_type="open", allow_mcp_server_network_access=True, allowed_hosts=[]
     )
     decision = PolicyEngine().evaluate(
-        req, "RIF_Runtime", egress_on, Posture.normal, _shipped_rules()
+        req, "Mandare", egress_on, Posture.normal, _shipped_rules()
     )
     assert decision.decision == "deny"
     assert decision.matched_rule == "policy.deny_unknown_by_default"

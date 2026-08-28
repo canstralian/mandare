@@ -2,9 +2,9 @@
 
 Circuit: task -> generation -> refinement -> test -> regression detection ->
 audit event -> report. Each refinement turn is gated through
-`RIFRuntime.evaluate()` (an auditable policy decision) before the agent is
+`MandareRuntime.evaluate()` (an auditable policy decision) before the agent is
 asked to refine the code, and a failed verification is itself recorded as a
-governed denial via `RIFRuntime.record_decision()` so regressions can drive
+governed denial via `MandareRuntime.record_decision()` so regressions can drive
 posture escalation exactly like any other denial.
 
 This module intentionally does not embed a live model client. Real model
@@ -25,10 +25,10 @@ from pathlib import Path
 from sandbox_exec import run_in_sandbox
 from score import score_session
 
-from rif_runtime.audit import utc_now_iso
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import Decision, PolicyDecision, PolicyRequest
-from rif_runtime.security import sha256_digest
+from mandare.audit import utc_now_iso
+from mandare.runtime import MandareRuntime
+from mandare.schemas import Decision, PolicyDecision, PolicyRequest
+from mandare.security import sha256_digest
 
 
 def _enum_value(value: object) -> object:
@@ -78,10 +78,10 @@ class ScriptedAgent(CodeAgent):
 def run_session(
     task: dict,
     agent: CodeAgent,
-    runtime: RIFRuntime | None = None,
+    runtime: MandareRuntime | None = None,
     actor: str | None = None,
 ) -> dict:
-    runtime = runtime or RIFRuntime()
+    runtime = runtime or MandareRuntime()
     actor_name = actor or f"agent:eval:{agent.name}"
     task_id = task["task_id"]
     tests = task["tests"]
@@ -229,7 +229,7 @@ def write_report(
     )
 
     md_lines = [
-        "# MST-RIF Report",
+        "# MST-Mandare Report",
         "",
         "| task_id | model | turns_attempted | turns_passed | turns_blocked |"
         " first_regression_turn | mst_score |",
@@ -271,7 +271,7 @@ def _load_agent(spec: str) -> CodeAgent:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Run an MST-RIF governed code refinement session."
+        description="Run an MST-Mandare governed code refinement session."
     )
     parser.add_argument("task", type=Path, help="Path to a task JSON file")
     parser.add_argument(

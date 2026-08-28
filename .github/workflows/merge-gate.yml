@@ -103,7 +103,7 @@ jobs:
 
       - run: ruff check .
       - run: ruff format --check .
-      - run: mypy src/rif_runtime --ignore-missing-imports
+      - run: mypy src/mandare --ignore-missing-imports
       - run: pytest -q
 
   # The honesty check. No cache, no lock, no constraints — installs the runtime

@@ -1,22 +1,22 @@
-# RIF Runtime
+# Mandare
 
-[![Merge Gate](https://github.com/canstralian/rif-runtime/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/merge-gate.yml)
-[![Coverage](https://github.com/canstralian/rif-runtime/actions/workflows/coverage.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/coverage.yml)
-[![Image](https://github.com/canstralian/rif-runtime/actions/workflows/image.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/image.yml)
-[![Release](https://github.com/canstralian/rif-runtime/actions/workflows/release.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/release.yml)
-[![CodeQL](https://github.com/canstralian/rif-runtime/actions/workflows/codeql.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/codeql.yml)
-[![Bandit](https://github.com/canstralian/rif-runtime/actions/workflows/bandit.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/bandit.yml)
-[![Gitleaks](https://github.com/canstralian/rif-runtime/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/gitleaks.yml)
-[![License](https://img.shields.io/github/license/canstralian/rif-runtime)](LICENSE)
+[![Merge Gate](https://github.com/canstralian/mandare/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/merge-gate.yml)
+[![Coverage](https://github.com/canstralian/mandare/actions/workflows/coverage.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/coverage.yml)
+[![Image](https://github.com/canstralian/mandare/actions/workflows/image.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/image.yml)
+[![Release](https://github.com/canstralian/mandare/actions/workflows/release.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/release.yml)
+[![CodeQL](https://github.com/canstralian/mandare/actions/workflows/codeql.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/codeql.yml)
+[![Bandit](https://github.com/canstralian/mandare/actions/workflows/bandit.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/bandit.yml)
+[![Gitleaks](https://github.com/canstralian/mandare/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/gitleaks.yml)
+[![License](https://img.shields.io/github/license/canstralian/mandare)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-**RIF Runtime is a policy and governance runtime for agent-driven systems.** It evaluates proposed actions before they cross a capability boundary, maintains runtime posture, and records decision history for inspection and replay.
+**Mandare is a policy and governance runtime for agent-driven systems.** It evaluates proposed actions before they cross a capability boundary, maintains runtime posture, and records decision history for inspection and replay.
 
 The design goal is deliberately simple:
 
-> **A model may propose. RIF decides.**
+> **A model may propose. Mandare decides.**
 
-RIF is not an autonomous-agent framework and does not treat model confidence, possession of a provider credential, or model output as authorization.
+Mandare is not an autonomous-agent framework and does not treat model confidence, possession of a provider credential, or model output as authorization.
 
 ## What exists today
 
@@ -109,13 +109,13 @@ The larger target architecture is documented separately from the implementation 
 
 ## Current maturity
 
-RIF Runtime is an actively developed release-candidate project, not a claim of production certification or a completed enterprise control plane. Some enterprise-oriented controls remain future work, including SBOM generation, signed releases, reproducible release builds, and a fully governed remote-inference authorization seam.
+Mandare is an actively developed release-candidate project, not a claim of production certification or a completed enterprise control plane. Some enterprise-oriented controls remain future work, including SBOM generation, signed releases, reproducible release builds, and a fully governed remote-inference authorization seam.
 
 Security and CI documentation describe repository controls that are present in source/workflow files; they do not constitute an independent assurance report.
 
 ## Contributing
 
-RIF benefits from contributors who enjoy the awkward but important boundary between **what an intelligent system wants to do** and **what a governed system is willing to let it do**.
+Mandare benefits from contributors who enjoy the awkward but important boundary between **what an intelligent system wants to do** and **what a governed system is willing to let it do**.
 
 Good contributions include:
 

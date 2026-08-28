@@ -54,7 +54,7 @@ The next supply-chain hardening layer should address SBOMs, signed artefacts/pro
 
 ## Current commands
 
-See [`DEVELOPMENT.md`](DEVELOPMENT.md) and [`docs/cli-reference.md`](docs/cli-reference.md). Do not use historical `make` targets or CLI commands from old roadmap material without checking the current `Makefile`/`src/rif_runtime/cli.py`.
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) and [`docs/cli-reference.md`](docs/cli-reference.md). Do not use historical `make` targets or CLI commands from old roadmap material without checking the current `Makefile`/`src/mandare/cli.py`.
 
 ## Canonical roadmap
 

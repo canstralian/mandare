@@ -2,7 +2,7 @@
 
 ## Scope
 
-RIF Runtime is a security-sensitive governance runtime. Its core security property is that policy evaluation remains authoritative over proposed agent actions.
+Mandare is a security-sensitive governance runtime. Its core security property is that policy evaluation remains authoritative over proposed agent actions.
 
 This document describes controls that are present in the repository today, plus limitations that matter when deploying the software. It is not a certification, penetration-test report, or claim of compliance with a particular regulatory framework.
 
@@ -25,7 +25,7 @@ The exact policy semantics are implementation-defined and tested in `tests/`. Po
 
 ### Control-plane authentication
 
-Mutable operations such as environment mutation, posture mutation, policy CRUD, and Metasploit capability-token minting are guarded by the `X-API-Key` dependency in `src/rif_runtime/auth.py`.
+Mutable operations such as environment mutation, posture mutation, policy CRUD, and Metasploit capability-token minting are guarded by the `X-API-Key` dependency in `src/mandare/auth.py`.
 
 The configured key set is supplied through:
 
@@ -37,7 +37,7 @@ The application hashes supplied and configured keys before constant-time compari
 
 ### Cryptographic utilities
 
-`src/rif_runtime/security.py` provides:
+`src/mandare/security.py` provides:
 
 - SHA-256 canonical digests;
 - HMAC-SHA256 signatures and verification;
@@ -45,9 +45,9 @@ The application hashes supplied and configured keys before constant-time compari
 - Fernet encryption using a PBKDF2-derived key;
 - recursive redaction of common secret-bearing keys.
 
-`src/rif_runtime/audit.py` provides hash-chain record primitives with a genesis hash and chain verification.
+`src/mandare/audit.py` provides hash-chain record primitives with a genesis hash and chain verification.
 
-The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`. Verification detects modification of a retained record, a broken predecessor link, and reordering — including a row removed from the middle, which orphans everything after it. It does **not** detect a deleted trailing suffix: every record that remains is still internally consistent, which is the same limitation as truncation below. `GET /v1/audit` reports the result under `decision_chain`, and `RIFRuntime.verify_decision_chain()` returns it directly.
+The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`. Verification detects modification of a retained record, a broken predecessor link, and reordering — including a row removed from the middle, which orphans everything after it. It does **not** detect a deleted trailing suffix: every record that remains is still internally consistent, which is the same limitation as truncation below. `GET /v1/audit` reports the result under `decision_chain`, and `MandareRuntime.verify_decision_chain()` returns it directly.
 
 **Scope of that property.** Chain verification detects integrity failures among the records that are still present. It is not proof of completeness and not an externally anchored ledger:
 
@@ -113,7 +113,7 @@ These are future hardening items, not active controls.
 
 ## Enterprise deployment expectations
 
-Before treating RIF as a production control plane, deployment owners should independently establish:
+Before treating Mandare as a production control plane, deployment owners should independently establish:
 
 - TLS and trusted ingress;
 - enterprise identity and authorization around administrative operations;

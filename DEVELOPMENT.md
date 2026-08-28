@@ -12,8 +12,8 @@ This guide is intentionally command-first. If a command is not backed by the cur
 ## Local setup
 
 ```bash
-git clone https://github.com/canstralian/rif-runtime.git
-cd rif-runtime
+git clone https://github.com/canstralian/mandare.git
+cd mandare
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
@@ -83,7 +83,7 @@ Run the focused checks first:
 ```bash
 ruff check src tests
 ruff format --check src tests
-mypy src/rif_runtime --ignore-missing-imports
+mypy src/mandare --ignore-missing-imports
 pytest -q
 ```
 
@@ -132,7 +132,7 @@ Avoid using repository state as a test fixture. Tests should use isolated tempor
 
 ## API development
 
-`src/rif_runtime/api.py` is the current HTTP route source of truth.
+`src/mandare/api.py` is the current HTTP route source of truth.
 
 When changing an endpoint:
 

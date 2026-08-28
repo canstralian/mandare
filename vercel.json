@@ -20,6 +20,6 @@
   ],
   "env": {
     "RIF_DATA_DIR": "/tmp/rif-data",
-    "RIF_ENVIRONMENT": "RIF_Runtime"
+    "RIF_ENVIRONMENT": "Mandare"
   }
 }

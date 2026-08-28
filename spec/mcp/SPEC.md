@@ -1,13 +1,13 @@
 # MCP Server Framework — Governance Specification
 
 Status: **Drafted** · Domain: `spec/mcp/` · Conforms to: ADR-0008, `spec/governance/`, `spec/capability/`, `spec/evidence/`
-Reference implementation: `src/rif_runtime/mcp/metasploit.py` (single-server governor this framework generalizes)
+Reference implementation: `src/mandare/mcp/metasploit.py` (single-server governor this framework generalizes)
 
 ---
 
 ## 1. Purpose and non-goals
 
-The MCP server framework defines how RIF Runtime admits and gates **Model
+The MCP server framework defines how Mandare admits and gates **Model
 Context Protocol** tool invocations from one or many MCP servers. MCP is the
 runtime's highest-leverage authority surface: unlike an HTTP fetch, an MCP tool
 call can *grant capability* — write files, run processes, mutate remote state —
@@ -22,7 +22,7 @@ into a contract every governed MCP server MUST satisfy.
 does not implement transport, and does not replace the policy engine — it
 composes with `PolicyEngine.evaluate()` and the reflexive posture loop.
 
-## 2. Position in RIF Runtime
+## 2. Position in Mandare
 
 The framework sits between an agent's proposed tool call and the MCP client
 transport, on the existing `mcp.*` action path:
@@ -41,11 +41,11 @@ Grounding in current surface (normative references, not restated here):
 
 - `mcp.invoke` ∈ `NETWORK_ACTIONS`; `mcp.*` egress is gated by
   `allow_mcp_server_network_access` on the environment profile
-  (`src/rif_runtime/policy.py`).
+  (`src/mandare/policy.py`).
 - Routes `POST /v1/mcp/invoke`, `POST /v1/mcp/metasploit/{evaluate,token}`
-  (`src/rif_runtime/api.py`). Token minting is behind `ControlPlaneAuth`.
+  (`src/mandare/api.py`). Token minting is behind `ControlPlaneAuth`.
 - Signed `CapabilityToken` and `EvidenceEvent`
-  (`src/rif_runtime/mcp/metasploit.py`).
+  (`src/mandare/mcp/metasploit.py`).
 
 ## 3. Authority model (the spine)
 
@@ -124,7 +124,7 @@ Classification is a property of the tool contract (T2), not of the arguments
   §4.7 / §6 hard gate.
 
 Classification reuses the existing `capabilities.classify` /
-`is_severe` machinery (`src/rif_runtime/mcp/capabilities.py`) as the normative
+`is_severe` machinery (`src/mandare/mcp/capabilities.py`) as the normative
 implementation; new servers extend the catalog, they do not fork the classifier.
 
 ## 6. The destructive-action hard gate
@@ -166,7 +166,7 @@ exclude free-text/T4 fields, exactly as `MetasploitIntent.intent_hash`.
 Every decision — allow or deny, every lane — MUST emit a signed, replayable
 `EvidenceEvent` and append it via `JsonlStore`. The framework does **not** define
 its own evidence format: it conforms to `spec/evidence/observation_event.schema.json`
-and reuses the signing/verification in `src/rif_runtime/mcp/metasploit.py`
+and reuses the signing/verification in `src/mandare/mcp/metasploit.py`
 (`_sign_evidence` / `verify_evidence`). Replay conforms to the (placeholder)
 `spec/replay/` contract once extracted. This is a deliberate reference to avoid
 the duplication failure mode called out in OD-5.
@@ -189,7 +189,7 @@ fixes the T2 contract used for pinning.
 ## 9. Configuration
 
 - MCP egress is off by default: `allow_mcp_server_network_access = false`
-  (`src/rif_runtime/schemas.py`). Environments opt in via
+  (`src/mandare/schemas.py`). Environments opt in via
   `config/environments.yaml`; the flag is never hardcoded per §Conventions.
 - The broker signing key is sourced from the environment
   (`RIF_MSF_BROKER_KEY` today; a framework-level `RIF_MCP_BROKER_KEY` is OD-4),

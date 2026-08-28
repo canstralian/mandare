@@ -54,7 +54,7 @@ After tagging, verify the exact GitHub Actions run and the resulting release ass
 
 For an application deployment, retain the previous known-good version and persistent-state backup before upgrading. Test the rollback path in the deployment environment rather than assuming package rollback also reverses state migrations.
 
-RIF currently has local JSON/JSONL persistence and does not ship a general database migration framework. Any future schema migration must therefore define compatibility and recovery explicitly.
+Mandare currently has local JSON/JSONL persistence and does not ship a general database migration framework. Any future schema migration must therefore define compatibility and recovery explicitly.
 
 ## Compatibility
 

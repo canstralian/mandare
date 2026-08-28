@@ -4,9 +4,9 @@
 Accepted (direction) — implementation to proceed incrementally, tracked as separate work items.
 
 ## Context
-`rif-runtime` today ships a working governance-first runtime (policy → decision →
+`mandare` today ships a working governance-first runtime (policy → decision →
 reflexive loop → posture → governance graph → persistent memory → audit API), but
-specification, runtime code, and documentation are interwoven in `src/rif_runtime/`
+specification, runtime code, and documentation are interwoven in `src/mandare/`
 and `docs/`. There is no first-class packaging for capabilities (skills/plugins), no
 dedicated control plane, and evidence/replay are single modules rather than systems.
 
@@ -52,7 +52,7 @@ Concretely, adopt the following structural boundaries:
   everything else conforms to it).
 - Existing `contracts/rif_familiar/` schemas are the seed for `spec/capability/` and
   `spec/skill/` — migrate rather than duplicate.
-- Existing `src/rif_runtime/governance/`, `audit.py`, `replay.py` become the first
+- Existing `src/mandare/governance/`, `audit.py`, `replay.py` become the first
   implementations of the new `spec/` contracts, not replacements to throw away.
 - Each future slice should land as its own PR with evidence (tests / docs) attached,
   per the lifecycle state machine above.

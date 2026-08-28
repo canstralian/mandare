@@ -9,7 +9,7 @@ instance of this contract, originally scoped to the RIF Familiar / Field Observe
 device. It seeds this directory rather than being rewritten, per ADR-0008's
 instruction to migrate existing contracts rather than duplicate them.
 
-Runtime implementation: `src/rif_runtime/mcp/capabilities.py`.
+Runtime implementation: `src/mandare/mcp/capabilities.py`.
 
 ## Open contract question — snapshot binding
 

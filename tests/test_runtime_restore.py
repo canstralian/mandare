@@ -4,18 +4,18 @@ import json
 
 import pytest
 
-from rif_runtime.config import PostureLevel, reset_settings
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import EnvironmentProfile, PolicyRequest, Posture
+from mandare.config import PostureLevel, reset_settings
+from mandare.runtime import MandareRuntime
+from mandare.schemas import EnvironmentProfile, PolicyRequest, Posture
 
 
 def test_locked_runtime_stays_locked_after_restart(tmp_path):
     # A locked posture denies everything, so losing it on restart silently
     # re-opens the runtime.
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.locked)
 
-    restarted = RIFRuntime(data_dir=tmp_path)
+    restarted = MandareRuntime(data_dir=tmp_path)
     assert restarted.posture == Posture.locked
 
 
@@ -37,21 +37,21 @@ def test_restart_restores_posture_from_decisions_when_no_history(tmp_path):
         "\n".join(json.dumps(row) for _ in range(20)) + "\n", encoding="utf-8"
     )
 
-    assert RIFRuntime(data_dir=tmp_path).posture == Posture.locked
+    assert MandareRuntime(data_dir=tmp_path).posture == Posture.locked
 
 
 def test_restart_honours_a_reset(tmp_path):
     # An operator reset is a recorded transition, so it must win over the
     # earlier escalation rather than being replayed away.
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.locked)
     first.set_posture(Posture.normal)
 
-    assert RIFRuntime(data_dir=tmp_path).posture == Posture.normal
+    assert MandareRuntime(data_dir=tmp_path).posture == Posture.normal
 
 
 def test_data_dir_owns_every_store(tmp_path):
-    runtime = RIFRuntime(data_dir=tmp_path)
+    runtime = MandareRuntime(data_dir=tmp_path)
 
     assert runtime.decisions_path == tmp_path / "decisions.jsonl"
     assert runtime.posture_store.path == tmp_path / "posture_history.jsonl"
@@ -62,7 +62,7 @@ def test_data_dir_owns_every_store(tmp_path):
 # --- configured posture floor ------------------------------------------------
 #
 # RIF_POSTURE / rif.toml [runtime] posture used to be parsed, validated, and
-# never read: RIFRuntime took its posture purely from the logs, so a runtime
+# never read: MandareRuntime took its posture purely from the logs, so a runtime
 # configured `locked` started up allowing everything.
 
 
@@ -82,7 +82,7 @@ def configured_posture(monkeypatch: pytest.MonkeyPatch):
 def test_configured_posture_applies_on_a_fresh_runtime(tmp_path, configured_posture):
     configured_posture("locked")
 
-    assert RIFRuntime(data_dir=tmp_path).posture == Posture.locked
+    assert MandareRuntime(data_dir=tmp_path).posture == Posture.locked
 
 
 def test_configured_posture_denies_traffic_a_normal_runtime_would_allow(
@@ -90,7 +90,7 @@ def test_configured_posture_denies_traffic_a_normal_runtime_would_allow(
 ):
     """The floor has to reach the decision path, not just the attribute."""
     configured_posture("locked")
-    runtime = RIFRuntime(data_dir=tmp_path)
+    runtime = MandareRuntime(data_dir=tmp_path)
     runtime.config.environments["open_test"] = EnvironmentProfile(
         networking_type="open", allowed_hosts=[]
     )
@@ -110,10 +110,10 @@ def test_configured_posture_denies_traffic_a_normal_runtime_would_allow(
 def test_configured_posture_is_a_floor_not_an_assignment(tmp_path, configured_posture):
     """A runtime that escalated past the floor is not relaxed back down to it."""
     configured_posture("elevated")
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.locked)
 
-    assert RIFRuntime(data_dir=tmp_path).posture == Posture.locked
+    assert MandareRuntime(data_dir=tmp_path).posture == Posture.locked
 
 
 def test_configured_floor_survives_an_operator_reset_across_restart(
@@ -126,20 +126,20 @@ def test_configured_floor_survives_an_operator_reset_across_restart(
     docs/API.md so the asymmetry is not a surprise.
     """
     configured_posture("restricted")
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.normal)
     assert first.posture == Posture.normal
 
-    assert RIFRuntime(data_dir=tmp_path).posture == Posture.restricted
+    assert MandareRuntime(data_dir=tmp_path).posture == Posture.restricted
 
 
 def test_default_configuration_leaves_restore_behaviour_unchanged(tmp_path):
     """With no RIF_POSTURE set the floor is `normal`, i.e. a no-op."""
-    first = RIFRuntime(data_dir=tmp_path)
+    first = MandareRuntime(data_dir=tmp_path)
     first.set_posture(Posture.locked)
     first.set_posture(Posture.normal)
 
-    assert RIFRuntime(data_dir=tmp_path).posture == Posture.normal
+    assert MandareRuntime(data_dir=tmp_path).posture == Posture.normal
 
 
 def test_posture_level_is_the_runtime_posture_enum():

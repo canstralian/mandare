@@ -12,7 +12,7 @@ Knowledge is never authoritative.
 
 ## Owns
 
-src/rif_runtime/knowledge/
+src/mandare/knowledge/
 
 ---
 

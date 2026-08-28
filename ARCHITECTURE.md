@@ -1,14 +1,14 @@
-# RIF Runtime Architecture
+# Mandare Architecture
 
 ## Purpose
 
-RIF Runtime places a deterministic governance boundary between an agent or caller and actions the runtime is willing to evaluate or invoke.
+Mandare places a deterministic governance boundary between an agent or caller and actions the runtime is willing to evaluate or invoke.
 
 The architectural invariant is:
 
 > **Policy is authoritative; model output is advisory.**
 
-This document describes the implementation currently present in `src/rif_runtime/`. Proposed architecture is kept separate and explicitly labelled as such.
+This document describes the implementation currently present in `src/mandare/`. Proposed architecture is kept separate and explicitly labelled as such.
 
 ## Implemented request path
 
@@ -19,7 +19,7 @@ Caller
 PolicyRequest
   |
   v
-RIFRuntime.evaluate()
+MandareRuntime.evaluate()
   |
   +--> PolicyEngine --------------------+
   |                                     |
@@ -44,7 +44,7 @@ The runtime now has a first vertical slice for capability governance. An executa
 ExecutionManifest
       |
       v
-RIFRuntime.execute_capability()
+MandareRuntime.execute_capability()
       |
       +--> PolicyEngine
       |       |
@@ -79,26 +79,26 @@ The important boundary is:
 
 Capability governance records currently capture identity, provenance, integrity, permissions, dependencies, lifecycle state, and evaluation evidence. This is intentionally a small contract that can later absorb signed artifacts, SkillSpector-style inspection, benchmark evidence, and richer provenance without coupling those concerns to the executable adapter interface.
 
-The existing `ExecutionKernel` remains capability-specificity-free: it resolves an already-selected adapter and executes it. `RIFRuntime.execute_capability()` is the governed orchestration path that performs policy evaluation and capability admission before invoking the kernel.
+The existing `ExecutionKernel` remains capability-specificity-free: it resolves an already-selected adapter and executes it. `MandareRuntime.execute_capability()` is the governed orchestration path that performs policy evaluation and capability admission before invoking the kernel.
 
 ## Major components
 
 | Component | Implementation | Role | Status |
 |---|---|---|---|
-| API | `src/rif_runtime/api.py` | FastAPI HTTP surface | Implemented |
-| CLI | `src/rif_runtime/cli.py` | Local operator/developer commands | Implemented |
-| Runtime | `src/rif_runtime/runtime.py` | Wires policy, posture, graph, telemetry, persistence, and governed capability execution | Implemented |
-| Policy | `src/rif_runtime/policy.py` | Evaluates policy requests and constraints | Implemented |
-| Configuration | `src/rif_runtime/config.py`, `rif.toml`, `config/` | Runtime/environment configuration | Implemented |
-| Posture | `src/rif_runtime/governance/` | Tracks and escalates runtime posture | Implemented |
-| Graph | `src/rif_runtime/graph/` | In-memory actor/target relationship view | Implemented |
-| Persistence | `src/rif_runtime/storage/` | JSONL append-oriented state storage | Implemented |
-| Replay | `src/rif_runtime/replay.py` | Reconstructs graph/posture state from decision history | Implemented |
-| Audit primitives | `src/rif_runtime/audit.py` | Hash-chain record primitives and verification | Implemented as a library surface; not equivalent to every persisted decision being hash-chained |
-| Capabilities | `src/rif_runtime/capabilities/` | Executable adapters plus governance identity/admission records | Implemented first vertical slice |
-| Execution | `src/rif_runtime/execution/` | Manifest and capability execution kernel | Implemented; governed orchestration lives in `RIFRuntime` |
-| MCP | `src/rif_runtime/mcp/` | MCP governance and Metasploit-specific evaluation | Implemented in the current scope |
-| Supabase integration | `src/rif_runtime/integrations/supabase.py` | Optional remote persistence/JWT verification | Optional |
+| API | `src/mandare/api.py` | FastAPI HTTP surface | Implemented |
+| CLI | `src/mandare/cli.py` | Local operator/developer commands | Implemented |
+| Runtime | `src/mandare/runtime.py` | Wires policy, posture, graph, telemetry, persistence, and governed capability execution | Implemented |
+| Policy | `src/mandare/policy.py` | Evaluates policy requests and constraints | Implemented |
+| Configuration | `src/mandare/config.py`, `rif.toml`, `config/` | Runtime/environment configuration | Implemented |
+| Posture | `src/mandare/governance/` | Tracks and escalates runtime posture | Implemented |
+| Graph | `src/mandare/graph/` | In-memory actor/target relationship view | Implemented |
+| Persistence | `src/mandare/storage/` | JSONL append-oriented state storage | Implemented |
+| Replay | `src/mandare/replay.py` | Reconstructs graph/posture state from decision history | Implemented |
+| Audit primitives | `src/mandare/audit.py` | Hash-chain record primitives and verification | Implemented as a library surface; not equivalent to every persisted decision being hash-chained |
+| Capabilities | `src/mandare/capabilities/` | Executable adapters plus governance identity/admission records | Implemented first vertical slice |
+| Execution | `src/mandare/execution/` | Manifest and capability execution kernel | Implemented; governed orchestration lives in `MandareRuntime` |
+| MCP | `src/mandare/mcp/` | MCP governance and Metasploit-specific evaluation | Implemented in the current scope |
+| Supabase integration | `src/mandare/integrations/supabase.py` | Optional remote persistence/JWT verification | Optional |
 
 ## Capability trust model
 
@@ -113,7 +113,7 @@ A capability record deliberately separates several claims:
 
 A signature, when present, proves an integrity relationship. It does not by itself prove that the capability is safe, useful, or policy-authorized.
 
-This deliberately mirrors the evidence-first trust model being explored from external skill ecosystems without making RIF dependent on a particular skill package format.
+This deliberately mirrors the evidence-first trust model being explored from external skill ecosystems without making Mandare dependent on a particular skill package format.
 
 ## Persistence model
 

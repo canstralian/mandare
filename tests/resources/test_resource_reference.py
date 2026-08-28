@@ -1,5 +1,5 @@
-from rif_runtime.resources.identity import ResourceId, ResourceKind
-from rif_runtime.resources.resource import ResourceReference
+from mandare.resources.identity import ResourceId, ResourceKind
+from mandare.resources.resource import ResourceReference
 
 
 def test_reference_keeps_identity_separate_from_uri() -> None:
@@ -7,10 +7,10 @@ def test_reference_keeps_identity_separate_from_uri() -> None:
         id=ResourceId(
             kind=ResourceKind.REPOSITORY,
             namespace="canstralian",
-            name="rif-runtime",
+            name="mandare",
         ),
-        uri="https://github.com/canstralian/rif-runtime",
+        uri="https://github.com/canstralian/mandare",
     )
 
-    assert reference.id.name == "rif-runtime"
+    assert reference.id.name == "mandare"
     assert reference.uri.startswith("https://")

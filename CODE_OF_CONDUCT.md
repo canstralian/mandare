@@ -2,7 +2,7 @@
 
 ## Our standard
 
-RIF Runtime is a technical project. Contributors, reviewers, and maintainers are expected to make the project useful, safe, and welcoming to people with different backgrounds and levels of experience.
+Mandare is a technical project. Contributors, reviewers, and maintainers are expected to make the project useful, safe, and welcoming to people with different backgrounds and levels of experience.
 
 We expect:
 
@@ -21,7 +21,7 @@ Project maintainers may remove comments, close discussions, restrict participati
 
 For conduct concerns, use the project's private reporting contact:
 
-[Click here to contact the project maintainers](mailto:distortedprojection@gmail.com?subject=RIF%20Runtime%20conduct%20concern)
+[Click here to contact the project maintainers](mailto:distortedprojection@gmail.com?subject=Mandare%20conduct%20concern)
 
 Security vulnerabilities should be reported according to [`SECURITY.md`](SECURITY.md), not through public issues or discussions.
 

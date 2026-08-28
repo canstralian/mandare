@@ -1,0 +1,21 @@
+---
+description: Mandare evidence-first guardrail — prefer repository evidence over external network research
+alwaysApply: true
+---
+
+# Mandare guardrail
+
+Never use network access to obtain implementation details when the repository
+already contains the relevant source, tests, schemas, or documentation. Prefer
+repository evidence over external evidence.
+
+## Practice
+
+- Search and read in-repo paths first (`src/`, `tests/`, `docs/`, `spec/`,
+  `config/`, `AGENTS.md`, `CLAUDE.md`, `.claude/skills/`).
+- Use `WebFetch` only when the user supplies a URL, or when the repo clearly
+  lacks the needed contract/docs and a listed domain is required.
+- Do not use open-ended web search for Mandare implementation work; it introduces
+  non-deterministic external context that weakens replay and evidence quality.
+- When external material is used, cite the URL and state why in-repo evidence
+  was insufficient.

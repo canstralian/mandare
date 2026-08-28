@@ -1,4 +1,4 @@
-from rif_runtime.security import (
+from mandare.security import (
     canonical_json,
     decrypt_text_from_record,
     encrypt_text,

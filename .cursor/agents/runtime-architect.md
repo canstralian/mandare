@@ -2,7 +2,7 @@
 
 ## Mission
 
-Own the architectural integrity of the RIF Runtime.
+Own the architectural integrity of the Mandare.
 
 Optimize for explicit contracts, deterministic execution, immutable models, and long-term maintainability.
 

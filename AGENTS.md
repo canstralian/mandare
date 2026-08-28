@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in RIF Runtime.
+Guidance for AI coding agents working in Mandare.
 
 ## Repository model
 
-RIF Runtime is a Python FastAPI service (`rif_runtime.api:app`) with a Typer CLI (`rif`). It primarily uses local JSON/JSONL persistence, but the repository also contains an **optional Supabase integration** for run/evidence persistence and JWT verification. Do not describe the project as having no external integrations.
+Mandare is a Python FastAPI service (`mandare.api:app`) with a Typer CLI (`rif`). It primarily uses local JSON/JSONL persistence, but the repository also contains an **optional Supabase integration** for run/evidence persistence and JWT verification. Do not describe the project as having no external integrations.
 
 For architecture, read [`ARCHITECTURE.md`](ARCHITECTURE.md). For contributor expectations, read [`CONTRIBUTING.md`](CONTRIBUTING.md). For security-sensitive work, read [`SECURITY.md`](SECURITY.md). For documentation authority, read [`docs/README.md`](docs/README.md).
 
@@ -39,7 +39,7 @@ rif replay [decisions_path]
 rif msf-check <capability> <target> [--mode ...] [--actor ...] [--scope-id ...]
 ```
 
-Do not invent or reuse historical examples for commands that are not in `src/rif_runtime/cli.py`.
+Do not invent or reuse historical examples for commands that are not in `src/mandare/cli.py`.
 
 ## Validation
 
@@ -48,7 +48,7 @@ Run the relevant checks before declaring work complete:
 ```bash
 ruff check src tests
 ruff format --check src tests
-mypy src/rif_runtime --ignore-missing-imports
+mypy src/mandare --ignore-missing-imports
 pytest -q
 ```
 
@@ -66,13 +66,13 @@ The repository also configures CodeQL, Gitleaks, Dependency Review, and a merge 
 
 Runtime-generated state normally lives under `data/`, with `RIF_DATA_DIR` available for isolation. Tests should use isolated temporary directories rather than shared repository state.
 
-Posture can persist across restarts. Do not assume a fresh `RIFRuntime()` starts at normal posture when persisted state is present.
+Posture can persist across restarts. Do not assume a fresh `MandareRuntime()` starts at normal posture when persisted state is present.
 
 ## Security boundaries
 
 The control plane uses `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS`. A missing configuration fails closed for guarded operations.
 
-Do not grant authority to model output. In particular, do not treat an API key for an external model/provider as proof that RIF policy has authorized provider egress.
+Do not grant authority to model output. In particular, do not treat an API key for an external model/provider as proof that Mandare policy has authorized provider egress.
 
 ## Contract discipline
 

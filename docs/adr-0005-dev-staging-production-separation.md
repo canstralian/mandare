@@ -11,7 +11,7 @@ production data.
 
 ## Decision
 Split external provider state into three isolated projects — dev, staging,
-production — mirroring the runtime's environment profiles (`RIF_Runtime`,
+production — mirroring the runtime's environment profiles (`Mandare`,
 `RIF_Research`, `RIF_CI`):
 
 - **Dev** — agents read and write freely; schema is disposable; migrations

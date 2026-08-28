@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-RIF Runtime requires a provider-independent abstraction for addressable
+Mandare requires a provider-independent abstraction for addressable
 state before implementing repository synchronization, MCP providers,
 documentation rendering, or governed knowledge mutation.
 

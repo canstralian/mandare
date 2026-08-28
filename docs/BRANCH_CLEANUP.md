@@ -1,11 +1,11 @@
 # Branch Cleanup Procedure
 
-**Repository:** `canstralian/rif-runtime`
+**Repository:** `canstralian/mandare`
 **Trigger:** a successful release (a `v*.*.*` tag pushed and the
 [Release workflow](../.github/workflows/release.yml) green), or a periodic
 stale-branch audit.
 
-RIF Runtime follows a lightweight trunk-based workflow: `main` is the only
+Mandare follows a lightweight trunk-based workflow: `main` is the only
 long-lived branch, and every other branch is temporary — created for one
 change, merged via pull request, then deleted. There is no `develop` branch,
 and `release/*` / `hotfix/*` are reserved patterns that are protected if they
@@ -24,7 +24,7 @@ Verify all of the following before beginning:
 - [ ] Release tag created and pushed (`git tag --sort=-creatordate`)
 - [ ] The Release workflow for that tag passed (it runs ruff, mypy, pytest,
       and `rif replay` before publishing)
-- [ ] `pyproject.toml` and `src/rif_runtime/__init__.py` versions were bumped
+- [ ] `pyproject.toml` and `src/mandare/__init__.py` versions were bumped
       together for the release
 - [ ] All required pull requests merged
 - [ ] No open work depends on branches scheduled for deletion

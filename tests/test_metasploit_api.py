@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 
-from rif_runtime.api import app
-from rif_runtime.auth import ENV_VAR
-from rif_runtime.mcp.metasploit import GovernanceMode, MetasploitIntent
-from rif_runtime.runtime import RIFRuntime
-from rif_runtime.schemas import Posture
+from mandare.api import app
+from mandare.auth import ENV_VAR
+from mandare.mcp.metasploit import GovernanceMode, MetasploitIntent
+from mandare.runtime import MandareRuntime
+from mandare.schemas import Posture
 
 client = TestClient(app)
 
@@ -98,7 +98,7 @@ def test_evaluate_route_is_dry_run_no_side_effects():
     # The unauthenticated /v1/mcp/metasploit/evaluate route must simulate only.
     # session.create is a severe deny; recording it would escalate posture and
     # append to the decision/evidence stores. Dry-run must do neither.
-    from rif_runtime import api
+    from mandare import api
 
     before_decisions = api.runtime.decisions_store.count()
     before_evidence = api.runtime.evidence_store.count()
@@ -113,7 +113,7 @@ def test_evaluate_route_is_dry_run_no_side_effects():
 
 
 def test_runtime_severe_denial_escalates_posture():
-    runtime = RIFRuntime()
+    runtime = MandareRuntime()
     runtime.posture = Posture.normal
     intent = MetasploitIntent(capability="session.create", target="10.10.10.5")
     outcome = runtime.evaluate_metasploit(intent, mode=GovernanceMode.shadow)
@@ -123,7 +123,7 @@ def test_runtime_severe_denial_escalates_posture():
 
 
 def test_runtime_records_decision_and_evidence():
-    runtime = RIFRuntime()
+    runtime = MandareRuntime()
     before_decisions = runtime.decisions_store.count()
     before_evidence = runtime.evidence_store.count()
     intent = MetasploitIntent(capability="module.search", target="cve-2017-0144")

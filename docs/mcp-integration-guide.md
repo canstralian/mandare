@@ -6,7 +6,7 @@
 
 ## Scope
 
-Integrating RIF Runtime with Model Context Protocol servers.
+Integrating Mandare with Model Context Protocol servers.
 
 ## Architecture
 

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from typer.testing import CliRunner
 
-from rif_runtime.cli import app
+from mandare.cli import app
 
 runner = CliRunner()
 
@@ -15,7 +15,7 @@ def test_serve_does_not_enable_reload_by_default():
     Reload was previously hardcoded on, so the documented way to start the
     service spawned uvicorn's file-watching supervisor in production.
     """
-    with patch("rif_runtime.cli.uvicorn.run") as run:
+    with patch("mandare.cli.uvicorn.run") as run:
         result = runner.invoke(app, ["serve"])
 
     assert result.exit_code == 0, result.output
@@ -23,7 +23,7 @@ def test_serve_does_not_enable_reload_by_default():
 
 
 def test_serve_reload_flag_enables_it():
-    with patch("rif_runtime.cli.uvicorn.run") as run:
+    with patch("mandare.cli.uvicorn.run") as run:
         result = runner.invoke(app, ["serve", "--reload"])
 
     assert result.exit_code == 0, result.output
@@ -39,14 +39,14 @@ def test_serve_takes_host_and_port_from_settings(monkeypatch):
     tested in tests/test_config_contract.py; what belongs here is that the CLI
     forwards whatever configuration says.
     """
-    from rif_runtime.config import RifSettings
+    from mandare.config import RifSettings
 
     settings = RifSettings.model_validate(
         {"server": {"host": "192.0.2.10", "port": 9999}}
     )
-    monkeypatch.setattr("rif_runtime.cli.get_settings", lambda: settings)
+    monkeypatch.setattr("mandare.cli.get_settings", lambda: settings)
 
-    with patch("rif_runtime.cli.uvicorn.run") as run:
+    with patch("mandare.cli.uvicorn.run") as run:
         runner.invoke(app, ["serve"])
 
     assert run.call_args.kwargs["host"] == "192.0.2.10"
@@ -55,14 +55,14 @@ def test_serve_takes_host_and_port_from_settings(monkeypatch):
 
 def test_serve_flags_override_settings(monkeypatch):
     """Explicit flags win over configuration."""
-    from rif_runtime.config import RifSettings
+    from mandare.config import RifSettings
 
     settings = RifSettings.model_validate(
         {"server": {"host": "192.0.2.10", "port": 9999}}
     )
-    monkeypatch.setattr("rif_runtime.cli.get_settings", lambda: settings)
+    monkeypatch.setattr("mandare.cli.get_settings", lambda: settings)
 
-    with patch("rif_runtime.cli.uvicorn.run") as run:
+    with patch("mandare.cli.uvicorn.run") as run:
         runner.invoke(app, ["serve", "--host", "0.0.0.0", "--port", "9001"])
 
     assert run.call_args.kwargs["host"] == "0.0.0.0"

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Quick verification script for RIF Runtime
+# Quick verification script for Mandare
 
 set -e
 
 echo "================================"
-echo "RIF Runtime Verification Script"
+echo "Mandare Verification Script"
 echo "================================"
 echo ""
 
@@ -45,7 +45,7 @@ fi
 echo "[6/6] Checking Docker setup..."
 if command -v docker &> /dev/null; then
     echo "✓ Docker installed"
-    echo "  Build test image with: docker build -t rif-runtime-server:latest ."
+    echo "  Build test image with: docker build -t mandare-server:latest ."
     echo "  Start dev stack with: docker compose up --build"
 else
     echo "⚠ Docker not installed"

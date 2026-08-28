@@ -1,6 +1,6 @@
-default_environment: RIF_Runtime
+default_environment: Mandare
 environments:
-  RIF_Runtime:
+  Mandare:
     networking_type: limited
     allow_mcp_server_network_access: false
     allow_package_manager_network_access: false

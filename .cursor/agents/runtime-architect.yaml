@@ -5,7 +5,7 @@ kind: cursor-agent
 description: Reviews subsystem boundaries and architectural evolution.
 
 owns:
-  - src/rif_runtime
+  - src/mandare
 
 responsibilities:
   - architecture review
@@ -21,7 +21,7 @@ outputs:
   - recommendations
 
 depends_on:
-  - run-rif-runtime
+  - run-mandare
 
 blocks:
   - provider-engineer

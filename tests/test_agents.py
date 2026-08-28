@@ -13,10 +13,10 @@ from pathlib import Path
 
 import yaml
 
-from rif_runtime.agents.deputy import DeputyAgent
-from rif_runtime.agents.manifest import AgentManifest
-from rif_runtime.agents.orchestrator import OrchestratorAgent
-from rif_runtime.schemas import Decision, PolicyDecision, Posture
+from mandare.agents.deputy import DeputyAgent
+from mandare.agents.manifest import AgentManifest
+from mandare.agents.orchestrator import OrchestratorAgent
+from mandare.schemas import Decision, PolicyDecision, Posture
 
 SCHEMA_PATH = (
     Path(__file__).resolve().parent.parent / ".rif" / "agents" / "manifest.schema.yaml"
@@ -29,7 +29,7 @@ def _decision(decision: Decision) -> PolicyDecision:
         actor="agent:test",
         action="http.request",
         target="https://example.com",
-        environment="RIF_Runtime",
+        environment="Mandare",
         posture=Posture.normal,
         reason="test",
         matched_rule="policy.test",
@@ -116,7 +116,7 @@ def test_orchestrator_builds_a_governed_request():
 
 def test_orchestrator_actor_follows_the_template_convention():
     """template.py points at OrchestratorAgent as the naming example."""
-    from rif_runtime.agents.template import TemplateAgent
+    from mandare.agents.template import TemplateAgent
 
     assert TemplateAgent(OrchestratorAgent.name).validate() is True
 
@@ -131,8 +131,8 @@ def test_execution_state_overlaps_run_status_as_the_spec_review_notes():
     RunStatus without going through that review, this test's premise changes
     and the reconciliation gets noticed rather than landing silently.
     """
-    from rif_runtime.execution.state import ExecutionState
-    from rif_runtime.runs.schemas import RunStatus
+    from mandare.execution.state import ExecutionState
+    from mandare.runs.schemas import RunStatus
 
     shared = {member.value for member in ExecutionState} & {
         member.value for member in RunStatus
@@ -145,7 +145,7 @@ def test_execution_state_is_not_used_by_the_runtime():
     """Seeded means seeded: nothing should be reading it yet."""
     import ast
 
-    root = Path(__file__).resolve().parent.parent / "src" / "rif_runtime"
+    root = Path(__file__).resolve().parent.parent / "src" / "mandare"
 
     def imports_execution_state(node: ast.AST, package: str) -> bool:
         """Every spelling of the import, absolute and relative.
@@ -156,20 +156,20 @@ def test_execution_state_is_not_used_by_the_runtime():
         this guard did exactly that and could not detect any relative form.
 
         Matching on the *spelling* is not enough either: `from .. import state`
-        reads like this module but resolves to `rif_runtime.state`, a different
+        reads like this module but resolves to `mandare.state`, a different
         module that does not exist. Relative imports are therefore resolved
         against the importing module's own `package`, and only an import that
-        resolves to `rif_runtime.execution.state` counts.
+        resolves to `mandare.execution.state` counts.
 
         `package` is passed in rather than derived from the module name,
         because the two differ for a package `__init__.py`: that module *is*
         its package, so `from .state import X` inside execution/__init__.py
-        resolves to rif_runtime.execution.state. Deriving it by stripping the
-        last component gave rif_runtime.state there, and the guard missed
+        resolves to mandare.execution.state. Deriving it by stripping the
+        last component gave mandare.state there, and the guard missed
         ExecutionState being re-exported through the package -- which is the
         most likely way it would actually get wired in.
         """
-        target = "rif_runtime.execution.state"
+        target = "mandare.execution.state"
         if isinstance(node, ast.Import):
             return any(alias.name == target for alias in node.names)
         if not isinstance(node, ast.ImportFrom):
@@ -201,7 +201,7 @@ def test_execution_state_is_not_used_by_the_runtime():
         # the directory holding it.
         package_parts = parts if parts[-1:] == ("__init__",) else parts[:-1]
         package_parts = tuple(part for part in package_parts if part != "__init__")
-        package = ".".join(("rif_runtime", *package_parts))
+        package = ".".join(("mandare", *package_parts))
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if imports_execution_state(node, package):
