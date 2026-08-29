@@ -1,57 +1,7 @@
 # MCP Integration Guide
 
-## Scope
+The canonical MCP integration guidance is [`docs/mcp-integration-guide.md`](docs/mcp-integration-guide.md).
 
-Integrating RIF Runtime with Model Context Protocol servers.
+The current implemented MCP governance surface is under `src/rif_runtime/mcp/` and is exposed through the routes documented in [`docs/API.md`](docs/API.md).
 
-## Architecture
-
-```text
-Runtime -> MCP Client -> MCP Server -> Tool
-```
-
-## Connection
-
-- stdio
-- websocket
-- http
-
-## Registration
-
-```yaml
-mcp:
-  servers:
-    - id: osint
-      transport: stdio
-      command: python
-      args: ["server.py"]
-```
-
-## Capability Mapping
-
-- MCP tool -> runtime capability
-- MCP resource -> context source
-- MCP prompt -> planning asset
-
-## Security
-
-- allowlisted servers
-- signed binaries where possible
-- isolated working directories
-
-## Evidence
-
-Record:
-
-- server id
-- tool name
-- parameters
-- result hash
-- latency
-
-## Failure Handling
-
-- unavailable
-- timeout
-- invalid schema
-- authorization failure
+The generic MCP client/registration model previously shown in this file is a design proposal, not a currently supported configuration interface.

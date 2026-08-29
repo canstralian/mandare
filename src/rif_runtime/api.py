@@ -8,9 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError
 
+from . import __version__
 from .agents.auditor import AuditorAgent
-from .auth import ControlPlaneAuth
+from .auth import ControlPlaneAuth, ReadPlaneAuth
 from .configuration.policies import PolicyRule
+from .governance.drift import recommend_correction
 from .integrations import supabase as sb
 from .mcp.capabilities import capability_catalog
 from .mcp.metasploit import (
@@ -22,12 +24,30 @@ from .replay import ReplayEngine
 from .runs.schemas import RunRecord, RunRequest, RunStatus
 from .runtime import RIFRuntime
 from .schemas import Decision, PolicyDecision, PolicyRequest, Posture
-from .startup import register_config_startup
+from .startup import config_lifespan, configuration_diagnostics, validate_config
 
-runtime = RIFRuntime()
+# Validate before constructing the runtime: RIFRuntime() loads configuration,
+# so an invalid rif.toml raises here, at import, long before config_lifespan
+# could report it. Without this the operator gets a bare ConfigError traceback
+# out of config.py rather than a message naming the configuration as the cause.
+validate_config()
+
+# The context manager covers the second half of configuration validation:
+# RIFRuntime checks the parsed values against environments.yaml and raises for
+# an unknown name, which validate_config() above cannot see.
+with configuration_diagnostics():
+    runtime = RIFRuntime()
 app = FastAPI(
     title="RIF Runtime",
-    version="0.3.0",
+    lifespan=config_lifespan,
+    # Resolved from package metadata (falling back to pyproject.toml in a
+    # source checkout), not written out here. The literal was "0.3.0" against
+    # a package version of 0.3.0rc2, so /openapi.json advertised a release the
+    # installed distribution was not.
+    version=__version__,
+    # Mount prefix when served behind a reverse proxy at a sub-path. Read from
+    # settings rather than left implicit, which made RIF_SERVER_ROOT_PATH inert.
+    root_path=validate_config().server.root_path,
     description="Governed execution substrate for intelligent systems.",
 )
 
@@ -45,8 +65,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-register_config_startup(app)
 
 _bearer = HTTPBearer(auto_error=False)
 _BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
@@ -101,14 +119,14 @@ def evaluate(req: PolicyRequest) -> PolicyDecision:
 def reset_posture() -> dict[str, Any]:
     # Must be registered before /v1/posture/{posture}, otherwise "reset" is
     # captured as a Posture path param and FastAPI returns 422.
-    runtime.posture = Posture.normal
-    return {"posture": runtime.posture.value}
+    # set_posture(), not a bare assignment: the transition has to reach
+    # posture_history.jsonl or the next restart restores the old posture.
+    return {"posture": runtime.set_posture(Posture.normal).value}
 
 
 @app.post("/v1/posture/{posture}", dependencies=[ControlPlaneAuth])
 def posture(posture: Posture) -> dict[str, Any]:
-    runtime.posture = posture
-    return {"posture": runtime.posture}
+    return {"posture": runtime.set_posture(posture)}
 
 
 @app.get("/")
@@ -120,25 +138,23 @@ def root() -> dict[str, Any]:
     }
 
 
-@app.get("/v1/graph/summary")
+@app.get("/v1/graph/summary", dependencies=[ReadPlaneAuth])
 def graph_summary() -> dict[str, Any]:
     return runtime.graph_summary()
 
 
-@app.get("/v1/telemetry/summary")
+@app.get("/v1/telemetry/summary", dependencies=[ReadPlaneAuth])
 def telemetry_summary() -> dict[str, Any]:
     return runtime.telemetry_summary()
 
 
-@app.get("/v1/audit")
+@app.get("/v1/audit", dependencies=[ReadPlaneAuth])
 def audit() -> dict[str, Any]:
     return AuditorAgent().audit(runtime)
 
 
 @app.post("/v1/mcp/invoke")
 def mcp_invoke(payload: dict[str, Any]) -> PolicyDecision:
-    from rif_runtime.schemas import PolicyRequest
-
     req = PolicyRequest(
         actor=payload.get("actor", "agent:mcp"),
         action="mcp.invoke",
@@ -202,19 +218,40 @@ def metasploit_token(payload: dict[str, Any]) -> CapabilityToken:
     )
 
 
-@app.get("/v1/persistence/summary")
+@app.get("/v1/persistence/summary", dependencies=[ReadPlaneAuth])
 def persistence_summary() -> dict[str, Any]:
     return runtime.persisted_summary()
 
 
-@app.get("/v1/recovered-state")
+@app.get("/v1/recovered-state", dependencies=[ReadPlaneAuth])
 def recovered_state() -> dict[str, Any]:
     # Rebuilt from the persisted decision log, not from live runtime state, so
-    # the response is meaningful after a restart.
-    return asdict(ReplayEngine().recover())
+    # the response is meaningful after a restart. Reads the runtime's own
+    # configured path so the two can't diverge under RIF_DATA_DIR.
+    return asdict(ReplayEngine(runtime.decisions_path).recover())
 
 
-@app.get("/v1/policies")
+@app.get("/v1/drift/recommend", dependencies=[ReadPlaneAuth])
+def drift_recommend() -> dict[str, Any]:
+    """Report the current drift vector and the posture it recommends.
+
+    Read-only: this surfaces the recommendation for a caller to act on and
+    never mutates posture itself.
+    """
+    vector = runtime.drift_vector()
+    correction = recommend_correction(vector)
+    return {
+        "drift_vector": {
+            "denial_rate": vector.denial_rate,
+            "adversarial_score": vector.adversarial_score,
+            "action_entropy": vector.action_entropy,
+            "target_entropy": vector.target_entropy,
+        },
+        "recommended_correction": correction.value,
+    }
+
+
+@app.get("/v1/policies", dependencies=[ReadPlaneAuth])
 def list_policies() -> dict[str, Any]:
     return {"rules": [rule.model_dump() for rule in runtime.policy_store.list()]}
 

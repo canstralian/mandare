@@ -1,57 +1,90 @@
 # CLI Reference
 
-> **Note:** Most commands described here (`execute`, `evidence`, `telemetry`, `validate`,
-> `policy`) are **planned** and not yet implemented. The current CLI commands are
-> `rif serve`, `rif check <actor> <action> <target>`, `rif replay [decisions_path]`,
-> and `rif msf-check <capability> <target>` — see `src/rif_runtime/cli.py`.
-> `rif replay` takes a file path, not an execution ID. Global flags are also planned.
+The current Typer CLI is implemented in `src/rif_runtime/cli.py`.
 
-## Binary
+## `rif serve`
+
+Start the FastAPI service with Uvicorn.
 
 ```bash
-rif
+rif serve
+rif serve --host 127.0.0.1 --port 8000
+rif serve --reload          # development only
 ```
 
-## Execute
+| Option | Default | Meaning |
+|---|---|---|
+| `--host` | `127.0.0.1` | Interface to bind |
+| `--port` | `8000` | Port to bind |
+| `--reload` | off | Restart on source changes (development only) |
+
+Auto-reload is opt-in. It was previously always on, which meant this command —
+the one the README quick start documents — started uvicorn's file-watching
+reloader even when serving for real.
+
+## `rif check`
+
+Evaluate one policy request and print the resulting decision.
 
 ```bash
-rif execute --intent "hello"
+rif check <actor> <action> <target>
 ```
 
-## Replay
+Example:
 
 ```bash
-rif replay exec_123
+rif check agent:test http.request https://example.com
 ```
 
-## Evidence
+This creates a runtime instance and therefore may write decision/posture state to the configured data directory.
+
+## `rif replay`
+
+Rebuild graph and posture state from a decisions log.
 
 ```bash
-rif evidence export exec_123 bundle.zip
+rif replay
+rif replay /path/to/decisions.jsonl
 ```
 
-## Telemetry
+With no path, the command uses the configured/default data directory.
+
+Replay reconstructs runtime state; it is not a remote execution mechanism and should not be treated as proof of an external side effect.
+
+## `rif msf-check`
+
+Evaluate a Metasploit capability request through the governed runtime path.
 
 ```bash
-rif telemetry tail
+rif msf-check <capability> <target>
 ```
 
-## Validate
+Optional parameters include:
 
-```bash
-rif validate config runtime.yaml
+```text
+--mode
+--actor
+--scope-id
 ```
 
-## Policy
+The default mode is `read_only_firewall` and the default actor is `agent:metasploit`.
 
-```bash
-rif policy check request.json
+This command evaluates the governed Metasploit integration. It should not be described as unrestricted Metasploit execution.
+
+## Commands not currently implemented
+
+Older repository documentation referenced commands such as:
+
+```text
+rif execute
+rif evidence
+rif telemetry
+rif validate
+rif policy
 ```
 
-## Global Flags
+Those are not part of the current CLI surface. Do not build tooling or documentation around them until they are implemented and tested.
 
-- --config
-- --json
-- --verbose
-- --profile
-- --offline
+## Data and side effects
+
+`rif check` and `rif replay` operate against the runtime's configured data directory. For development and tests, use an isolated `RIF_DATA_DIR` rather than shared production state.

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from rif_runtime.runtime import RIFRuntime
 from rif_runtime.schemas import PolicyRequest
 
@@ -13,4 +11,6 @@ def test_decision_written():
             target="https://api.anthropic.com",
         )
     )
-    assert Path("data/decisions.jsonl").exists()
+    # Asserted against the runtime's own configured path rather than a literal
+    # data/decisions.jsonl, so the test follows RIF_DATA_DIR.
+    assert r.decisions_path.exists()

@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": [
+          "config/**",
+          "rif.toml"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
+  ],
+  "env": {
+    "RIF_DATA_DIR": "/tmp/rif-data",
+    "RIF_ENVIRONMENT": "RIF_Runtime"
+  }
+}
