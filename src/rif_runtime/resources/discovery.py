@@ -65,14 +65,18 @@ class ResourceDiscovery(Protocol):
 class StaticResourceDiscovery:
     """Deterministic local discovery provider for tests and offline deployments."""
 
-    def __init__(self, candidates: list[ResourceCandidate] | tuple[ResourceCandidate, ...]):
+    def __init__(
+        self,
+        candidates: list[ResourceCandidate] | tuple[ResourceCandidate, ...],
+    ):
         self._candidates = tuple(candidates)
 
     def discover(self, intent: DiscoveryIntent) -> list[ResourceCandidate]:
         results = [
             candidate
             for candidate in self._candidates
-            if not intent.resource_types or candidate.resource_type in intent.resource_types
+            if not intent.resource_types
+            or candidate.resource_type in intent.resource_types
         ]
         if intent.required_capabilities:
             required = set(intent.required_capabilities)
@@ -115,7 +119,10 @@ class ARDDiscoveryClient:
         request = Request(
             f"{self.endpoint}/search",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
             method="POST",
         )
         try:
@@ -126,9 +133,13 @@ class ARDDiscoveryClient:
 
         raw_results = body.get("results", [])
         if not isinstance(raw_results, list):
-            raise ResourceDiscoveryError("ARD response field 'results' must be an array")
+            raise ResourceDiscoveryError(
+                "ARD response field 'results' must be an array"
+            )
 
-        return [self._candidate(item) for item in raw_results[: intent.max_results]]
+        return [
+            self._candidate(item) for item in raw_results[: intent.max_results]
+        ]
 
     def _candidate(self, item: dict[str, Any]) -> ResourceCandidate:
         if not isinstance(item, dict):
@@ -137,8 +148,11 @@ class ARDDiscoveryClient:
         name = item.get("displayName", identifier)
         resource_type = item.get("type")
         source = item.get("source", self.endpoint)
-        if not all(isinstance(value, str) and value for value in (identifier, name, resource_type, source)):
-            raise ResourceDiscoveryError("ARD result is missing required identity fields")
+        values = (identifier, name, resource_type, source)
+        if not all(isinstance(value, str) and value for value in values):
+            raise ResourceDiscoveryError(
+                "ARD result is missing required identity fields"
+            )
 
         score = item.get("score")
         if score is not None and not isinstance(score, (int, float)):
@@ -159,6 +173,8 @@ class ARDDiscoveryClient:
 
 
 def _publisher_from_identifier(identifier: str) -> str | None:
-    """Extract the publisher segment from an ARD URN without asserting trust."""
+    """Extract the publisher segment without asserting trust."""
     parts = identifier.split(":", 3)
-    return parts[2] if len(parts) == 4 and parts[0] == "urn" and parts[1] == "air" else None
+    if len(parts) == 4 and parts[0] == "urn" and parts[1] == "air":
+        return parts[2]
+    return None
