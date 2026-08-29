@@ -120,7 +120,11 @@ Every new runtime package requires a matching test package.
 
 ## Documentation Hierarchy
 
-Runtime Constitution
+Executable implementation and tests (`src/`, `tests/`)
+
+↓
+
+Repository configuration and workflows
 
 ↓
 
