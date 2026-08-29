@@ -8,22 +8,32 @@ from rif_runtime.execution.exceptions import (
 )
 
 from .capability import Capability
-from .models import CapabilityEvaluation, CapabilityRecord, CapabilityStatus
+from .models import (
+    AgentIdentity,
+    BehaviorEvidence,
+    CapabilityDeclaration,
+    CapabilityEvaluation,
+    CapabilityRecord,
+)
+from .trust import CapabilityTrustEngine, TrustDecision
 
 
 class CapabilityRegistry:
-    """
-    Registry of executable capabilities and their governance records.
+    """Registry of executable capabilities and their governance records.
 
-    Capability names are unique. Registration and admission are explicit.
-    Resolution is deterministic; execution authority is represented separately
-    from the executable adapter so provenance/evaluation evidence cannot be
-    confused with the Python object that performs the operation.
+    Registration is separate from authority. A capability can be discovered,
+    inspected and evaluated without becoming executable. Identity, declared
+    authority and observed behaviour are carried with the governance record.
     """
 
-    def __init__(self, capabilities: Iterable[Capability] | None = None) -> None:
+    def __init__(
+        self,
+        capabilities: Iterable[Capability] | None = None,
+        trust_engine: CapabilityTrustEngine | None = None,
+    ) -> None:
         self._capabilities: dict[str, Capability] = {}
         self._records: dict[str, CapabilityRecord] = {}
+        self._trust_engine = trust_engine or CapabilityTrustEngine()
 
         if capabilities is not None:
             for capability in capabilities:
@@ -52,6 +62,16 @@ class CapabilityRegistry:
             raise ValueError(f"Capability record already registered: {record.id}")
         self._records[record.id] = record
 
+    def bind_identity(self, name: str, identity: AgentIdentity) -> CapabilityRecord:
+        record = self.record(name)
+        record.identity = identity
+        return record
+
+    def declare(self, name: str, declaration: CapabilityDeclaration) -> CapabilityRecord:
+        record = self.record(name)
+        record.declaration = declaration
+        return record
+
     def resolve(self, name: str) -> Capability:
         try:
             return self._capabilities[name]
@@ -67,7 +87,7 @@ class CapabilityRegistry:
             ) from exc
 
     def admit(self, name: str) -> CapabilityRecord:
-        """Admit a capability only after integrity and evaluation evidence pass."""
+        """Admit only after integrity, evaluation, identity and declaration pass."""
         record = self.record(name)
         if not record.integrity.verified:
             raise PolicyViolationError(
@@ -77,23 +97,61 @@ class CapabilityRegistry:
             raise PolicyViolationError(
                 f"Capability admission denied: no passing evaluation: {name}"
             )
-        if record.lifecycle.status not in {
-            CapabilityStatus.evaluated,
-            CapabilityStatus.admitted,
-            CapabilityStatus.available,
-        }:
+        if record.identity is None:
             raise PolicyViolationError(
-                "Capability admission denied: "
-                f"lifecycle={record.lifecycle.status}: {name}"
+                f"Capability admission denied: agent identity missing: {name}"
             )
-        record.lifecycle.status = CapabilityStatus.admitted
+        if record.declaration is None:
+            raise PolicyViolationError(
+                f"Capability admission denied: declaration missing: {name}"
+            )
+        if name not in record.identity.declared_capabilities:
+            raise PolicyViolationError(
+                f"Capability admission denied: identity does not declare {name}"
+            )
+        record.lifecycle.status = record.lifecycle.status.admitted
         return record
 
     def add_evaluation(self, name: str, evaluation: CapabilityEvaluation) -> None:
         record = self.record(name)
         record.evaluations.append(evaluation)
         if evaluation.passed:
-            record.lifecycle.status = CapabilityStatus.evaluated
+            record.lifecycle.status = record.lifecycle.status.evaluated
+
+    def observe(self, name: str, evidence: BehaviorEvidence) -> CapabilityRecord:
+        """Record behaviour and immediately recompute execution trust."""
+        record = self.record(name)
+        record.behavior_evidence.append(evidence)
+        self._trust_engine.assess(record)
+        return record
+
+    def assess_trust(self, name: str) -> object:
+        """Recompute trust from the complete observed evidence stream."""
+        return self._trust_engine.assess(self.record(name))
+
+    def authorize(
+        self,
+        name: str,
+        *,
+        action: str,
+        target: str | None = None,
+    ) -> TrustDecision:
+        """Enforce declared authority and current behavioural trust."""
+        record = self.record(name)
+        decision = self._trust_engine.authorize(
+            record,
+            action=action,
+            target=target,
+        )
+        if decision is TrustDecision.deny:
+            raise PolicyViolationError(
+                f"Capability authorization denied: {name}:{action}"
+            )
+        if decision is TrustDecision.quarantine:
+            raise PolicyViolationError(
+                f"Capability quarantined by trust policy: {name}:{action}"
+            )
+        return decision
 
     def __contains__(self, name: object) -> bool:
         return name in self._capabilities
