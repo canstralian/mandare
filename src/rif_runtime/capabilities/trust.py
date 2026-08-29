@@ -4,9 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 from .models import (
-    AgentIdentity,
     BehaviorEvidence,
-    CapabilityDeclaration,
     CapabilityRecord,
     TrustAssessment,
     TrustStatus,
@@ -22,10 +20,9 @@ class TrustDecision(StrEnum):
 class CapabilityTrustEngine:
     """Evaluate declared authority against observed behaviour.
 
-    Trust is deliberately evidence-driven and monotonic for a single check:
-    declaration establishes the ceiling, while behavioural evidence can only
-    preserve or reduce that authority. This keeps discovery separate from
-    execution authority.
+    Trust is evidence-driven: the declaration establishes the authority ceiling,
+    while observed violations reduce that authority. Discovery therefore remains
+    separate from execution authority.
     """
 
     def assess(
@@ -33,18 +30,18 @@ class CapabilityTrustEngine:
         record: CapabilityRecord,
         evidence: list[BehaviorEvidence] | None = None,
     ) -> TrustAssessment:
-        observations = evidence if evidence is not None else record.behavior_evidence
+        observations = (
+            evidence if evidence is not None else record.behavior_evidence
+        )
         score = 1.0
         reasons: list[str] = []
 
         if not record.integrity.verified:
             score -= 0.5
             reasons.append("integrity is not verified")
-
         if record.identity is None:
             score -= 0.15
             reasons.append("agent identity is not established")
-
         if record.declaration is None:
             score -= 0.25
             reasons.append("capability declaration is absent")
@@ -92,16 +89,7 @@ class CapabilityTrustEngine:
             return TrustDecision.deny
         if action not in declaration.actions:
             return TrustDecision.deny
-        if declaration.targets and target is not None and target not in declaration.targets:
-            return TrustDecision.deny
+        if declaration.targets and target is not None:
+            if target not in declaration.targets:
+                return TrustDecision.deny
         return TrustDecision.allow
-
-
-def identity_for(record: CapabilityRecord) -> AgentIdentity | None:
-    """Return the identity bound to a capability record."""
-    return record.identity
-
-
-def declaration_for(record: CapabilityRecord) -> CapabilityDeclaration | None:
-    """Return the declared authority bound to a capability record."""
-    return record.declaration
