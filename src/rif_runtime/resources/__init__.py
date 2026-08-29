@@ -46,7 +46,6 @@ __all__ = [
     "DuplicateResourceCapabilityError",
     "ModuleInfo",
     "RepositoryResource",
-    "RepositoryCandidate",
     "RepositoryScanner",
     "RepositorySnapshot",
     "RepositorySnapshotBuilder",
