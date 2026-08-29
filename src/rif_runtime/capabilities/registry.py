@@ -15,6 +15,7 @@ from .models import (
     CapabilityEvaluation,
     CapabilityRecord,
     CapabilityStatus,
+    TrustAssessment,
 )
 from .trust import CapabilityTrustEngine, TrustDecision
 
@@ -66,7 +67,9 @@ class CapabilityRegistry:
         record.identity = identity
         return record
 
-    def declare(self, name: str, declaration: CapabilityDeclaration) -> CapabilityRecord:
+    def declare(
+        self, name: str, declaration: CapabilityDeclaration
+    ) -> CapabilityRecord:
         record = self.record(name)
         record.declaration = declaration
         return record
@@ -124,7 +127,7 @@ class CapabilityRegistry:
         self._trust_engine.assess(record)
         return record
 
-    def assess_trust(self, name: str):
+    def assess_trust(self, name: str) -> TrustAssessment:
         """Recompute trust from the complete observed evidence stream."""
         return self._trust_engine.assess(self.record(name))
 
