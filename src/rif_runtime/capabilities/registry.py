@@ -14,6 +14,7 @@ from .models import (
     CapabilityDeclaration,
     CapabilityEvaluation,
     CapabilityRecord,
+    CapabilityStatus,
 )
 from .trust import CapabilityTrustEngine, TrustDecision
 
@@ -46,12 +47,10 @@ class CapabilityRegistry:
     ) -> None:
         if capability.name in self._capabilities:
             raise ValueError(f"Capability already registered: {capability.name}")
-
         if record is not None and record.id != capability.name:
             raise ValueError(
                 "Capability record id must match executable capability name"
             )
-
         self._capabilities[capability.name] = capability
         if record is not None:
             self._records[capability.name] = record
@@ -109,14 +108,14 @@ class CapabilityRegistry:
             raise PolicyViolationError(
                 f"Capability admission denied: identity does not declare {name}"
             )
-        record.lifecycle.status = record.lifecycle.status.admitted
+        record.lifecycle.status = CapabilityStatus.admitted
         return record
 
     def add_evaluation(self, name: str, evaluation: CapabilityEvaluation) -> None:
         record = self.record(name)
         record.evaluations.append(evaluation)
         if evaluation.passed:
-            record.lifecycle.status = record.lifecycle.status.evaluated
+            record.lifecycle.status = CapabilityStatus.evaluated
 
     def observe(self, name: str, evidence: BehaviorEvidence) -> CapabilityRecord:
         """Record behaviour and immediately recompute execution trust."""
@@ -125,7 +124,7 @@ class CapabilityRegistry:
         self._trust_engine.assess(record)
         return record
 
-    def assess_trust(self, name: str) -> object:
+    def assess_trust(self, name: str):
         """Recompute trust from the complete observed evidence stream."""
         return self._trust_engine.assess(self.record(name))
 
