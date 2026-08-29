@@ -36,6 +36,36 @@ RIFRuntime.evaluate()
   +--> telemetry / audit / recovery surfaces
 ```
 
+## Resource discovery
+
+Resource discovery is a pre-execution observation layer. It answers **what resources are candidates for an objective**; it does not authorize, admit, or execute them.
+
+```text
+DiscoveryIntent
+      |
+      v
+ResourceDiscovery provider
+      |
+      +--> StaticResourceDiscovery
+      |
+      +--> ARDDiscoveryClient
+      |
+      +--> future registries / catalogs
+      |
+      v
+ResourceCandidate[]
+      |
+      v
+Governance / selection / capability admission
+      |
+      v
+Execution
+```
+
+`ResourceDiscovery` is deliberately provider-neutral. ARD v0.91 is an adapter, not a RIF-native authority model. ARD relevance scores remain informational search signals and are never interpreted as trust, compliance, safety, or authorization. The runtime persists the discovery observation separately in `discovery_evidence.jsonl` so later policy/selection work can reconstruct what was found without conflating discovery with execution.
+
+The ARD client implements the standard `POST /search` request shape and normalizes returned entries into `ResourceCandidate` objects. It does not fetch or invoke the artifact described by a result. Native execution protocols such as MCP or A2A remain downstream concerns.
+
 ## Governed capability execution
 
 The runtime now has a first vertical slice for capability governance. An executable adapter and its governance identity are separate objects. The adapter is never treated as trusted merely because it is registered.
@@ -75,7 +105,7 @@ RIFRuntime.execute_capability()
 
 The important boundary is:
 
-> **Availability is not authorization. Admission is not execution. Policy authorization and capability admission are both required before the governed runtime path invokes an adapter.**
+> **Discovery is not authorization. Availability is not authorization. Admission is not execution. Policy authorization and capability admission are both required before the governed runtime path invokes an adapter.**
 
 Capability governance records currently capture identity, provenance, integrity, permissions, dependencies, lifecycle state, and evaluation evidence. This is intentionally a small contract that can later absorb signed artifacts, SkillSpector-style inspection, benchmark evidence, and richer provenance without coupling those concerns to the executable adapter interface.
 
@@ -87,7 +117,7 @@ The existing `ExecutionKernel` remains capability-specificity-free: it resolves 
 |---|---|---|---|
 | API | `src/rif_runtime/api.py` | FastAPI HTTP surface | Implemented |
 | CLI | `src/rif_runtime/cli.py` | Local operator/developer commands | Implemented |
-| Runtime | `src/rif_runtime/runtime.py` | Wires policy, posture, graph, telemetry, persistence, and governed capability execution | Implemented |
+| Runtime | `src/rif_runtime/runtime.py` | Wires policy, posture, graph, telemetry, persistence, discovery, and governed capability execution | Implemented |
 | Policy | `src/rif_runtime/policy.py` | Evaluates policy requests and constraints | Implemented |
 | Configuration | `src/rif_runtime/config.py`, `rif.toml`, `config/` | Runtime/environment configuration | Implemented |
 | Posture | `src/rif_runtime/governance/` | Tracks and escalates runtime posture | Implemented |
@@ -95,6 +125,7 @@ The existing `ExecutionKernel` remains capability-specificity-free: it resolves 
 | Persistence | `src/rif_runtime/storage/` | JSONL append-oriented state storage | Implemented |
 | Replay | `src/rif_runtime/replay.py` | Reconstructs graph/posture state from decision history | Implemented |
 | Audit primitives | `src/rif_runtime/audit.py` | Hash-chain record primitives and verification | Implemented as a library surface; not equivalent to every persisted decision being hash-chained |
+| Resources | `src/rif_runtime/resources/` | Resource identity, descriptors, registries, and discovery contracts | Implemented first discovery vertical slice |
 | Capabilities | `src/rif_runtime/capabilities/` | Executable adapters plus governance identity/admission records | Implemented first vertical slice |
 | Execution | `src/rif_runtime/execution/` | Manifest and capability execution kernel | Implemented; governed orchestration lives in `RIFRuntime` |
 | MCP | `src/rif_runtime/mcp/` | MCP governance and Metasploit-specific evaluation | Implemented in the current scope |
@@ -124,7 +155,8 @@ Common files include:
 - `decisions.jsonl` — persisted policy decisions;
 - `posture_history.jsonl` — persisted posture transitions;
 - `metasploit_evidence.jsonl` — Metasploit-related evidence when that path is used;
-- `capability_evidence.jsonl` — governed capability execution attempts and results.
+- `capability_evidence.jsonl` — governed capability execution attempts and results;
+- `discovery_evidence.jsonl` — resource discovery observations and candidate sets.
 
 JSONL is durable local state, not a distributed database. File integrity, backup, concurrency, retention, and recovery are deployment responsibilities unless a future storage contract states otherwise.
 
@@ -149,6 +181,7 @@ The runtime contains several useful security primitives:
 - an audit hash-chain library;
 - replay and persisted-state recovery;
 - capability integrity/evaluation admission checks;
+- discovery separated from authorization and execution;
 - non-root container execution in the supplied Dockerfile;
 - dependency locks and security scanning in CI.
 
@@ -160,7 +193,7 @@ These controls should not be conflated with a complete sandbox, zero-trust deplo
 
 Remaining architectural work includes:
 
-- durable registry persistence and capability discovery;
+- durable registry persistence and richer capability discovery;
 - signed artifact verification and provenance attestations;
 - automated static/security inspection of skill packages;
 - benchmark and regression evidence ingestion;
