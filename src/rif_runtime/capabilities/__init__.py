@@ -2,17 +2,26 @@
 
 from .capability import Capability
 from .models import (
+    AgentIdentity,
+    BehaviorEvidence,
+    CapabilityDeclaration,
     CapabilityEvaluation,
     CapabilityIntegrity,
     CapabilityLifecycle,
     CapabilityProvenance,
     CapabilityRecord,
     CapabilityStatus,
+    TrustAssessment,
+    TrustStatus,
 )
 from .registry import CapabilityRegistry
+from .trust import CapabilityTrustEngine, TrustDecision
 
 __all__ = [
+    "AgentIdentity",
+    "BehaviorEvidence",
     "Capability",
+    "CapabilityDeclaration",
     "CapabilityEvaluation",
     "CapabilityIntegrity",
     "CapabilityLifecycle",
@@ -20,4 +29,8 @@ __all__ = [
     "CapabilityRecord",
     "CapabilityRegistry",
     "CapabilityStatus",
+    "CapabilityTrustEngine",
+    "TrustAssessment",
+    "TrustDecision",
+    "TrustStatus",
 ]
