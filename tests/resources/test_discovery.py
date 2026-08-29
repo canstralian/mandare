@@ -44,7 +44,7 @@ def test_discovery_score_is_not_trust() -> None:
 
 
 class SearchHandler(BaseHTTPRequestHandler):
-    request_payload: dict = {}
+    request_payload: dict[str, object] = {}
 
     def do_POST(self) -> None:  # noqa: N802
         length = int(self.headers["Content-Length"])
