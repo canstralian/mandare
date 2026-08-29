@@ -23,6 +23,12 @@ from .mcp.metasploit import (
 )
 from .policy import PolicyEngine
 from .replay import ReplayEngine
+from .resources.discovery import (
+    DiscoveryIntent,
+    ResourceCandidate,
+    ResourceDiscovery,
+    StaticResourceDiscovery,
+)
 from .schemas import EnvironmentProfile, PolicyDecision, PolicyRequest, Posture
 from .storage.jsonl import HashChainedJsonlStore, JsonlStore
 
@@ -56,6 +62,10 @@ class RIFRuntime:
         self.capability_evidence_store = JsonlStore(
             self.data_dir / "capability_evidence.jsonl"
         )
+        self.discovery_evidence_store = JsonlStore(
+            self.data_dir / "discovery_evidence.jsonl"
+        )
+        self.resource_discovery: ResourceDiscovery = StaticResourceDiscovery([])
         self._lock = threading.RLock()
         self.posture = self._restore_posture()
 
@@ -141,6 +151,45 @@ class RIFRuntime:
         if name not in self.config.environments:
             raise ValueError(f"unknown environment: {name}")
         self.environment_name = name
+
+    def set_resource_discovery(self, provider: ResourceDiscovery) -> None:
+        """Install a discovery provider without granting it execution authority."""
+        with self._lock:
+            self.resource_discovery = provider
+
+    def discover_resources(self, intent: DiscoveryIntent) -> list[ResourceCandidate]:
+        """Discover candidate resources and persist the discovery decision.
+
+        Discovery is deliberately pre-governance: candidates are observations,
+        not authorization. In particular, ARD relevance scores are recorded as
+        search signals only and never treated as trust or policy decisions.
+        """
+        with self._lock:
+            candidates = self.resource_discovery.discover(intent)
+            self.discovery_evidence_store.append(
+                {
+                    "event": "resource_discovery",
+                    "objective": intent.objective,
+                    "resource_types": list(intent.resource_types),
+                    "required_capabilities": list(intent.required_capabilities),
+                    "max_results": intent.max_results,
+                    "provider": type(self.resource_discovery).__name__,
+                    "candidates": [
+                        {
+                            "identifier": candidate.identifier,
+                            "name": candidate.name,
+                            "resource_type": candidate.resource_type,
+                            "source": candidate.source,
+                            "endpoint": candidate.endpoint,
+                            "capabilities": list(candidate.capabilities),
+                            "publisher": candidate.publisher,
+                            "relevance_score": candidate.relevance_score,
+                        }
+                        for candidate in candidates
+                    ],
+                }
+            )
+            return candidates
 
     def evaluate(self, req: PolicyRequest, record: bool = True) -> PolicyDecision:
         with self._lock:
