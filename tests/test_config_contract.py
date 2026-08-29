@@ -631,3 +631,43 @@ def test_a_blank_environment_still_starts_the_runtime(tmp_path, monkeypatch):
 
     runtime = RIFRuntime(data_dir=tmp_path / "data")
     assert runtime.environment_name in runtime.config.environments
+
+
+def test_blank_path_and_host_env_are_treated_as_unset(monkeypatch):
+    """Blank RIF_DATA_DIR / RIF_CONFIG_DIR / RIF_SERVER_HOST use field defaults.
+
+    Path("") resolves to Path("."), so an empty data_dir would write runtime
+    state into CWD. Blank host is likewise not a useful listen address. Mirror
+    blank RIF_ENVIRONMENT: empty means unset, not an empty configured value.
+    """
+    for blank in ("", "   "):
+        monkeypatch.setenv("RIF_DATA_DIR", blank)
+        monkeypatch.setenv("RIF_CONFIG_DIR", blank)
+        monkeypatch.setenv("RIF_SERVER_HOST", blank)
+        reset_settings()
+        settings = get_settings()
+        assert settings.paths.data_dir == "data"
+        assert settings.paths.config_dir == "config"
+        assert settings.server.host == "127.0.0.1"
+
+    monkeypatch.setenv("RIF_DATA_DIR", "  /tmp/rif-data  ")
+    monkeypatch.setenv("RIF_CONFIG_DIR", "  /tmp/rif-config  ")
+    monkeypatch.setenv("RIF_SERVER_HOST", "  0.0.0.0  ")
+    reset_settings()
+    settings = get_settings()
+    assert settings.paths.data_dir == "/tmp/rif-data"
+    assert settings.paths.config_dir == "/tmp/rif-config"
+    assert settings.server.host == "0.0.0.0"
+
+
+def test_blank_or_invalid_server_port_raises_config_error(monkeypatch):
+    """Blank/non-integer RIF_SERVER_PORT must raise ConfigError, not ValueError.
+
+    _coerce_env_value used to call int("") before pydantic validation, so the
+    failure escaped load_settings' ValidationError -> ConfigError path.
+    """
+    for bad in ("", "   ", "not-a-port", "12.5"):
+        monkeypatch.setenv("RIF_SERVER_PORT", bad)
+        reset_settings()
+        with pytest.raises(ConfigError, match="server.port"):
+            get_settings()
