@@ -79,8 +79,12 @@ repo-local gotchas that are easiest to get wrong.
   configured, so treat deny-by-default as a property of `policies.json`:
   a diff that removes the catch-all restores allow-by-default silently
   (`tests/test_policy_store.py:105`, `:205`). Flag any change that treats
-  wildcards as inert, and any change that deletes `allow_run_create`, which is
-  what keeps `POST /v1/runs` from 403-ing under deny-by-default.
+  wildcards as inert. On `allow_run_create`, which keeps `POST /v1/runs` from
+  403-ing under deny-by-default, the two deletion paths differ: removing it
+  from a deployed `data/policies.json` is repaired on the next load by
+  `PolicyStore._ensure_required_first_party_rules`
+  (`configuration/policies.py:73`), but removing it from `DEFAULT_POLICIES` in
+  source deletes the repair's only source with it and is blocking.
 - **Posture escalates on denials** (normal -> elevated -> restricted -> locked);
   a `locked` posture denies everything. Watch for logic that bypasses this.
 - **`data/policies.json` is checked in** (seed/default state); `data/*.jsonl`

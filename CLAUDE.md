@@ -102,7 +102,7 @@ Posture can survive restart. Do not assume a new runtime instance means a clean 
 
 Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured. Inspection routes use `ReadPlaneAuth`; `POST /v1/runs` uses Supabase JWT identity. `POST /v1/mcp/invoke` is deliberately unauthenticated *and* dry-run (`runtime.evaluate(req, record=False)`) — making it recording, or adding another unauthenticated route that records, is a security-boundary change.
 
-The shipped default policy is deny-by-default: the `deny_unknown_by_default` catch-all in `data/policies.json` is enforced (`tests/test_policy_store.py:105`). Wildcard rules are not inert. First-party actions must stay enumerated — deleting `allow_run_create` silently 403s `POST /v1/runs`.
+The shipped default policy is deny-by-default: the `deny_unknown_by_default` catch-all in `data/policies.json` is enforced (`tests/test_policy_store.py:105`). Wildcard rules are not inert. First-party actions must stay enumerated, with one asymmetry: deleting `allow_run_create` from a deployed `data/policies.json` is repaired on the next load by `PolicyStore._ensure_required_first_party_rules`, while deleting it from `DEFAULT_POLICIES` in source removes the repair source too and silently 403s `POST /v1/runs`.
 
 Never promote model output into authority. An external provider credential is configuration, not a RIF authorization decision.
 
