@@ -2,6 +2,8 @@ import pytest
 
 from rif_runtime.capabilities.echo import EchoCapability
 from rif_runtime.capabilities.models import (
+    AgentIdentity,
+    CapabilityDeclaration,
     CapabilityEvaluation,
     CapabilityIntegrity,
     CapabilityLifecycle,
@@ -40,6 +42,19 @@ def admitted_echo_record() -> CapabilityRecord:
                 score=1.0,
             )
         ],
+        identity=AgentIdentity(
+            id="agent:test",
+            issuer="rif-runtime:test",
+            subject="echo-operator",
+            declared_capabilities=["echo"],
+        ),
+        declaration=CapabilityDeclaration(
+            purpose="echo a payload back to the caller",
+            actions=["ping"],
+            data_access=[],
+            egress=[],
+            risk="low",
+        ),
     )
 
 
@@ -107,6 +122,33 @@ def test_registry_rejects_unverified_capability(tmp_path) -> None:
     runtime.register_capability(EchoCapability(), record)
 
     with pytest.raises(PolicyViolationError, match="integrity not verified"):
+        runtime.capability_registry.admit("echo")
+
+
+def test_registry_rejects_capability_without_identity(tmp_path) -> None:
+    """Admission needs a bound identity, not just verified code.
+
+    Integrity and a passing evaluation say the artifact is what it claims to
+    be. They say nothing about who is answerable for running it, so a record
+    with no identity is refused before the declaration is even consulted.
+    """
+    runtime = RIFRuntime(data_dir=tmp_path)
+    record = admitted_echo_record()
+    record.identity = None
+    runtime.register_capability(EchoCapability(), record)
+
+    with pytest.raises(PolicyViolationError, match="agent identity missing"):
+        runtime.capability_registry.admit("echo")
+
+
+def test_registry_rejects_capability_without_declaration(tmp_path) -> None:
+    """An identity alone does not establish what authority it may exercise."""
+    runtime = RIFRuntime(data_dir=tmp_path)
+    record = admitted_echo_record()
+    record.declaration = None
+    runtime.register_capability(EchoCapability(), record)
+
+    with pytest.raises(PolicyViolationError, match="declaration missing"):
         runtime.capability_registry.admit("echo")
 
 
