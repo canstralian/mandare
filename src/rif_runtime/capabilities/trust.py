@@ -30,9 +30,7 @@ class CapabilityTrustEngine:
         record: CapabilityRecord,
         evidence: list[BehaviorEvidence] | None = None,
     ) -> TrustAssessment:
-        observations = (
-            evidence if evidence is not None else record.behavior_evidence
-        )
+        observations = evidence if evidence is not None else record.behavior_evidence
         score = 1.0
         reasons: list[str] = []
 
@@ -46,20 +44,28 @@ class CapabilityTrustEngine:
             score -= 0.25
             reasons.append("capability declaration is absent")
 
+        breached = False
         for item in observations:
             if not item.within_declaration:
                 score -= 0.2
+                breached = True
                 reasons.append(f"undeclared behaviour: {item.action}")
             if item.policy_violation:
                 score -= 0.35
+                breached = True
                 reasons.append(f"policy violation: {item.action}")
             if item.outcome == "failure":
                 score -= 0.05
 
         score = max(0.0, min(1.0, score))
+        # The declaration is the authority ceiling, so behaviour that steps
+        # outside it costs the trusted status outright rather than only
+        # shaving the score. Otherwise a first undeclared action would be
+        # recorded as a reason while still authorising execution, and the
+        # reasons would contradict the status they are attached to.
         if score < 0.4:
             status = TrustStatus.quarantined
-        elif score < 0.75:
+        elif score < 0.75 or breached:
             status = TrustStatus.degraded
         else:
             status = TrustStatus.trusted

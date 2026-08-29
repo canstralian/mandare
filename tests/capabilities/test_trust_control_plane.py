@@ -56,9 +56,7 @@ def test_authorization_is_constrained_by_declaration() -> None:
     registry.register_record(record())
 
     assert (
-        registry.authorize(
-            "web.fetch", action="fetch", target="https://example.com"
-        )
+        registry.authorize("web.fetch", action="fetch", target="https://example.com")
         is TrustDecision.allow
     )
 
@@ -87,6 +85,4 @@ def test_undeclared_behaviour_degrades_and_then_quarantines_trust() -> None:
     assert registry.record("web.fetch").trust.status is TrustStatus.quarantined
 
     with pytest.raises(PolicyViolationError):
-        registry.authorize(
-            "web.fetch", action="fetch", target="https://example.com"
-        )
+        registry.authorize("web.fetch", action="fetch", target="https://example.com")
