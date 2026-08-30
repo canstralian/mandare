@@ -41,6 +41,16 @@ def test_identifier_regexes_are_anchored_to_contract_shape() -> None:
     assert not valid_step_id("extract-evidence")
 
 
+def test_skill_payloads_are_frozen_at_domain_boundary() -> None:
+    source = {"nested": {"items": [1, 2]}}
+    step = SkillStep("extract", "extract_evidence", parameters=source)
+    source["nested"]["items"].append(3)
+
+    assert step.parameters["nested"]["items"] == (1, 2)
+    with pytest.raises(TypeError):
+        step.parameters["new"] = "value"
+
+
 def test_topological_order_is_deterministic() -> None:
     steps = (
         SkillStep("synthesize", "summarize", ("claims", "sources")),
@@ -125,20 +135,27 @@ def test_skill_runtime_stops_after_failed_capability() -> None:
     assert len(executor.calls) == 1
 
 
-def test_skill_manifest_schema_rejects_unknown_fields() -> None:
+def test_skill_manifest_schema_is_fail_closed() -> None:
     schema = json.loads(SCHEMA_PATH.read_text())
-    instance = {
+    valid_instance = {
         "schema_version": "rif.skill-manifest/v0.1",
         "skill_id": "research-analysis",
         "version": "1.0.0",
         "description": "Research workflow",
-        "steps": [
-            {
-                "step_id": "extract_evidence",
-                "capability_id": "extract",
-                "unexpected": True,
-            }
-        ],
+        "steps": [{"step_id": "extract_evidence", "capability_id": "extract"}],
     }
-    errors = list(Draft202012Validator(schema).iter_errors(instance))
-    assert any("unexpected" in error.message for error in errors)
+    assert list(Draft202012Validator(schema).iter_errors(valid_instance)) == []
+
+    unknown_field = json.loads(json.dumps(valid_instance))
+    unknown_field["steps"][0]["unexpected"] = True
+    assert any(
+        "unexpected" in error.message
+        for error in Draft202012Validator(schema).iter_errors(unknown_field)
+    )
+
+    unknown_version = json.loads(json.dumps(valid_instance))
+    unknown_version["schema_version"] = "rif.skill-manifest/v99"
+    assert any(
+        "rif.skill-manifest/v0.1" in error.message
+        for error in Draft202012Validator(schema).iter_errors(unknown_version)
+    )
