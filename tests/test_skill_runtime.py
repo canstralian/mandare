@@ -73,6 +73,9 @@ def test_topological_order_rejects_duplicate_and_self_dependency() -> None:
             )
         )
 
+    with pytest.raises(ValueError, match="duplicate dependency"):
+        topological_order((SkillStep("a", "cap_a", ("root", "root")), SkillStep("root", "cap_root")))
+
     with pytest.raises(ValueError, match="itself"):
         topological_order((SkillStep("a", "cap_a", ("a",)),))
 
