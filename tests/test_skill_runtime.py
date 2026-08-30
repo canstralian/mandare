@@ -71,7 +71,7 @@ def test_skill_runtime_delegates_every_step_to_existing_executor() -> None:
     executor = StubExecutor([ExecutionStatus.SUCCEEDED, ExecutionStatus.SUCCEEDED])
     runtime = SkillRuntime(executor)
     skill = SkillManifest(
-        spec_version="0.1",
+        schema_version="rif.skill-manifest/v0.1",
         skill_id="research-analysis",
         version="1.0.0",
         description="Research workflow",
@@ -102,7 +102,7 @@ def test_skill_runtime_stops_after_failed_capability() -> None:
     executor = StubExecutor([ExecutionStatus.FAILED, ExecutionStatus.SUCCEEDED])
     runtime = SkillRuntime(executor)
     skill = SkillManifest(
-        spec_version="0.1",
+        schema_version="rif.skill-manifest/v0.1",
         skill_id="research-analysis",
         version="1.0.0",
         description="Research workflow",
@@ -128,7 +128,7 @@ def test_skill_runtime_stops_after_failed_capability() -> None:
 def test_skill_manifest_schema_rejects_unknown_fields() -> None:
     schema = json.loads(SCHEMA_PATH.read_text())
     instance = {
-        "spec_version": "0.1",
+        "schema_version": "rif.skill-manifest/v0.1",
         "skill_id": "research-analysis",
         "version": "1.0.0",
         "description": "Research workflow",
