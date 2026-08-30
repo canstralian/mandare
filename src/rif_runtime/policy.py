@@ -80,6 +80,20 @@ class PolicyEngine:
         posture: Posture,
         policy_rules: Sequence[PolicyRule] = (),
     ) -> PolicyDecision:
+        """Evaluate a request against policy rules with deny-by-default fallback.
+
+        Execution order:
+        1. Locked posture: immediate deny.
+        2. Selective rules (most-specific-first): first match decides.
+        3. Environment constraints: host allowlist, package/MCP egress gates.
+        4. Catch-all rules (configured order): explicit catch-all (if present).
+        5. Default deny: no match, no catch-all → deny.
+
+        The default.allow fallback has been removed. Operators must explicitly
+        configure a catch-all allow rule (effect="allow", action="*", target="*")
+        if they intend to permit unmatched requests. See data/policies.json for
+        the shipped configuration, which includes deny_unknown_by_default.
+        """
         if posture == Posture.locked:
             return self.deny(req, env_name, posture, "runtime locked", "posture.locked")
         # Selective rules run before the environment constraints below: an
