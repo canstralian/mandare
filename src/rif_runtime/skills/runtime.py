@@ -44,9 +44,10 @@ def _thaw(value: Any) -> Any:
 def topological_order(steps: Iterable[SkillStep]) -> tuple[SkillStep, ...]:
     """Return a deterministic topological ordering of skill steps.
 
-    The planner rejects duplicate identifiers, missing dependencies and cycles.
-    When multiple nodes are ready, lexical ``(step_id, capability_id)`` order is
-    used so replay does not depend on insertion order or thread scheduling.
+    The planner rejects duplicate identifiers, duplicate dependencies, missing
+    dependencies and cycles. When multiple nodes are ready, lexical
+    ``(step_id, capability_id)`` order is used so replay does not depend on
+    insertion order or thread scheduling.
     """
     step_map: dict[str, SkillStep] = {}
     for step in steps:
@@ -58,6 +59,8 @@ def topological_order(steps: Iterable[SkillStep]) -> tuple[SkillStep, ...]:
     indegree: dict[str, int] = {}
     for step in step_map.values():
         unique_dependencies = set(step.depends_on)
+        if len(unique_dependencies) != len(step.depends_on):
+            raise ValueError(f"duplicate dependency in skill step: {step.step_id}")
         if step.step_id in unique_dependencies:
             raise ValueError(f"skill step depends on itself: {step.step_id}")
         missing = unique_dependencies - step_map.keys()
