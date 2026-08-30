@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from rif_runtime.execution.manifest import ExecutionManifest
 from rif_runtime.execution.result import ExecutionResult, ExecutionStatus
@@ -14,7 +15,6 @@ from rif_runtime.skills import (
     valid_skill_id,
     valid_step_id,
 )
-from jsonschema import Draft202012Validator
 
 
 SCHEMA_PATH = Path(__file__).parents[1] / "contracts" / "skill_manifest.schema.json"
