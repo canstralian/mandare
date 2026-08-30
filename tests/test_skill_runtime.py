@@ -1,8 +1,9 @@
+import json
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
 
+from rif_runtime.execution.manifest import ExecutionManifest
 from rif_runtime.execution.result import ExecutionResult, ExecutionStatus
 from rif_runtime.skills import (
     SkillExecutionContext,
@@ -13,6 +14,7 @@ from rif_runtime.skills import (
     valid_skill_id,
     valid_step_id,
 )
+from jsonschema import Draft202012Validator
 
 
 SCHEMA_PATH = Path(__file__).parents[1] / "contracts" / "skill_manifest.schema.json"
@@ -21,9 +23,9 @@ SCHEMA_PATH = Path(__file__).parents[1] / "contracts" / "skill_manifest.schema.j
 class StubExecutor:
     def __init__(self, statuses: list[ExecutionStatus] | None = None) -> None:
         self.statuses = statuses or [ExecutionStatus.SUCCEEDED]
-        self.calls = []
+        self.calls: list[ExecutionManifest] = []
 
-    def execute_capability(self, manifest):
+    def execute_capability(self, manifest: ExecutionManifest) -> ExecutionResult:
         self.calls.append(manifest)
         status = self.statuses[min(len(self.calls) - 1, len(self.statuses) - 1)]
         return ExecutionResult(status=status)
@@ -104,7 +106,10 @@ def test_skill_runtime_stops_after_failed_capability() -> None:
         skill_id="research-analysis",
         version="1.0.0",
         description="Research workflow",
-        steps=(SkillStep("first", "first_cap"), SkillStep("second", "second_cap")),
+        steps=(
+            SkillStep("first", "first_cap"),
+            SkillStep("second", "second_cap"),
+        ),
     )
     context = SkillExecutionContext(
         run_id="run-2",
@@ -121,8 +126,6 @@ def test_skill_runtime_stops_after_failed_capability() -> None:
 
 
 def test_skill_manifest_schema_rejects_unknown_fields() -> None:
-    import json
-
     schema = json.loads(SCHEMA_PATH.read_text())
     instance = {
         "spec_version": "0.1",
