@@ -17,7 +17,7 @@ def _open_profile() -> EnvironmentProfile:
 
 def test_unmatched_request_is_denied_when_no_policy_rules_exist():
     decision = PolicyEngine().evaluate(
-        _request(), "RIF_Test", _open_profile(), Posture.normal, []
+        _request(), "RIF_Test", _open_profile(), Posture.normal
     )
 
     assert decision.decision == "deny"
