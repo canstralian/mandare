@@ -12,6 +12,12 @@ environments:
     allow_package_manager_network_access: true
     allowed_hosts: [api.anthropic.com, api.openai.com, api.github.com, github.com, raw.githubusercontent.com, pypi.org, files.pythonhosted.org]
     metadata: {project: rif, environment: research, governance: enabled, security: constrained, stage: dev}
+  RIF_GitHub_ReadOnly:
+    networking_type: limited
+    allow_mcp_server_network_access: true
+    allow_package_manager_network_access: false
+    allowed_hosts: [api.github.com, github.com]
+    metadata: {project: rif, environment: github-readonly, mode: read-only-firewall, governance: enabled, security: knowledge-not-authority, egress: constrained, stage: dev}
   RIF_CI:
     networking_type: limited
     allow_mcp_server_network_access: false
