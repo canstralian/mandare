@@ -30,14 +30,14 @@ never implied by a Skill step.
 class SkillStep:
     step_id: str
     capability_id: str
-    kind: SkillStepKind = SkillStepKind.capability
     depends_on: tuple[str, ...] = ()
+    kind: SkillStepKind = SkillStepKind.capability
     parameters: Mapping[str, Any] = ...
     metadata: Mapping[str, Any] = ...
 
 @dataclass(frozen=True, slots=True)
 class SkillManifest:
-    spec_version: str
+    schema_version: str
     skill_id: str
     version: str
     description: str
@@ -49,10 +49,10 @@ class SkillManifest:
 
 - `tuple` is used for immutable ordered collections that participate in replay.
 - `Mapping` is the public read-only interface for keyed payloads.
-- `dict` is permitted as a local construction representation and at existing
-  execution boundaries that already use dictionaries.
-- `list` is permitted as a local mutable accumulation buffer; persisted or
-  replay-relevant ordered results are converted to tuples.
+- `dict` is permitted at existing execution boundaries; Skill payloads are
+  frozen internally and thawed only when handed to the existing executor.
+- `list` is permitted as a local mutable accumulation buffer; replay-relevant
+  ordered results are converted to tuples.
 - `set` is internal to dependency resolution and must never become a source of
   externally observable ordering.
 - `Any` is restricted to extension payloads (`parameters` and `metadata`). It
@@ -74,7 +74,7 @@ Step identifiers use:
 ```
 
 Regex performs lexical validation only. Semantic validation remains owned by
-the canonical schema and runtime contracts.
+the canonical schema and existing contract machinery.
 
 ## 4. Deterministic planning
 
@@ -101,11 +101,13 @@ construct ExecutionManifest
         v
 existing RIFRuntime.execute_capability()
         |
-        +--> policy deny/review -> existing terminal path
+        +--> existing PolicyEngine
         |
-        +--> capability admission -> existing registry
+        +--> existing CapabilityRegistry admission
         |
-        +--> execution kernel -> existing evidence path
+        +--> existing ExecutionKernel
+        |
+        +--> existing evidence/audit path
 ```
 
 A failed or denied step terminates the Skill. Later steps are not dispatched.
@@ -140,6 +142,8 @@ validation.
 
 Unknown top-level or step fields are rejected by
 `contracts/skill_manifest.schema.json` via `additionalProperties: false`.
+The schema also fixes `schema_version` to `rif.skill-manifest/v0.1`, so an
+unknown version fails closed instead of being interpreted optimistically.
 
 ## 8. Promotion gate
 
