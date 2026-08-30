@@ -133,10 +133,10 @@ class PolicyEngine:
                     f"host denied: {h}",
                     "network.host.denied",
                 )
-        # Catch-all rules are the configured fallback, replacing the built-in
-        # default.allow. Deliberately last: a "*"/"*" rule states what to do
-        # with everything not otherwise decided, so letting it run earlier
-        # would let a single broad allow disable the host allowlist above.
+        # Catch-all rules are the configured fallback for explicit operator intent.
+        # Deliberately last: a "*"/"*" rule states what to do with everything not
+        # otherwise decided, so letting it run earlier would let a single broad allow
+        # disable the host allowlist above.
         for rule in catch_all_rules(policy_rules):
             return PolicyDecision(
                 decision=rule.effect,
@@ -148,15 +148,14 @@ class PolicyEngine:
                 reason=rule.reason,
                 matched_rule=f"policy.{rule.id}",
             )
-        return PolicyDecision(
-            decision=Decision.allow,
-            actor=req.actor,
-            action=req.action,
-            target=req.target,
-            environment=env_name,
-            posture=posture,
-            reason="allowed by constraints",
-            matched_rule="default.allow",
+        # Deny by default: no matching rule and no catch-all rule means deny.
+        # This is the engine-level enforcement of the deny-by-default principle.
+        return self.deny(
+            req,
+            env_name,
+            posture,
+            "no matching policy rule",
+            "default.deny",
         )
 
     def deny(
