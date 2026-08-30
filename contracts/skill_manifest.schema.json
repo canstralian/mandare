@@ -1,20 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/canstralian/mandare/contracts/skill_manifest.schema.json",
-  "title": "RIF Skill Manifest",
+  "$id": "rif://contracts/skill-manifest/v0.1",
+  "title": "RIF Skill Manifest v0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "spec_version",
-    "skill_id",
-    "version",
-    "description",
-    "steps"
-  ],
+  "required": ["schema_version", "skill_id", "version", "description", "steps"],
   "properties": {
-    "spec_version": {
-      "type": "string",
-      "minLength": 1
+    "schema_version": {
+      "const": "rif.skill-manifest/v0.1"
     },
     "skill_id": {
       "type": "string",
@@ -30,9 +23,7 @@
     "steps": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/step"
-      }
+      "items": {"$ref": "#/$defs/step"}
     },
     "metadata": {
       "type": "object",
@@ -43,10 +34,7 @@
     "step": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "step_id",
-        "capability_id"
-      ],
+      "required": ["step_id", "capability_id"],
       "properties": {
         "step_id": {
           "type": "string",
@@ -57,8 +45,7 @@
           "minLength": 1
         },
         "kind": {
-          "type": "string",
-          "enum": ["capability"]
+          "const": "capability"
         },
         "depends_on": {
           "type": "array",
