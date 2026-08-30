@@ -52,11 +52,25 @@ mcp = [
 # Single source of truth for the development toolchain. `requirements/dev.txt`
 # is compiled from this extra with `--generate-hashes`; every CI job installs
 # that lock, so no two jobs can resolve a different toolchain.
+#
+# When you add or re-pin dev tooling here, also update `requirements-dev.txt`
+# to match, then run `make lock`. That root file is NOT generated and does not
+# read the lock: it is an unconstrained mirror of this list, and it is what
+# `Dockerfile.dev` and `scripts/cloud-agent-install.sh` install. Tooling added
+# here but not there is simply absent from the dev image and the cloud
+# bootstrap.
 dev = [
+    # Floor is 9.0.3, not 8.x: PYSEC-2026-1845 affects pytest <9.0.3 and
+    # `pip-audit` on requirements/dev.txt fails the security job below that.
     "pytest>=9.0.3,<10.0",
     "pytest-cov>=7.1,<8.0",
     "mypy>=1.18,<2.0",
+    # Pinned to a minor series, not floated. Unpinned installs pulled ruff
+    # 0.16.x, which re-sorts imports and enables new lints -- turning main red
+    # with no code change. The lock pins the exact patch.
     "ruff>=0.15,<0.16",
+    # Required by tests/test_rif_familiar_contracts.py. Without these the
+    # `pip install -e \".[dev]\"` path collects an ImportError.
     "jsonschema[format]>=4.25,<5.0",
     "rfc3339-validator>=0.1.4,<0.2",
     "types-PyYAML>=6.0,<7.0",
@@ -73,6 +87,8 @@ mandare-mcp-github = "rif_runtime.mcp.github:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# Vercel FastAPI builder looks for app in default locations; src/ layout needs
+# an explicit entrypoint (see https://vercel.com/docs/frameworks/backend/fastapi).
 [tool.vercel]
 entrypoint = "src.rif_runtime.api:app"
 
