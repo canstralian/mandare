@@ -64,6 +64,19 @@ def test_topological_order_is_deterministic() -> None:
     )
 
 
+def test_topological_order_rejects_duplicate_and_self_dependency() -> None:
+    with pytest.raises(ValueError, match="duplicate"):
+        topological_order(
+            (
+                SkillStep("same", "cap_a"),
+                SkillStep("same", "cap_b"),
+            )
+        )
+
+    with pytest.raises(ValueError, match="itself"):
+        topological_order((SkillStep("a", "cap_a", ("a",)),))
+
+
 def test_topological_order_rejects_missing_dependency_and_cycle() -> None:
     with pytest.raises(ValueError, match="missing dependencies"):
         topological_order((SkillStep("a", "cap", ("missing",)),))
@@ -159,3 +172,8 @@ def test_skill_manifest_schema_is_fail_closed() -> None:
         "rif.skill-manifest/v0.1" in error.message
         for error in Draft202012Validator(schema).iter_errors(unknown_version)
     )
+
+
+def test_skill_package_public_exports_are_stable() -> None:
+    assert valid_skill_id("research-analysis")
+    assert valid_step_id("extract_evidence")
