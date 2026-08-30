@@ -7,7 +7,7 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from ..execution.manifest import ExecutionManifest
-from ..execution.result import ExecutionResult
+from ..execution.result import ExecutionResult, ExecutionStatus
 from .models import SkillExecutionContext, SkillExecutionResult, SkillManifest, SkillStep
 
 
@@ -144,7 +144,7 @@ class SkillRuntime:
             results.append(
                 result_factory(step, result) if result_factory else result
             )
-            if result.status.value != "completed":
+            if result.status is not ExecutionStatus.SUCCEEDED:
                 return SkillExecutionResult(
                     skill_id=skill.skill_id,
                     completed_steps=tuple(completed),
