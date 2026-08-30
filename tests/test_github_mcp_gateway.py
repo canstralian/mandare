@@ -1,7 +1,7 @@
 import pytest
 
 
-mcp = pytest.importorskip("mcp")
+pytest.importorskip("mcp")
 
 from rif_runtime.mcp.github import GITHUB_READ_ONLY_TOOLS, _target  # noqa: E402
 
