@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Any, Protocol
 
 from ..execution.manifest import ExecutionManifest
@@ -15,7 +14,7 @@ class CapabilityExecutor(Protocol):
     """Existing runtime surface required by the skill orchestrator."""
 
     def execute_capability(self, manifest: ExecutionManifest) -> ExecutionResult:
-        """Execute one already-declared capability through the runtime gate."""
+        """Execute one declared capability through the runtime gate."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +28,17 @@ class PlannedStep:
 def _canonical_step_key(step: SkillStep) -> tuple[str, str]:
     """Return a stable key for tie-breaking independent of mapping order."""
     return (step.step_id, step.capability_id)
+
+
+def _thaw(value: Any) -> Any:
+    """Restore JSON-compatible mutable containers at the execution boundary."""
+    if isinstance(value, Mapping):
+        return {str(key): _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    if isinstance(value, frozenset):
+        return sorted(_thaw(item) for item in value)
+    return value
 
 
 def topological_order(steps: Iterable[SkillStep]) -> tuple[SkillStep, ...]:
@@ -83,13 +93,7 @@ def topological_order(steps: Iterable[SkillStep]) -> tuple[SkillStep, ...]:
 
 
 class SkillRuntime:
-    """Orchestrate declarative skills through the existing RIF runtime gate.
-
-    This class deliberately contains no policy rules, admission rules, or
-    capability validation. Each step becomes an ``ExecutionManifest`` and is
-    handed to the existing ``execute_capability`` path, preserving one
-    authorization and evidence regime for the whole runtime.
-    """
+    """Orchestrate declarative skills through the existing RIF runtime gate."""
 
     def __init__(self, executor: CapabilityExecutor) -> None:
         self._executor = executor
@@ -129,10 +133,10 @@ class SkillRuntime:
                 capability=step.capability_id,
                 action=f"skill:{skill.skill_id}:{step.step_id}",
                 target=None,
-                parameters=dict(MappingProxyType(dict(step.parameters))),
+                parameters=_thaw(step.parameters),
                 metadata={
-                    **dict(context.metadata),
-                    **dict(step.metadata),
+                    **_thaw(context.metadata),
+                    **_thaw(step.metadata),
                     "skill_id": skill.skill_id,
                     "skill_version": skill.version,
                     "skill_step_id": step.step_id,
@@ -141,9 +145,7 @@ class SkillRuntime:
                 },
             )
             result = self._executor.execute_capability(manifest)
-            results.append(
-                result_factory(step, result) if result_factory else result
-            )
+            results.append(result_factory(step, result) if result_factory else result)
             if result.status is not ExecutionStatus.SUCCEEDED:
                 return SkillExecutionResult(
                     skill_id=skill.skill_id,
