@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any, Mapping
 
 
@@ -19,13 +20,36 @@ class SkillStepKind(StrEnum):
     capability = "capability"
 
 
+def _freeze(value: Any) -> Any:
+    """Convert built-in mutable containers to deterministic read-only forms."""
+    if isinstance(value, dict):
+        return MappingProxyType(
+            {key: _freeze(item) for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
+        )
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(_freeze(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _freeze_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Return a recursively frozen copy of a mapping payload."""
+    frozen = _freeze(dict(value))
+    if not isinstance(frozen, Mapping):
+        raise TypeError("expected mapping payload")
+    return frozen
+
+
 @dataclass(frozen=True, slots=True)
 class SkillStep:
     """One deterministic, governed step in a skill plan.
 
     ``depends_on`` is an immutable tuple because dependency order is part of
-    the replay contract. ``parameters`` and ``metadata`` are read-only mapping
-    interfaces; they are not policy decisions or authorization grants.
+    the replay contract. ``parameters`` and ``metadata`` are recursively frozen
+    at construction so nested lists and dictionaries cannot mutate the plan.
     """
 
     step_id: str
@@ -35,22 +59,26 @@ class SkillStep:
     parameters: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "depends_on", tuple(self.depends_on))
+        object.__setattr__(self, "parameters", _freeze_mapping(self.parameters))
+        object.__setattr__(self, "metadata", _freeze_mapping(self.metadata))
+
 
 @dataclass(frozen=True, slots=True)
 class SkillManifest:
-    """Versioned declarative procedure composed from governed capabilities.
+    """Versioned declarative procedure composed from governed capabilities."""
 
-    A manifest describes procedure and input shape only. Its presence never
-    grants permission, selects a provider, carries credentials, or records a
-    policy verdict. Authorization remains in the existing capability gate.
-    """
-
-    spec_version: str
+    schema_version: str
     skill_id: str
     version: str
     description: str
     steps: tuple[SkillStep, ...]
     metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "steps", tuple(self.steps))
+        object.__setattr__(self, "metadata", _freeze_mapping(self.metadata))
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,15 +91,13 @@ class SkillExecutionContext:
     skill_version: str
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "metadata", _freeze_mapping(self.metadata))
+
 
 @dataclass(frozen=True, slots=True)
 class SkillExecutionResult:
-    """Aggregate result for a skill execution.
-
-    Individual capability results remain owned by the existing execution
-    kernel. This object records orchestration state without introducing a
-    second execution or policy model.
-    """
+    """Aggregate result for a skill execution."""
 
     skill_id: str
     completed_steps: tuple[str, ...]
