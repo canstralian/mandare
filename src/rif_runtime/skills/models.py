@@ -23,9 +23,8 @@ class SkillStepKind(StrEnum):
 def _freeze(value: Any) -> Any:
     """Convert built-in mutable containers to deterministic read-only forms."""
     if isinstance(value, dict):
-        return MappingProxyType(
-            {key: _freeze(item) for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
-        )
+        items = sorted(value.items(), key=lambda pair: str(pair[0]))
+        return MappingProxyType({key: _freeze(item) for key, item in items})
     if isinstance(value, list):
         return tuple(_freeze(item) for item in value)
     if isinstance(value, set):
