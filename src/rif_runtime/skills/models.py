@@ -24,15 +24,14 @@ class SkillStep:
     """One deterministic, governed step in a skill plan.
 
     ``depends_on`` is an immutable tuple because dependency order is part of
-    the replay contract. ``parameters`` and ``metadata`` are copied into
-    immutable mapping views by the runtime boundary; they are not policy
-    decisions or authorization grants.
+    the replay contract. ``parameters`` and ``metadata`` are read-only mapping
+    interfaces; they are not policy decisions or authorization grants.
     """
 
     step_id: str
     capability_id: str
-    kind: SkillStepKind = SkillStepKind.capability
     depends_on: tuple[str, ...] = ()
+    kind: SkillStepKind = SkillStepKind.capability
     parameters: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
