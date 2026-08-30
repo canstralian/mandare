@@ -2,14 +2,14 @@
 
 ## Scope
 
-RIF Runtime is a security-sensitive governance runtime. Its core security property is that policy evaluation remains authoritative over proposed agent actions.
+Mandare is a security-sensitive governance runtime. Its core security property is that policy evaluation remains authoritative over proposed agent actions.
 
 This document describes controls that are present in the repository today, plus limitations that matter when deploying the software. It is not a certification, penetration-test report, or claim of compliance with a particular regulatory framework.
 
 ## Security principles
 
 1. **Deny-oriented governance:** policy constraints can reject requests before a governed action path proceeds.
-2. **Explicit control-plane authentication:** mutable control-plane endpoints require `X-API-Key` credentials configured through `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no key is configured.
+2. **Explicit control-plane authentication:** mutable control-plane endpoints require `X-API-Key` credentials configured through `MANDARE_CONTROL_PLANE_API_KEYS` and fail closed when no key is configured.
 3. **Evidence-aware operation:** decisions and posture transitions are persisted locally and can be replayed into runtime state.
 4. **Secret minimization:** the runtime contains recursive redaction helpers for common credential-bearing field names.
 5. **Defence in depth:** container, dependency, source-analysis, secret-scanning, and dependency-review controls complement application-level checks.
@@ -25,37 +25,37 @@ The exact policy semantics are implementation-defined and tested in `tests/`. Po
 
 ### Control-plane authentication
 
-Mutable operations such as environment mutation, posture mutation, policy CRUD, and Metasploit capability-token minting are guarded by the `X-API-Key` dependency in `src/rif_runtime/auth.py`.
+Mutable operations such as environment mutation, posture mutation, policy CRUD, and Metasploit capability-token minting are guarded by the `X-API-Key` dependency in `src/Mandare_runtime/auth.py`.
 
 The configured key set is supplied through:
 
 ```text
-RIF_CONTROL_PLANE_API_KEYS=key-one,key-two
+MANDARE_CONTROL_PLANE_API_KEYS=key-one,key-two
 ```
 
 The application hashes supplied and configured keys before constant-time comparison. This is application-level API-key authentication; it is not a substitute for enterprise identity federation, authorization administration, rotation infrastructure, or network controls.
 
 ### Cryptographic utilities
 
-`src/rif_runtime/security.py` provides:
+`src/Mandare_runtime/security.py` provides:
 
 - SHA-256 canonical digests;
-- HMAC-SHA256 signatures and verification;
+- HMAC-SHA256 signatures and veMandareication;
 - PBKDF2-HMAC-SHA256 secret hashing;
 - Fernet encryption using a PBKDF2-derived key;
 - recursive redaction of common secret-bearing keys.
 
-`src/rif_runtime/audit.py` provides hash-chain record primitives with a genesis hash and chain verification.
+`src/Mandare_runtime/audit.py` provides hash-chain record primitives with a genesis hash and chain veMandareication.
 
-The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`. Verification detects modification of a retained record, a broken predecessor link, and reordering — including a row removed from the middle, which orphans everything after it. It does **not** detect a deleted trailing suffix: every record that remains is still internally consistent, which is the same limitation as truncation below. `GET /v1/audit` reports the result under `decision_chain`, and `RIFRuntime.verify_decision_chain()` returns it directly.
+The decision log (`decisions.jsonl`) is hash-chained by `HashChainedJsonlStore`. Each row carries a `_chain` envelope with its `previous_hash` and `current_hash`. VeMandareication detects modification of a retained record, a broken predecessor link, and reordering — including a row removed from the middle, which orphans everything after it. It does **not** detect a deleted trailing suffix: every record that remains is still internally consistent, which is the same limitation as truncation below. `GET /v1/audit` reports the result under `decision_chain`, and `MANDARERuntime.veMandarey_decision_chain()` returns it directly.
 
-**Scope of that property.** Chain verification detects integrity failures among the records that are still present. It is not proof of completeness and not an externally anchored ledger:
+**Scope of that property.** Chain veMandareication detects integrity failures among the records that are still present. It is not proof of completeness and not an externally anchored ledger:
 
 - an attacker with write access can truncate the log and rewrite a shorter, internally valid chain — nothing in the file commits to its own length;
 - the chain is unwitnessed, so it establishes internal consistency, not third-party attestation;
-- rows written before chaining was introduced carry no envelope. They are reported as `unchained_leading` and are explicitly **not** counted as verified;
+- rows written before chaining was introduced carry no envelope. They are reported as `unchained_leading` and are explicitly **not** counted as veMandareied;
 - other stores (`posture_history.jsonl`, `metasploit_evidence.jsonl`) remain plain append-only JSONL and are not chained;
-- concurrent appends are serialised by an advisory `flock`, and each writer re-reads the tail inside that lock, so two processes appending to one log (a `rif check` alongside a running `rif serve`) produce one chain rather than a fork. `fcntl` is POSIX-only; on a platform without it the lock degrades to a no-op and the single-writer assumption returns.
+- concurrent appends are serialised by an advisory `flock`, and each writer re-reads the tail inside that lock, so two processes appending to one log (a `Mandare check` alongside a running `Mandare serve`) produce one chain rather than a fork. `fcntl` is POSIX-only; on a platform without it the lock degrades to a no-op and the single-writer assumption returns.
 
 Tamper-*evidence* is therefore what this provides. Tamper-*proofing* would require external anchoring or an append-only medium the runtime does not control.
 
@@ -94,7 +94,7 @@ The current release workflow builds Python distributions and publishes GitHub Re
 - signed release artefacts;
 - SBOM generation as a release control;
 - reproducible builds;
-- cryptographically verified container provenance.
+- cryptographically veMandareied container provenance.
 
 These are future hardening items, not active controls.
 
@@ -105,7 +105,7 @@ These are future hardening items, not active controls.
 | Unauthorized policy operation | Control-plane API-key guard | API keys are not enterprise IAM |
 | Policy bypass through malformed input | Pydantic validation and policy checks | Policy semantics are still evolving |
 | Secret leakage in structured data | Redaction helper and secret-scanning workflow | Redaction is field-name based, not a DLP system |
-| Local state tampering | Hash-chained decision log with verification, plus replay | Detects edits to the log; a writer who truncates it can rewrite a shorter valid chain, and other JSONL stores are unchained |
+| Local state tampering | Hash-chained decision log with veMandareication, plus replay | Detects edits to the log; a writer who truncates it can rewrite a shorter valid chain, and other JSONL stores are unchained |
 | Replay of stale local state | Persisted posture/replay semantics | Replay is not an authorization protocol or nonce service |
 | Dependency compromise | Hash locks, audits, dependency review | No signed/SBOM/reproducible release chain yet |
 | Container privilege escalation | Non-root image baseline | Full runtime isolation is deployment-dependent |
@@ -113,7 +113,7 @@ These are future hardening items, not active controls.
 
 ## Enterprise deployment expectations
 
-Before treating RIF as a production control plane, deployment owners should independently establish:
+Before treating MANDARE as a production control plane, deployment owners should independently establish:
 
 - TLS and trusted ingress;
 - enterprise identity and authorization around administrative operations;
@@ -139,7 +139,7 @@ Please include the affected component/version, a concise description, reproducti
 
 Please allow 7 days for an initial response. Coordinated disclosure is preferred.
 
-## Security changes
+## Security changes 
 
 Security-sensitive changes should include:
 
