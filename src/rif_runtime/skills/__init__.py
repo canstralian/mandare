@@ -7,6 +7,8 @@ from .models import (
     SkillExecutionResult,
     SkillManifest,
     SkillStep,
+    valid_skill_id,
+    valid_step_id,
 )
 from .runtime import SkillRuntime, topological_order
 
@@ -19,4 +21,6 @@ __all__ = [
     "SkillRuntime",
     "SkillStep",
     "topological_order",
+    "valid_skill_id",
+    "valid_step_id",
 ]
