@@ -2,7 +2,7 @@ name: run-rif-runtime
 
 kind: claude-skill
 
-description: Primary engineering orchestrator for the RIF Runtime.
+description: Primary engineering orchestrator for Mandare.
 
 owns:
   - src/

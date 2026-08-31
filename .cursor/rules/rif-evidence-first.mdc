@@ -1,9 +1,9 @@
 ---
-description: RIF Runtime evidence-first guardrail — prefer repository evidence over external network research
+description: Mandare evidence-first guardrail -- prefer repository evidence over external network research
 alwaysApply: true
 ---
 
-# RIF Runtime guardrail
+# Mandare guardrail
 
 Never use network access to obtain implementation details when the repository
 already contains the relevant source, tests, schemas, or documentation. Prefer

@@ -1,16 +1,16 @@
-# RIF Runtime
+# Mandare
 
-[![Merge Gate](https://github.com/canstralian/rif-runtime/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/merge-gate.yml)
-[![Coverage](https://github.com/canstralian/rif-runtime/actions/workflows/coverage.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/coverage.yml)
-[![Image](https://github.com/canstralian/rif-runtime/actions/workflows/image.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/image.yml)
-[![Release](https://github.com/canstralian/rif-runtime/actions/workflows/release.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/release.yml)
-[![CodeQL](https://github.com/canstralian/rif-runtime/actions/workflows/codeql.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/codeql.yml)
-[![Bandit](https://github.com/canstralian/rif-runtime/actions/workflows/bandit.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/bandit.yml)
-[![Gitleaks](https://github.com/canstralian/rif-runtime/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/gitleaks.yml)
-[![License](https://img.shields.io/github/license/canstralian/rif-runtime)](LICENSE)
+[![Merge Gate](https://github.com/canstralian/mandare/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/merge-gate.yml)
+[![Coverage](https://github.com/canstralian/mandare/actions/workflows/coverage.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/coverage.yml)
+[![Image](https://github.com/canstralian/mandare/actions/workflows/image.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/image.yml)
+[![Release](https://github.com/canstralian/mandare/actions/workflows/release.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/release.yml)
+[![CodeQL](https://github.com/canstralian/mandare/actions/workflows/codeql.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/codeql.yml)
+[![Bandit](https://github.com/canstralian/mandare/actions/workflows/bandit.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/bandit.yml)
+[![Gitleaks](https://github.com/canstralian/mandare/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/gitleaks.yml)
+[![License](https://img.shields.io/github/license/canstralian/mandare)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
-**RIF Runtime is a policy and governance runtime for agent-driven systems.** It evaluates proposed actions before they cross a capability boundary, maintains runtime posture, and records decision history for inspection and replay.
+**Mandare is a policy and governance runtime for agent-driven systems.** It evaluates proposed actions before they cross a capability boundary, maintains runtime posture, and records decision history for inspection and replay.
 
 The design goal is deliberately simple:
 
@@ -94,22 +94,22 @@ The larger target architecture is documented separately from the implementation 
 
 ## Documentation map
 
-- [`docs/README.md`](docs/README.md) — documentation index and source-of-truth rules
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — implementation architecture
-- [`DEVELOPMENT.md`](DEVELOPMENT.md) — local development and validation
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor workflow
-- [`SECURITY.md`](SECURITY.md) — security model, limitations, and reporting
-- [`DEPLOYMENT.md`](DEPLOYMENT.md) — supported container deployment paths
-- [`TESTING.md`](TESTING.md) — testing strategy
-- [`docs/API.md`](docs/API.md) — current HTTP routes
-- [`docs/cli-reference.md`](docs/cli-reference.md) — current CLI commands
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned work
-- [`docs/REFLEXIVE_EVOLUTION.md`](docs/REFLEXIVE_EVOLUTION.md) — reflexive design, explicitly separated from shipped behaviour
-- [`spec/README.md`](spec/README.md) — contract/specification status
+- [`docs/README.md`](docs/README.md) -- documentation index and source-of-truth rules
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) -- implementation architecture
+- [`DEVELOPMENT.md`](DEVELOPMENT.md) -- local development and validation
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) -- contributor workflow
+- [`SECURITY.md`](SECURITY.md) -- security model, limitations, and reporting
+- [`DEPLOYMENT.md`](DEPLOYMENT.md) -- supported container deployment paths
+- [`TESTING.md`](TESTING.md) -- testing strategy
+- [`docs/API.md`](docs/API.md) -- current HTTP routes
+- [`docs/cli-reference.md`](docs/cli-reference.md) -- current CLI commands
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) -- planned work
+- [`docs/REFLEXIVE_EVOLUTION.md`](docs/REFLEXIVE_EVOLUTION.md) -- reflexive design, explicitly separated from shipped behaviour
+- [`spec/README.md`](spec/README.md) -- contract/specification status
 
 ## Current maturity
 
-RIF Runtime is an actively developed release-candidate project, not a claim of production certification or a completed enterprise control plane. Some enterprise-oriented controls remain future work, including SBOM generation, signed releases, reproducible release builds, and a fully governed remote-inference authorization seam.
+Mandare is an actively developed release-candidate project, not a claim of production certification or a completed enterprise control plane. Some enterprise-oriented controls remain future work, including SBOM generation, signed releases, reproducible release builds, and a fully governed remote-inference authorization seam.
 
 Security and CI documentation describe repository controls that are present in source/workflow files; they do not constitute an independent assurance report.
 
