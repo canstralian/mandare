@@ -60,11 +60,11 @@ blank_issues_enabled: false
 
 contact_links:
   - name: Questions & Discussions
-    url: https://github.com/canstralian/rif-runtime/discussions
+    url: https://github.com/canstralian/mandare/discussions
     about: Ask questions or discuss ideas.
 
   - name: Security Reports
-    url: https://github.com/canstralian/rif-runtime/security
+    url: https://github.com/canstralian/mandare/security
     about: Report security vulnerabilities privately.
 CONFIG
 

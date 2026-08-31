@@ -12,8 +12,8 @@ This guide is intentionally command-first. If a command is not backed by the cur
 ## Local setup
 
 ```bash
-git clone https://github.com/canstralian/rif-runtime.git
-cd rif-runtime
+git clone https://github.com/canstralian/mandare.git
+cd mandare
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .

@@ -14,9 +14,9 @@
 
 The design goal is deliberately simple:
 
-> **A model may propose. RIF decides.**
+> **A model may propose. Mandare decides.**
 
-RIF is not an autonomous-agent framework and does not treat model confidence, possession of a provider credential, or model output as authorization.
+Mandare is not an autonomous-agent framework and does not treat model confidence, possession of a provider credential, or model output as authorization.
 
 ## What exists today
 
@@ -115,7 +115,7 @@ Security and CI documentation describe repository controls that are present in s
 
 ## Contributing
 
-RIF benefits from contributors who enjoy the awkward but important boundary between **what an intelligent system wants to do** and **what a governed system is willing to let it do**.
+Mandare benefits from contributors who enjoy the awkward but important boundary between **what an intelligent system wants to do** and **what a governed system is willing to let it do**.
 
 Good contributions include:
 
