@@ -234,8 +234,8 @@ def test_locked_posture_still_precedes_every_rule():
     assert decision.matched_rule == "posture.locked"
 
 
-def test_no_rules_falls_back_to_default_allow():
-    """Removing every rule leaves the built-in fallback intact."""
+def test_no_rules_fall_back_to_default_deny():
+    """Removing every rule must fail closed rather than silently allowing."""
     req = PolicyRequest(
         actor="agent:test", action="http.request", target="https://example.com"
     )
@@ -244,8 +244,9 @@ def test_no_rules_falls_back_to_default_allow():
         req, "RIF_Runtime", _open_profile(), Posture.normal, []
     )
 
-    assert decision.decision == "allow"
-    assert decision.matched_rule == "default.allow"
+    assert decision.decision == "deny"
+    assert decision.matched_rule == "default.deny"
+    assert decision.reason == "no applicable policy rule"
 
 
 # --- first-party actions under deny-by-default -------------------------------
