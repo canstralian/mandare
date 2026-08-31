@@ -4,11 +4,11 @@ set -euo pipefail
 mkdir -p .github/ISSUE_TEMPLATE
 
 cat > CONTRIBUTING.md <<'CONTRIB'
-# Contributing to RIF Runtime
+# Contributing to Mandare
 
-Thank you for your interest in RIF Runtime.
+Thank you for your interest in Mandare.
 
-RIF Runtime is a governance-first execution substrate for intelligent systems...
+Mandare is a governance-first execution substrate for intelligent systems...
 
 ...
 CONTRIB
@@ -16,7 +16,7 @@ CONTRIB
 cat > SECURITY.md <<'SECURITY'
 # Security Policy
 
-Security is a primary design objective of RIF Runtime.
+Security is a primary design objective of Mandare.
 
 ...
 SECURITY
