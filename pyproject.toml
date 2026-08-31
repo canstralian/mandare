@@ -63,7 +63,7 @@ dev = [
     "pytest-cov>=7.1,<8.0",
     "mypy>=1.18,<2.0",
     # Pinned to a minor series, not floated. Unpinned installs pulled ruff
-    # 0.16.x, which re-sorts imports and enables new lints -- turning main red
+    # 0.16.x, which re-sorts imports and enables new lints — turning main red
     # with no code change. The lock pins the exact patch.
     "ruff>=0.15,<0.16",
     # Required by tests/test_rif_familiar_contracts.py. Without these the

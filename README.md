@@ -94,18 +94,18 @@ The larger target architecture is documented separately from the implementation 
 
 ## Documentation map
 
-- [`docs/README.md`](docs/README.md) -- documentation index and source-of-truth rules
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) -- implementation architecture
-- [`DEVELOPMENT.md`](DEVELOPMENT.md) -- local development and validation
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) -- contributor workflow
-- [`SECURITY.md`](SECURITY.md) -- security model, limitations, and reporting
-- [`DEPLOYMENT.md`](DEPLOYMENT.md) -- supported container deployment paths
-- [`TESTING.md`](TESTING.md) -- testing strategy
-- [`docs/API.md`](docs/API.md) -- current HTTP routes
-- [`docs/cli-reference.md`](docs/cli-reference.md) -- current CLI commands
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) -- planned work
-- [`docs/REFLEXIVE_EVOLUTION.md`](docs/REFLEXIVE_EVOLUTION.md) -- reflexive design, explicitly separated from shipped behaviour
-- [`spec/README.md`](spec/README.md) -- contract/specification status
+- [`docs/README.md`](docs/README.md) — documentation index and source-of-truth rules
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — implementation architecture
+- [`DEVELOPMENT.md`](DEVELOPMENT.md) — local development and validation
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributor workflow
+- [`SECURITY.md`](SECURITY.md) — security model, limitations, and reporting
+- [`DEPLOYMENT.md`](DEPLOYMENT.md) — supported container deployment paths
+- [`TESTING.md`](TESTING.md) — testing strategy
+- [`docs/API.md`](docs/API.md) — current HTTP routes
+- [`docs/cli-reference.md`](docs/cli-reference.md) — current CLI commands
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned work
+- [`docs/REFLEXIVE_EVOLUTION.md`](docs/REFLEXIVE_EVOLUTION.md) — reflexive design, explicitly separated from shipped behaviour
+- [`spec/README.md`](spec/README.md) — contract/specification status
 
 ## Current maturity
 
