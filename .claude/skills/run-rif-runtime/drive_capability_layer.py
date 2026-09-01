@@ -24,12 +24,13 @@ from rif_runtime.schemas import Decision, EnvironmentProfile, PolicyRequest, Pos
 
 
 def run_allowed_echo() -> None:
-    """Demonstrates the allow path. The engine fails closed, so an allow has
-    to come from a rule that authorizes the action — an unrestricted profile
-    and Posture.normal only mean nothing denied it, which is not the same
-    thing. An unexpected denial here means the policy/environment setup
-    changed — raise rather than silently reporting success with nothing
-    executed."""
+    """
+    Demonstrate successful policy authorization and capability execution.
+    
+    The request must be explicitly allowed by policy; an unrestricted networking
+    profile and normal posture alone do not authorize execution. Raises
+    `RuntimeError` if policy denies the request.
+    """
     registry = CapabilityRegistry([EchoCapability()])
     kernel = ExecutionKernel(registry)
     policy = PolicyEngine()
