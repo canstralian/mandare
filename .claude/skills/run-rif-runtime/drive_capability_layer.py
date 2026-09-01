@@ -26,7 +26,7 @@ from rif_runtime.schemas import Decision, EnvironmentProfile, PolicyRequest, Pos
 def run_allowed_echo() -> None:
     """
     Demonstrate successful policy authorization and capability execution.
-    
+
     The request must be explicitly allowed by policy; an unrestricted networking
     profile and normal posture alone do not authorize execution. Raises
     `RuntimeError` if policy denies the request.

@@ -80,18 +80,17 @@ class PolicyEngine:
         posture: Posture,
         policy_rules: Sequence[PolicyRule] = (),
     ) -> PolicyDecision:
-        """
-        Evaluate a policy request against runtime posture, environment constraints, and configured rules.
-        
-        Parameters:
-        	req (PolicyRequest): Request identity, action, and target to evaluate.
-        	env_name (str): Name of the environment associated with the request.
-        	profile (EnvironmentProfile): Environment permissions and network restrictions.
-        	posture (Posture): Current runtime security posture.
-        	policy_rules (Sequence[PolicyRule]): Configured selective and catch-all policy rules.
-        
+        """Evaluate a request against posture, configured rules, and constraints.
+
+        Args:
+            req: Request identity, action, and target to evaluate.
+            env_name: Name of the environment associated with the request.
+            profile: Environment permissions and network restrictions.
+            posture: Current runtime security posture.
+            policy_rules: Configured selective and catch-all policy rules.
+
         Returns:
-        	PolicyDecision: The configured or enforced decision, denying requests with no applicable rule.
+            The resulting decision. A request that matches no rule is denied.
         """
         if posture == Posture.locked:
             return self.deny(req, env_name, posture, "runtime locked", "posture.locked")
@@ -179,18 +178,17 @@ class PolicyEngine:
         reason: str,
         rule: str,
     ) -> PolicyDecision:
-        """
-        Constructs a denial decision for a policy request.
-        
-        Parameters:
-            req (PolicyRequest): Request whose identity and requested operation are included in the decision.
-            env_name (str): Environment associated with the request.
-            posture (Posture): Current security posture.
-            reason (str): Explanation for the denial.
-            rule (str): Identifier of the policy rule associated with the denial.
-        
+        """Construct a denial decision for a policy request.
+
+        Args:
+            req: Request whose identity and operation the decision records.
+            env_name: Environment associated with the request.
+            posture: Current security posture.
+            reason: Explanation for the denial.
+            rule: Identifier of the policy rule associated with the denial.
+
         Returns:
-            PolicyDecision: A denial containing the request context and policy details.
+            A denial carrying the request context and policy details.
         """
         return PolicyDecision(
             decision=Decision.deny,

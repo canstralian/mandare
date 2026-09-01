@@ -5,10 +5,10 @@ from rif_runtime.schemas import EnvironmentProfile, PolicyRequest, Posture
 
 def _request(action: str = "http.request") -> PolicyRequest:
     """Create a policy request for the test agent targeting the unmatched example host.
-    
+
     Parameters:
         action (str): Action associated with the request.
-    
+
     Returns:
         PolicyRequest: The constructed policy request.
     """
@@ -21,7 +21,7 @@ def _request(action: str = "http.request") -> PolicyRequest:
 
 def _open_profile() -> EnvironmentProfile:
     """Create an open environment profile with no allowed hosts.
-    
+
     Returns:
         EnvironmentProfile: An open profile configured without allowed hosts.
     """
