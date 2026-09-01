@@ -1,9 +1,9 @@
 ---
 name: run-rif-runtime
-description: Build, run, and drive RIF Runtime. Use when asked to start RIF Runtime, run its tests, build it, evaluate a policy decision, interact with the running API, or drive/exercise the Capability Layer (registering and executing a capability, e.g. before adding a new provider adapter like Hugging Face).
+description: Build, run, and drive Mandare. Use when asked to start Mandare, run its tests, build it, evaluate a policy decision, interact with the running API, or drive/exercise the Capability Layer (registering and executing a capability, e.g. before adding a new provider adapter like Hugging Face).
 ---
 
-RIF Runtime is a FastAPI service (`rif_runtime.api:app`) plus a Typer CLI
+Mandare is a FastAPI service (`rif_runtime.api:app`) plus a Typer CLI
 (`rif`). Drive it either over HTTP with `curl`/`scripts/smoke.sh` against a
 running server, or directly via the `rif check` CLI subcommand, which
 evaluates one policy request without needing a server at all.

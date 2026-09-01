@@ -15,6 +15,7 @@ import sys
 
 from rif_runtime.capabilities.echo import EchoCapability
 from rif_runtime.capabilities.registry import CapabilityRegistry
+from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.execution.exceptions import CapabilityNotFoundError
 from rif_runtime.execution.kernel import ExecutionKernel
 from rif_runtime.execution.manifest import ExecutionManifest
@@ -23,17 +24,29 @@ from rif_runtime.schemas import Decision, EnvironmentProfile, PolicyRequest, Pos
 
 
 def run_allowed_echo() -> None:
-    """Demonstrates the allow path. Posture.normal + an unrestricted profile
-    is expected to allow unconditionally, so an unexpected denial here means
-    the policy/environment setup changed — raise rather than silently
-    reporting success with nothing executed."""
+    """
+    Demonstrate successful policy authorization and capability execution.
+
+    The request must be explicitly allowed by policy; an unrestricted networking
+    profile and normal posture alone do not authorize execution. Raises
+    `RuntimeError` if policy denies the request.
+    """
     registry = CapabilityRegistry([EchoCapability()])
     kernel = ExecutionKernel(registry)
     policy = PolicyEngine()
     profile = EnvironmentProfile(networking_type="unrestricted")
+    rules = [
+        PolicyRule(
+            id="allow_demo_echo",
+            effect="allow",
+            action="capability.echo",
+            target="echo",
+            reason="demo capability invocation",
+        )
+    ]
 
     req = PolicyRequest(actor="agent:demo", action="capability.echo", target="echo")
-    decision = policy.evaluate(req, "demo", profile, Posture.normal)
+    decision = policy.evaluate(req, "demo", profile, Posture.normal, rules)
     print(f"policy decision: {decision.decision} ({decision.reason})")
 
     if decision.decision != Decision.allow:

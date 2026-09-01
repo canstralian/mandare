@@ -86,11 +86,16 @@ floor. To make a reset survive restart, lower the configured posture as well.
    are the configured fallback for everything not already decided. They run
    last on purpose: a catch-all `allow` evaluated earlier would silently
    disable the host allowlist in step 3.
-5. **`default.allow`** — the built-in fallback when no catch-all is configured.
+5. **`default.deny`** — the built-in fallback when no catch-all is configured.
+   A request that reaches this step has not been authorized by any rule, so it
+   is denied with the reason `no applicable policy rule`. Clearing an
+   environment constraint is not an authorization: it only means nothing
+   denied the request earlier.
 
 The shipped `data/policies.json` configures a catch-all deny
-(`deny_unknown_by_default`), so an unconfigured action is denied rather than
-allowed.
+(`deny_unknown_by_default`), so an unconfigured action is denied at step 4
+before the fallback is reached. Deleting that catch-all does not open the
+runtime up — step 5 still denies.
 
 ## Authentication
 

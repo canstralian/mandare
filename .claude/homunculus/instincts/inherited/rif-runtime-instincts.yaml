@@ -1,4 +1,4 @@
-# Instincts generated from https://github.com/canstralian/rif-runtime
+# Instincts generated from https://github.com/canstralian/mandare
 # Generated: 2026-08-03T08:08:12.139Z
 # Version: 2.0
 # NOTE: This file supplements (does not replace) any existing curated instincts.
@@ -10,10 +10,10 @@ trigger: "when writing a commit message"
 confidence: 0.85
 domain: git
 source: repo-analysis
-source_repo: https://github.com/canstralian/rif-runtime
+source_repo: https://github.com/canstralian/mandare
 ---
 
-# Rif Runtime Commit Conventional
+# Mandare Commit Conventional
 
 ## Action
 
@@ -31,10 +31,10 @@ trigger: "when writing a commit message"
 confidence: 0.6
 domain: git
 source: repo-analysis
-source_repo: https://github.com/canstralian/rif-runtime
+source_repo: https://github.com/canstralian/mandare
 ---
 
-# Rif Runtime Commit Length
+# Mandare Commit Length
 
 ## Action
 
@@ -51,19 +51,19 @@ trigger: "when creating a new file"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: https://github.com/canstralian/rif-runtime
+source_repo: https://github.com/canstralian/mandare
 ---
 
-# Rif Runtime Naming Files
+# Mandare Naming Files
 
 ## Action
 
-Use camelCase naming convention
+Use snake_case for module file names
 
 ## Evidence
 
-- Analyzed file naming patterns in repository
-- Dominant pattern: camelCase
+- src/rif_runtime/ modules: policy.py, replay.py, _version.py
+- tests/ modules: test_policy_store.py, test_version.py
 
 ---
 id: rif-runtime-import-relative
@@ -71,19 +71,19 @@ trigger: "when importing modules"
 confidence: 0.75
 domain: code-style
 source: repo-analysis
-source_repo: https://github.com/canstralian/rif-runtime
+source_repo: https://github.com/canstralian/mandare
 ---
 
-# Rif Runtime Import Relative
+# Mandare Import Relative
 
 ## Action
 
-Use relative imports for project files
+Use absolute imports rooted at the package
 
 ## Evidence
 
-- Import analysis shows relative import pattern
-- Example: import { x } from '../lib/x'
+- Example: from rif_runtime.policy import PolicyEngine
+- ruff's isort rules (select = ["I"]) order them
 
 ---
 id: rif-runtime-export-style
@@ -91,19 +91,18 @@ trigger: "when exporting from a module"
 confidence: 0.7
 domain: code-style
 source: repo-analysis
-source_repo: https://github.com/canstralian/rif-runtime
+source_repo: https://github.com/canstralian/mandare
 ---
 
-# Rif Runtime Export Style
+# Mandare Export Style
 
 ## Action
 
-Prefer named exports
+Declare the public surface with __all__ where a module has one
 
 ## Evidence
 
-- Export pattern analysis
-- Dominant style: named
+- Python has no export statement; module-level names are the surface
 
 ---
 id: rif-runtime-test-separate
@@ -111,38 +110,38 @@ trigger: "when writing tests"
 confidence: 0.8
 domain: testing
 source: repo-analysis
-source_repo: https://github.com/canstralian/rif-runtime
+source_repo: https://github.com/canstralian/mandare
 ---
 
-# Rif Runtime Test Separate
+# Mandare Test Separate
 
 ## Action
 
-Place tests in the tests/ or __tests__/ directory, mirroring src structure
+Place tests in tests/ as test_*.py, mirroring the module under test
 
 ## Evidence
 
-- Separate test directory pattern detected
-- Tests live in dedicated test folders
+- pyproject.toml: testpaths = ["tests"], python_files = ["test_*.py"]
+- Example: tests/test_policy_store.py covers src/rif_runtime/policy.py
 
 ---
 id: rif-runtime-instinct-file-naming
-trigger: "When creating a new TypeScript file"
+trigger: "When creating a new Python file"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct File Naming
+# Mandare Instinct File Naming
 
 ## Action
 
-Name the file using camelCase
+Name the file using snake_case
 
 ## Evidence
 
-- Pattern in namingConventions.files
+- src/rif_runtime/ and tests/ are uniformly snake_case
 
 ---
 id: rif-runtime-instinct-function-naming
@@ -150,18 +149,18 @@ trigger: "When defining a new function"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Function Naming
+# Mandare Instinct Function Naming
 
 ## Action
 
-Use camelCase for the function name
+Use snake_case for the function name
 
 ## Evidence
 
-- Pattern in namingConventions.functions
+- PEP 8; ruff lints src and tests under this convention
 
 ---
 id: rif-runtime-instinct-class-naming
@@ -169,10 +168,10 @@ trigger: "When defining a new class"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Class Naming
+# Mandare Instinct Class Naming
 
 ## Action
 
@@ -188,10 +187,10 @@ trigger: "When defining a constant"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Constant Naming
+# Mandare Instinct Constant Naming
 
 ## Action
 
@@ -203,41 +202,41 @@ Use SCREAMING_SNAKE_CASE for the constant name
 
 ---
 id: rif-runtime-instinct-import-style
-trigger: "When importing modules in TypeScript files"
+trigger: "When importing modules in Python files"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Import Style
+# Mandare Instinct Import Style
 
 ## Action
 
-Use relative import paths
+Use absolute import paths from rif_runtime
 
 ## Evidence
 
-- Pattern in importStyle
+- Example: from rif_runtime.schemas import Decision
 
 ---
 id: rif-runtime-instinct-export-style
-trigger: "When exporting from a TypeScript module"
+trigger: "When defining a module's public surface"
 confidence: 0.8
 domain: code-style
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Export Style
+# Mandare Instinct Export Style
 
 ## Action
 
-Use named exports
+Expose module-level names; use __all__ to make the surface explicit
 
 ## Evidence
 
-- Pattern in exportStyle
+- Python has no export statement
 
 ---
 id: rif-runtime-instinct-git-commit-prefix
@@ -245,10 +244,10 @@ trigger: "When writing a commit message for a bug fix"
 confidence: 0.9
 domain: git
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Git Commit Prefix
+# Mandare Instinct Git Commit Prefix
 
 ## Action
 
@@ -265,10 +264,10 @@ trigger: "When writing a commit message"
 confidence: 0.7
 domain: git
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Git Commit Length
+# Mandare Instinct Git Commit Length
 
 ## Action
 
@@ -284,10 +283,10 @@ trigger: "When adding or updating tests"
 confidence: 0.8
 domain: testing
 source: repo-analysis
-source_repo: canstralian/rif-runtime
+source_repo: canstralian/mandare
 ---
 
-# Rif Runtime Instinct Test Location
+# Mandare Instinct Test Location
 
 ## Action
 
@@ -296,4 +295,3 @@ Place test files in a separate directory from source files
 ## Evidence
 
 - Pattern in architecture.folderStructure.testLocation
-

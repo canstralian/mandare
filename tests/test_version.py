@@ -31,14 +31,14 @@ def test_version_matches_pyproject() -> None:
     # path is always taken there. Local dev runs without an editable install
     # are skipped rather than hard-failed to avoid confusing new contributors.
     try:
-        installed = version("rif-runtime")
+        installed = version("mandare")
     except PackageNotFoundError:
         if os.environ.get("CI"):
             pytest.fail(
-                "rif-runtime not installed in CI — ci.yml must run "
+                "mandare not installed in CI — ci.yml must run "
                 "`pip install -e .` before pytest"
             )
-        pytest.skip("rif-runtime not installed — run `pip install -e .` first")
+        pytest.skip("mandare not installed — run `pip install -e .` first")
 
     assert installed == expected, (
         f"installed metadata {installed!r} != pyproject {expected!r}"
@@ -92,7 +92,7 @@ def test_version_unknown_when_all_fallbacks_fail(
     assert result == "unknown"
     assert len(w) == 1
     assert issubclass(w[0].category, RuntimeWarning)
-    assert "rif-runtime" in str(w[0].message)
+    assert "mandare" in str(w[0].message)
 
 
 def test_api_app_version_matches_the_package() -> None:

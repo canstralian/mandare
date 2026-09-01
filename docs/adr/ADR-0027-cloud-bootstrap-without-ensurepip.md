@@ -122,7 +122,7 @@ After merge, verification is objective when all of the following hold on a
 - [ ] Ubuntu apt is not required for success
 - [ ] `.venv/.rif-bootstrap-ok` exists
 - [ ] Required imports succeed (`fastapi`, `rif_runtime`, …)
-- [ ] Editable install present (`importlib.metadata.version("rif-runtime")`)
+- [ ] Editable install present (`importlib.metadata.version("mandare")`)
 - [ ] Warm re-run logs structural reuse and still passes acceptance
 - [ ] Corrupted (python-symlink-only) `.venv` is recreated, then accepted
 

@@ -1,4 +1,5 @@
 from rif_runtime.agents.template import TemplateAgent
+from rif_runtime.configuration.policies import PolicyRule
 from rif_runtime.policy import PolicyEngine
 from rif_runtime.schemas import Decision, EnvironmentProfile, Posture
 
@@ -33,17 +34,30 @@ def test_round_trip_through_policy_engine():
     agent = make_agent()
     engine = PolicyEngine()
     profile = EnvironmentProfile(allowed_hosts=["api.example.com"])
+    # The engine fails closed, so the allow arm needs a rule that actually
+    # authorizes the request. Passing the host allowlist only means no
+    # constraint denied it, which is not an authorization.
+    rules = [
+        PolicyRule(
+            id="allow_example_api",
+            effect="allow",
+            action="http.request",
+            target="api.example.com",
+        )
+    ]
     allowed = engine.evaluate(
         agent.request("http.request", "https://api.example.com/v1"),
         "RIF_Test",
         profile,
         Posture.normal,
+        rules,
     )
     denied = engine.evaluate(
         agent.request("http.request", "https://untrusted.example.net"),
         "RIF_Test",
         profile,
         Posture.normal,
+        rules,
     )
     assert allowed.decision == Decision.allow
     assert denied.decision == Decision.deny

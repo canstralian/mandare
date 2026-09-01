@@ -80,6 +80,18 @@ class PolicyEngine:
         posture: Posture,
         policy_rules: Sequence[PolicyRule] = (),
     ) -> PolicyDecision:
+        """Evaluate a request against posture, configured rules, and constraints.
+
+        Args:
+            req: Request identity, action, and target to evaluate.
+            env_name: Name of the environment associated with the request.
+            profile: Environment permissions and network restrictions.
+            posture: Current runtime security posture.
+            policy_rules: Configured selective and catch-all policy rules.
+
+        Returns:
+            The resulting decision. A request that matches no rule is denied.
+        """
         if posture == Posture.locked:
             return self.deny(req, env_name, posture, "runtime locked", "posture.locked")
         # Selective rules run before the environment constraints below: an
@@ -133,10 +145,10 @@ class PolicyEngine:
                     f"host denied: {h}",
                     "network.host.denied",
                 )
-        # Catch-all rules are the configured fallback, replacing the built-in
-        # default.allow. Deliberately last: a "*"/"*" rule states what to do
-        # with everything not otherwise decided, so letting it run earlier
-        # would let a single broad allow disable the host allowlist above.
+        # Catch-all rules are the configured fallback. Deliberately last: a
+        # "*"/"*" rule states what to do with everything not otherwise
+        # decided, so letting it run earlier would let a single broad allow
+        # disable the host allowlist above.
         for rule in catch_all_rules(policy_rules):
             return PolicyDecision(
                 decision=rule.effect,
@@ -148,15 +160,14 @@ class PolicyEngine:
                 reason=rule.reason,
                 matched_rule=f"policy.{rule.id}",
             )
-        return PolicyDecision(
-            decision=Decision.allow,
-            actor=req.actor,
-            action=req.action,
-            target=req.target,
-            environment=env_name,
-            posture=posture,
-            reason="allowed by constraints",
-            matched_rule="default.allow",
+        # Fail closed: an action with no applicable policy rule is not
+        # authorized merely because the engine has no opinion about it.
+        return self.deny(
+            req,
+            env_name,
+            posture,
+            "no applicable policy rule",
+            "default.deny",
         )
 
     def deny(
@@ -167,6 +178,18 @@ class PolicyEngine:
         reason: str,
         rule: str,
     ) -> PolicyDecision:
+        """Construct a denial decision for a policy request.
+
+        Args:
+            req: Request whose identity and operation the decision records.
+            env_name: Environment associated with the request.
+            posture: Current security posture.
+            reason: Explanation for the denial.
+            rule: Identifier of the policy rule associated with the denial.
+
+        Returns:
+            A denial carrying the request context and policy details.
+        """
         return PolicyDecision(
             decision=Decision.deny,
             actor=req.actor,

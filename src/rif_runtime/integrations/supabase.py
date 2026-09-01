@@ -1,6 +1,6 @@
 """Supabase integration — optional dependency.
 
-Install:      pip install "rif-runtime[supabase]"
+Install:      pip install "mandare[supabase]"
 Env vars:
     SUPABASE_URL              — project URL (required for any Supabase feature)
     SUPABASE_SERVICE_ROLE_KEY — used by the runtime for evidence/state writes
@@ -24,9 +24,7 @@ from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
 
-_MISSING_PKG = (
-    "supabase package not installed — run: pip install 'rif-runtime[supabase]'"
-)
+_MISSING_PKG = "supabase package not installed — run: pip install 'mandare[supabase]'"
 _NOT_CONFIGURED_SVC = (
     "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for evidence writes"
 )
