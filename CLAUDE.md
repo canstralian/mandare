@@ -84,6 +84,15 @@ Runtime state is normally under `data/`, with `RIF_DATA_DIR` available for isola
 
 Posture can survive restart. Do not assume a new runtime instance means a clean posture when persisted state exists.
 
+`RIFRuntime._lock` is a `threading.RLock`, held around both `evaluate()` and
+`record_decision()` (and the equivalent Metasploit path), so `governance_graph`,
+`posture`, and the JSONL stores mutate as one serialized unit per call and
+concurrent requests cannot interleave a posture transition or an audit append.
+`evaluate()` calls `record_decision()` while already holding `_lock`; the
+reentrancy is load-bearing — swapping in a plain `threading.Lock` deadlocks on
+that re-entry. Don't narrow the lock's scope or change its type without
+re-verifying that call path.
+
 ## Security boundary
 
 Mutable control-plane operations use `X-API-Key` and `RIF_CONTROL_PLANE_API_KEYS` and fail closed when no control-plane keys are configured.
