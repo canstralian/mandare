@@ -20,6 +20,7 @@ operator's machine.
 | --- | --- | --- |
 | [`.cursor/cli.json`](../../.cursor/cli.json) | Project | Permissions only (Cursor project override) |
 | [`.cursor/sandbox.json`](../../.cursor/sandbox.json) | Project | Workspace-write sandbox + deny-by-default network |
+| [`.cursor/mcp.json`](../../.cursor/mcp.json) | Project | Cursor MCP connector declarations (not RIF policy) |
 | [`.cursor/rules/rif-evidence-first.mdc`](../../.cursor/rules/rif-evidence-first.mdc) | Project | Always-on evidence-first guardrail |
 | [`cli-config.json.example`](./cli-config.json.example) | Global template | Full `~/.cursor/cli-config.json` for local CLI |
 
@@ -35,6 +36,7 @@ cp docs/cursor/cli-config.json.example ~/.cursor/cli-config.json
 
 - `.cursor/cli.json`
 - `.cursor/sandbox.json`
+- `.cursor/mcp.json`
 - `.cursor/rules/rif-evidence-first.mdc`
 
 3. Restart the Cursor Agent CLI (or run `/sandbox` and confirm sandbox is
@@ -68,13 +70,15 @@ Cursor's published CLI schema differs slightly from informal tool-name lists:
 - `docs.anthropic.com`
 - `modelcontextprotocol.io`, `*.modelcontextprotocol.io`
 - `airtable.com`, `*.airtable.com`
+- `mcp.supabase.com`, `supabase.com`, `*.supabase.com`
 
 Sandbox also allows PyPI hosts so `pip install` works under
 `user_config_with_defaults` without opening the wider web.
 
 ## MCP allowlist
 
-These MCP servers are permitted when configured in local `mcp.json`:
+These MCP servers are permitted when configured in `.cursor/mcp.json` (or a
+local `mcp.json`):
 
 - `filesystem`
 - `github`
@@ -82,6 +86,18 @@ These MCP servers are permitted when configured in local `mcp.json`:
 - `rif-replay`
 - `rif-policy`
 - `airtable`
+- `supabase`
+
+The committed `supabase` entry is a Cursor IDE connector for project
+`xbpujhxecuebpdizhnqp`. It is configuration, not a RIF authorization
+decision: it does not grant the runtime policy authority, does not replace
+`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY`, and does
+not make model output authoritative. Authentication still happens in Cursor
+when the operator connects the server. The declared feature set
+(`docs`, `account`, `database`, `debugging`, `development`, `functions`,
+`branching`) is operator-supplied; treat write-capable features as
+human-supervised, consistent with ADR-0004's proposed read-only vs admin
+split.
 
 ## Evidence-first rule
 
@@ -97,3 +113,5 @@ Encoded in `.cursor/rules/rif-evidence-first.mdc` with `alwaysApply: true`.
   are denied and still prompt outside that set.
 - Adding a new documentation host requires editing both `.cursor/cli.json`
   (WebFetch) and `.cursor/sandbox.json` (networkPolicy), then updating this doc.
+  Adding a Cursor MCP connector also requires `.cursor/mcp.json` and a matching
+  `Mcp(<server>:*)` allowlist entry.
