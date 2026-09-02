@@ -360,7 +360,7 @@ Absent at skill creation:
 - Repository inspection: `git`, filesystem, tests, docs
 - GitHub read operations already available in the Cloud Agent environment, when present
 - Local quality gate: ruff, mypy, pytest, bandit, pip-audit
-- Runtime drive: `rif` CLI / FastAPI app, using `.claude/skills/run-rif-runtime/SKILL.md` when the task is actually to run the runtime
+- Runtime drive: `rif` CLI / FastAPI app through an explicit allowlisted runtime command or trusted delegation interface when the task is actually to run the runtime
 
 ## Change justification gate
 
@@ -382,4 +382,4 @@ Stop when the current objective reaches one of:
 
 or when the highest-value next action is to wait for human authorization.
 
-If the PROBLEM → ROOT CAUSE → NECESSARY CHANGE → VALIDATION chain cannot be established, terminate with `do nothing yet` and record why.
+If the PROBLEM → ROOT CAUSE → NECESSARY CHANGE → VALIDATION chain cannot be established, terminate with `NEEDS_HUMAN_DECISION` and record why.
