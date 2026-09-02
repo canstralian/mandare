@@ -29,12 +29,16 @@
       "WebFetch(*.modelcontextprotocol.io)",
       "WebFetch(airtable.com)",
       "WebFetch(*.airtable.com)",
+      "WebFetch(mcp.supabase.com)",
+      "WebFetch(supabase.com)",
+      "WebFetch(*.supabase.com)",
       "Mcp(filesystem:*)",
       "Mcp(github:*)",
       "Mcp(rif-evidence:*)",
       "Mcp(rif-replay:*)",
       "Mcp(rif-policy:*)",
-      "Mcp(airtable:*)"
+      "Mcp(airtable:*)",
+      "Mcp(supabase:*)"
     ],
     "deny": [
       "Read(.env)",
