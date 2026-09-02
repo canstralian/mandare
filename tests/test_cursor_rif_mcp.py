@@ -16,23 +16,18 @@ MCP_JSON = Path(__file__).resolve().parents[1] / ".cursor" / "mcp.json"
 
 
 def _encode(message: dict) -> bytes:
-    body = json.dumps(message).encode("utf-8")
-    return f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body
+    return json.dumps(message).encode("utf-8") + b"\n"
 
 
 def _read(proc: subprocess.Popen[bytes]) -> dict:
-    headers: dict[str, str] = {}
     assert proc.stdout is not None
     while True:
         line = proc.stdout.readline()
         assert line, "MCP server closed stdout before completing the response"
-        if line in (b"\r\n", b"\n"):
-            break
-        key, _, value = line.decode("ascii").partition(":")
-        headers[key.strip().lower()] = value.strip()
-    length = int(headers["content-length"])
-    body = proc.stdout.read(length)
-    return json.loads(body.decode("utf-8"))
+        stripped = line.strip()
+        if not stripped:
+            continue
+        return json.loads(stripped.decode("utf-8"))
 
 
 def _rpc(
@@ -74,7 +69,7 @@ def test_mcp_json_registers_allowlisted_stdio_servers_only() -> None:
     assert set(servers) == {"rif-policy", "rif-replay", "rif-evidence"}
     for name, spec in servers.items():
         surface = name.removeprefix("rif-")
-        assert spec["command"] == "python3"
+        assert spec["command"] == ".venv/bin/python"
         assert spec["args"] == [
             "-u",
             ".cursor/mcp/rif_stdio_mcp.py",
