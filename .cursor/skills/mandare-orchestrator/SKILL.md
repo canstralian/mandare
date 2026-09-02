@@ -183,19 +183,25 @@ Before using an MCP, determine:
 5. What evidence will it provide?
 6. What external-state/security risk does it introduce?
 
-Initial project MCP posture (`.cursor/mcp.json`):
+Current project MCP posture (`.cursor/mcp.json`):
 
-- empty `mcpServers` registry
+- local stdio adapters only: `rif-policy`, `rif-replay`, `rif-evidence`
+- implementation: `.cursor/mcp/rif_stdio_mcp.py` wrapping existing Python APIs
+- `rif-policy` evaluates with `record=False` (does not persist; not `/v1/mcp/invoke`)
 - no database MCP
 - no Firecrawl
 - no redundant filesystem MCP
-- no additional GitHub MCP unless an actual capability gap is demonstrated
+- no GitHub MCP
+- no Airtable MCP
+- no Cloudflare remote MCP in this repository
 
-Discover capability gaps from real Mandare work before adding external MCP servers. Adding a server requires security review, then a change to `.cursor/mcp.json`, then a test. Do not invent reasons to install servers.
+RIF's `src/rif_runtime/mcp/` package is the runtime's MCP *governance* boundary (Metasploit-class tool admission). It is not a Cursor connector. Do not invert that: Cursor MCP adapters must not become an ungated authority path.
 
 Do not copy Codex MCP entries from `.codex/config.toml` into Cursor project MCP configuration.
 
-Do not treat `.cursor/cli.json` MCP allowlist names (`filesystem`, `github`, `rif-evidence`, `rif-replay`, `rif-policy`, `airtable`) as installed project servers. An allowlist is not a registry.
+Do not deploy a Cloudflare Workers MCP server into this tree without an ADR: this repository's compute surface is Python FastAPI + Typer, and capability-snapshot MCP authority is still an open specification review.
+
+Adding a server still requires: demonstrated capability gap, security review, `.cursor/mcp.json` change, and a test.
 
 ## Continuous / loop execution
 
@@ -338,11 +344,11 @@ Present at skill creation:
 - `.codex/` (Codex CLI)
 - `.agents/skills/rif-runtime/`
 
-Absent at skill creation:
+Cursor project MCP:
 
-- `.cursor/skills/` (this skill is the first Cursor project skill)
-- `.cursor/mcp.json` (created as an empty registry alongside this skill)
-- `.cursor/hooks.json`
+- `.cursor/mcp.json` registers local stdio servers `rif-policy`, `rif-replay`, `rif-evidence`
+- `.cursor/mcp/rif_stdio_mcp.py` is the adapter process
+- `.cursor/hooks.json` is still absent and should not be invented without a lifecycle event
 
 `.claude/skills/rif-runtime/SKILL.md` is auto-generated and incorrectly describes a TypeScript codebase. Do not follow it over `src/`, tests, `AGENTS.md`, or `ARCHITECTURE.md`.
 
