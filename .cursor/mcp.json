@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "rif-policy": {
+      "command": "python3",
+      "args": ["-u", ".cursor/mcp/rif_stdio_mcp.py", "--surface", "policy"],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    },
+    "rif-replay": {
+      "command": "python3",
+      "args": ["-u", ".cursor/mcp/rif_stdio_mcp.py", "--surface", "replay"],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    },
+    "rif-evidence": {
+      "command": "python3",
+      "args": ["-u", ".cursor/mcp/rif_stdio_mcp.py", "--surface", "evidence"],
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  }
+}

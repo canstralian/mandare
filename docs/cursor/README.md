@@ -74,7 +74,7 @@ Sandbox also allows PyPI hosts so `pip install` works under
 
 ## MCP allowlist
 
-These MCP servers are permitted when configured in local `mcp.json`:
+`.cursor/cli.json` permits these MCP server names when configured:
 
 - `filesystem`
 - `github`
@@ -82,6 +82,16 @@ These MCP servers are permitted when configured in local `mcp.json`:
 - `rif-replay`
 - `rif-policy`
 - `airtable`
+
+Project registry (`.cursor/mcp.json`) currently installs only the three local
+stdio adapters `rif-policy`, `rif-replay`, and `rif-evidence`. They run
+`.cursor/mcp/rif_stdio_mcp.py` against existing Python APIs. `rif-policy`
+uses `evaluate(record=False)` and does not persist decisions.
+
+An allowlist entry is not an installed server. `filesystem`, `github`, and
+`airtable` remain uninstalled. Do not copy Codex MCP servers from
+`.codex/config.toml` into this file. Do not add a Cloudflare Workers MCP
+server to this Python repository without an ADR.
 
 ## Evidence-first rule
 
