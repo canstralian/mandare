@@ -16,6 +16,10 @@ The design goal is deliberately simple:
 
 > **A model may propose. RIF decides.**
 
+- [Roadmap](docs/ROADMAP.md)
+- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) (security → tooling → architecture)
+- [Reflexive Evolution Pipeline](docs/REFLEXIVE_EVOLUTION.md)
+
 RIF is not an autonomous-agent framework and does not treat model confidence, possession of a provider credential, or model output as authorization.
 
 ## What exists today

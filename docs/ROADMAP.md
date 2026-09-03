@@ -8,6 +8,33 @@ The model may propose. The runtime evaluates. A governed system records what dec
 
 This is a roadmap, not a statement that every item below exists today.
 
+| Area | Status |
+| --- | --- |
+| Security hardening (Critical/High) | **Next** — see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) Phase 0 |
+| Tooling / CI / governance | Planned — Phase 2 |
+| Policy Engine | In Progress |
+| Explainability | In Progress |
+| Evidence Layer | Planned |
+| Reflexive Healing | Planned |
+| Controlled Evolution | Planned |
+| HF Space | Planned |
+
+## Execution plan
+
+The prioritized, acceptance-tested sequence (security → tooling → architecture) lives in
+**[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)**. That document is the working backlog;
+milestones below remain the product north star and map to Phase 3 (A–G) there.
+
+## Current foundation
+
+- governance runtime and reflexive loop;
+- persistence primitives and durable decision history;
+- MCP interception boundary;
+- policy, posture, graph, telemetry, and audit surfaces;
+- explainability regression tests;
+- CI, release, secret scanning, dependency review, code-quality, and security-scanning workflows;
+- development environment + agent instructions (see [`AGENTS.md`](../AGENTS.md)).
+
 ## Current state
 
 | Area | Current status |
@@ -36,6 +63,8 @@ This is a roadmap, not a statement that every item below exists today.
 ### 1. Capability supply-chain evidence
 
 The first capability-governance slice now separates executable adapters from their governance identity and requires integrity plus passing evaluation evidence before admission. The next increment should make that evidence durable and independently verifiable.
+
+**Depends on:** Implementation Plan Phase 0 H2 (true deny-by-default) and Phase 2 CI.
 
 - persist capability records rather than keeping them only in process memory;
 - ingest artifact digests and signatures;
