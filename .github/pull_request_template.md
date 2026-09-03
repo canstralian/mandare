@@ -1,25 +1,47 @@
 ## Summary
 
-Describe the change and its intended outcome.
+<!-- What problem does this change solve? Keep the summary factual. -->
+
+## Change classification
+
+- [ ] Behaviour
+- [ ] Security
+- [ ] Persistence / replay
+- [ ] API / CLI
+- [ ] Documentation
+- [ ] Specification / contract
+- [ ] Release / CI
+
+## Evidence
+
+<!-- Link or describe the code, tests, configuration, or workflow evidence supporting the change. -->
 
 ## Validation
 
-- [ ] `ruff check src tests`
-- [ ] `mypy src/rif_runtime --ignore-missing-imports`
-- [ ] `pytest -q`
-- [ ] Relevant API or CLI smoke test completed
+```text
+Tests:
+Lint/type checks:
+Security checks:
+Workflow/run evidence (if applicable):
+```
 
-## Governance Impact
+## Governance impact
 
-- [ ] No governance impact
-- [ ] Policy evaluation changed
-- [ ] Allow/deny behavior changed
-- [ ] Posture behavior changed
-- [ ] Replay, audit, or persistence behavior changed
-- [ ] MCP/tool execution boundary changed
+- Authority boundary changed: yes / no
+- Policy semantics changed: yes / no
+- Persistence/replay semantics changed: yes / no
+- External egress changed: yes / no
+- New contract introduced: yes / no
 
-Describe the impact, risk, and rollback approach:
+If any answer is yes, explain the impact below.
 
-## Risk and Rollback
+## Documentation
 
-Describe failure modes and how this change can be reverted.
+- [ ] User/contributor documentation updated
+- [ ] Security documentation updated if relevant
+- [ ] Specification/review updated if relevant
+- [ ] No unsupported claims introduced
+
+## Risk and rollback
+
+<!-- What could regress? How would an operator or contributor recover? -->

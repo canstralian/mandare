@@ -1,4 +1,18 @@
 {
-  "install": "python3 -m venv .venv && . .venv/bin/activate && python3 -m pip install --upgrade pip && pip install -e . && pip install -r requirements-dev.txt",
-  "start": "true"
+  "name": "RIF Runtime",
+  "install": "bash scripts/cloud-agent-install.sh",
+  "start": "true",
+  "ports": [
+    {
+      "name": "RIF API",
+      "port": 8000
+    }
+  ],
+  "terminals": [
+    {
+      "name": "rif-api",
+      "command": "source .venv/bin/activate && python -m uvicorn rif_runtime.api:app --host 127.0.0.1 --port 8000",
+      "description": "RIF Runtime API on :8000 (Swagger at /docs). Prefer this over `rif serve` so the process is a single killable PID."
+    }
+  ]
 }

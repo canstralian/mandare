@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
 from rif_runtime.security import sha256_digest
-
 
 GENESIS_HASH = "0" * 64
 
@@ -22,9 +21,14 @@ class AuditRecord:
     def __post_init__(self) -> None:
         object.__setattr__(self, "current_hash", calculate_hash(self))
 
+    @staticmethod
+    def new_event_id() -> str:
+        """Fresh identifier for a record about to be appended to a chain."""
+        return str(uuid4())
+
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def calculate_hash(record: AuditRecord) -> str:

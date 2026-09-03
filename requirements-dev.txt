@@ -1,8 +1,36 @@
-pytest
-httpx
-# Pinned: CI installs this unpinned and ruff 0.16.0 re-sorts imports / enables
-# new lints, turning main red with no code change. Bump deliberately.
-ruff==0.15.22
-mypy
-types-PyYAML
-jsonschema[format]
+# Development tooling, unconstrained, mirroring the [dev] extra in
+# pyproject.toml.
+#
+# pyproject.toml's [project.optional-dependencies].dev is the source of truth.
+# This file exists because scripts/cloud-agent-install.sh, DEVELOPMENT.md and
+# scripts/verify-dev-env.sh install from it; keep the ranges below identical to
+# the [dev] extra so the two cannot disagree.
+#
+# CI does not read this file. Every CI job installs requirements/dev.txt, which
+# is compiled from the [dev] extra with --generate-hashes. See
+# requirements/README.md.
+
+# Testing
+# Floor is 9.0.3: PYSEC-2026-1845 affects pytest <9.0.3.
+pytest>=9.0.3,<10.0
+pytest-cov>=7.1,<8.0
+
+# Static analysis
+mypy>=1.18,<2.0
+# Pinned to a minor series. Unpinned installs pulled ruff 0.16.x, which
+# re-sorts imports and enables new lints, turning main red with no code change.
+ruff>=0.15,<0.16
+# PyYAML ships no py.typed; mypy 1.x needs the stub package explicitly.
+types-PyYAML>=6.0,<7.0
+
+# Packaging
+build>=1.3,<2.0
+wheel>=0.45,<1.0
+
+# Runtime validation
+jsonschema[format]>=4.25,<5.0
+rfc3339-validator>=0.1.4,<0.2
+
+# Security
+bandit>=1.8,<2.0
+pip-audit>=2.7,<3.0

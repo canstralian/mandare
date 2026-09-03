@@ -1,0 +1,303 @@
+# Merge gate — the aggregated pre-merge contract for `main`.
+#
+# This is deliberately NOT a release gate: it makes no assertion about tags,
+# versions, or artefacts, and it does not run on tag pushes. Tag-time checks
+# (version-vs-tag, build, publish) live in `release.yml`. Naming this a
+# release gate would overstate what it verifies.
+#
+# Every job installs from `requirements/dev.txt`, a hash-pinned lock compiled
+# from `pyproject.toml`. The one exception is `clean-clone`, which installs the
+# runtime set unconstrained and uncached on purpose — it is the only job that
+# sees what a fresh consumer actually resolves today.
+name: Merge Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Finding 5: the gate must be re-runnable on demand, not only on push.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merge-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Lock-derived cache key. Keyed on the compiled lock, never on pyproject.toml
+  # or requirements.txt: those hold ranges, so their hash is stable while the
+  # resolved wheels move underneath. Keying on the lock means a cache hit and a
+  # cache miss install byte-identical dependencies.
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  # Guarantees the lock is a faithful compilation of pyproject.toml. Without
+  # this, the locks silently rot the first time a dependency is edited and
+  # every downstream "reproducible" claim becomes false.
+  lock-sync:
+    name: lock is in sync with pyproject
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install "pip-tools>=7.6,<8.0"
+
+      # pip-compile reuses the pins already present in the output file unless
+      # --upgrade is passed, so this is a no-op when the lock is current and a
+      # diff exactly when pyproject.toml changed without recompiling.
+      - name: Recompile locks
+        run: |
+          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
+            --output-file requirements/runtime.txt pyproject.toml
+          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
+            --extra dev --output-file requirements/dev.txt pyproject.toml
+
+      - name: Assert no drift
+        run: |
+          if ! git diff --exit-code -- requirements/; then
+            {
+              echo "### Lock out of sync"
+              echo
+              echo 'pyproject.toml changed without recompiling the locks. Run:'
+              echo
+              echo '```'
+              echo 'make lock'
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+  verify:
+    name: verify (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      # --require-hashes makes pip refuse any artefact whose digest is not in
+      # the lock. `pip install -e .` cannot carry a hash, so the project itself
+      # is installed separately with --no-deps; its dependencies are already
+      # present and pinned from the line above.
+      - name: Install from lock
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --require-hashes -r requirements/dev.txt
+          python -m pip install -e . --no-deps
+
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy src/rif_runtime --ignore-missing-imports
+      - run: pytest -q
+
+  # The honesty check. No cache, no lock, no constraints — installs the runtime
+  # set the way a new user would and runs the suite against whatever resolves
+  # today. This is the job that goes red when an upstream release breaks us,
+  # which the locked jobs are designed never to notice.
+  clean-clone:
+    name: clean clone (unconstrained resolution)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Mirrors scripts/cloud-agent-install.sh exactly: runtime deps first (which
+      # includes `.` so pip installs the package non-editably from the local tree),
+      # then editable re-install with --no-deps so the source-tree __file__ path
+      # resolves correctly for tests, then the unpinned dev set.
+      - name: Install unconstrained
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps
+          python -m pip install -r requirements-dev.txt
+
+      # Deliberately not linting here: ruff and mypy findings shift with every
+      # tooling release and would make this job a version detector rather than
+      # a breakage detector. The test suite is the signal.
+      - run: pytest -q
+
+  dependency-security:
+    name: dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Install from lock
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --require-hashes -r requirements/dev.txt
+          python -m pip install -e . --no-deps
+
+      # Auditing the locks rather than the environment: the lock is the thing
+      # that is reproducible, so it is the thing worth attesting. --disable-pip
+      # keeps pip-audit from re-resolving and auditing something other than
+      # what CI actually installs.
+      - name: Audit runtime lock
+        run: pip-audit --requirement requirements/runtime.txt --disable-pip
+
+      - name: Audit dev lock
+        run: pip-audit --requirement requirements/dev.txt --disable-pip
+
+  # ADVISORY. `mypy src/ tests/` under [tool.mypy] strict currently reports 156
+  # errors, nearly all missing annotations in tests/. That is tracked typing
+  # debt, not a regression, so it must not block a merge.
+  #
+  # Finding 1: this job does NOT use job-level `continue-on-error`. That would
+  # make GitHub report the job as success in the Checks UI, rendering the
+  # advisory signal invisible and letting the debt grow unobserved. Instead the
+  # mypy step alone is allowed to fail, the error count is captured, and the
+  # gate job below prints it into the run summary where it is actually read.
+  typecheck-tests:
+    name: typecheck tests (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      outcome: ${{ steps.mypy.outcome }}
+      errors: ${{ steps.count.outputs.errors }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Install from lock
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --require-hashes -r requirements/dev.txt
+          python -m pip install -e . --no-deps
+
+      # Redirected, not piped. The default shell on Linux runners is `bash -e`
+      # without pipefail, so `mypy | tee` would report tee's exit status and
+      # this step's outcome would read "success" no matter what mypy found —
+      # reintroducing exactly the invisible-green problem this job exists to
+      # avoid.
+      - name: mypy src/ tests/
+        id: mypy
+        continue-on-error: true
+        run: |
+          mypy src/ tests/ > mypy-tests.log 2>&1 || status=$?
+          cat mypy-tests.log
+          exit "${status:-0}"
+
+      - name: Count errors
+        id: count
+        if: ${{ !cancelled() }}
+        run: |
+          # Parses mypy's own trailer ("Found 156 errors in 17 files"), which
+          # is stable under [tool.mypy] pretty = true; per-line matching is not,
+          # because pretty wraps messages across lines.
+          errors=$(sed -n 's/^Found \([0-9][0-9]*\) error.*/\1/p' mypy-tests.log | tail -1)
+          echo "errors=${errors:-0}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Typing debt (advisory)"
+            echo
+            echo "\`mypy src/ tests/\` reported **${errors:-0}** errors."
+            echo
+            echo "This does not block the merge gate. It is reported so the"
+            echo "number is visible per-run and can be driven down."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: mypy-tests-log
+          path: mypy-tests.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The single required check. Point branch protection at this job only.
+  #
+  # Finding 3: `if: always()` would also run this on cancelled runs — including
+  # runs killed by cancel-in-progress above — posting a failing required check
+  # against a superseded commit. `!cancelled()` still runs when an upstream job
+  # fails (which is the case that matters) but stands down on cancellation.
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ !cancelled() }}
+    needs:
+      - lock-sync
+      - verify
+      - clean-clone
+      - dependency-security
+      - typecheck-tests
+    steps:
+      - name: Summarise
+        env:
+          LOCK_SYNC: ${{ needs.lock-sync.result }}
+          VERIFY: ${{ needs.verify.result }}
+          CLEAN_CLONE: ${{ needs.clean-clone.result }}
+          DEP_SECURITY: ${{ needs.dependency-security.result }}
+          TYPECHECK: ${{ needs.typecheck-tests.result }}
+          TYPECHECK_OUTCOME: ${{ needs.typecheck-tests.outputs.outcome }}
+          TYPECHECK_ERRORS: ${{ needs.typecheck-tests.outputs.errors }}
+        run: |
+          mark() { [ "$1" = "success" ] && echo "pass" || echo "FAIL ($1)"; }
+          {
+            echo "## Merge gate"
+            echo
+            echo "| Check | Required | Result |"
+            echo "|---|---|---|"
+            echo "| lock in sync with pyproject | yes | $(mark "$LOCK_SYNC") |"
+            echo "| verify (3.12, 3.13) | yes | $(mark "$VERIFY") |"
+            echo "| clean clone (unconstrained) | yes | $(mark "$CLEAN_CLONE") |"
+            echo "| dependency security | yes | $(mark "$DEP_SECURITY") |"
+            echo "| typecheck tests | no (advisory) | ${TYPECHECK_OUTCOME:-unknown} — ${TYPECHECK_ERRORS:-?} errors |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Advisory jobs are excluded from the verdict by construction: only the
+      # four required results are tested. typecheck-tests can never fail the
+      # gate, and can never be silently green either — its count is in the
+      # table above on every run.
+      - name: Verdict
+        env:
+          LOCK_SYNC: ${{ needs.lock-sync.result }}
+          VERIFY: ${{ needs.verify.result }}
+          CLEAN_CLONE: ${{ needs.clean-clone.result }}
+          DEP_SECURITY: ${{ needs.dependency-security.result }}
+        run: |
+          failed=0
+          for check in LOCK_SYNC VERIFY CLEAN_CLONE DEP_SECURITY; do
+            result="${!check}"
+            if [ "$result" != "success" ]; then
+              echo "::error::required check ${check} did not pass: ${result}"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "**Gate: BLOCKED**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "**Gate: CLEAR**" >> "$GITHUB_STEP_SUMMARY"

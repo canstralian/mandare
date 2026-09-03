@@ -1,0 +1,70 @@
+# RIF Runtime Configuration
+# =========================
+# This is the canonical configuration file for the RIF runtime.
+# All keys shown below are the supported set; unknown keys will cause
+# a startup validation error.
+#
+# Every value can be overridden by a RIF_* environment variable.
+# Env vars take precedence over file values.
+#
+# Env-var mapping:
+#   RIF_POSTURE          -> [runtime] posture
+#   RIF_ENVIRONMENT      -> [runtime] environment
+#   RIF_CLOUD_EGRESS     -> [runtime] cloud_egress
+#   RIF_SERVER_HOST      -> [server] host
+#   RIF_SERVER_PORT      -> [server] port
+#   RIF_SERVER_ROOT_PATH -> [server] root_path
+#   RIF_PROVIDER_MODE    -> [provider] mode
+#   RIF_PROVIDER_MODEL   -> [provider] model
+#   RIF_PROVIDER_ENDPOINT-> [provider] endpoint
+#   RIF_DATA_DIR         -> [paths] data_dir
+#   RIF_CONFIG_DIR       -> [paths] config_dir
+
+[runtime]
+# Governance posture: normal | elevated | restricted | locked
+posture = "normal"
+
+# Active environment name. Must match an entry in environments.yaml -- an
+# unknown name now raises at startup rather than being ignored, because the
+# environment carries the egress constraints and quietly serving a different
+# profile than the one configured is a silent downgrade.
+#
+# Was "production", which environments.yaml does not define. That was harmless
+# only while this key was unread; the shipped config now names a real profile.
+environment = "RIF_Runtime"
+
+# Allow outbound network calls to cloud services. Defaults to false (air-gapped).
+cloud_egress = false
+
+[server]
+# FastAPI / Uvicorn bind settings.
+#
+# `rif serve` now takes its default host and port from here (both were
+# previously hardcoded in the CLI, so these keys were parsed and ignored).
+# Loopback is the default for that reason: a checked-in 0.0.0.0 would have
+# turned every `rif serve` into a network-facing listener the moment the
+# setting started being read. Deployments that must listen externally set
+# RIF_SERVER_HOST, or pass --host; the container image already passes
+# --host=0.0.0.0 explicitly.
+host = "127.0.0.1"
+port = 8000
+
+# ASGI root_path for reverse-proxy deployments (e.g. "/api/v1")
+root_path = ""
+
+[provider]
+# Execution mode: local | remote | hybrid
+mode = "local"
+
+# Model identifier passed to the provider backend
+model = "default"
+
+# Provider API endpoint URL (leave empty for local-only mode)
+endpoint = ""
+
+[paths]
+# Directory for runtime data (decisions, evidence, posture history)
+data_dir = "data"
+
+# Directory for supplementary config files (environments.yaml, policies)
+config_dir = "config"

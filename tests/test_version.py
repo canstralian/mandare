@@ -35,7 +35,8 @@ def test_version_matches_pyproject() -> None:
     except PackageNotFoundError:
         if os.environ.get("CI"):
             pytest.fail(
-                "rif-runtime not installed in CI — ci.yml must run `pip install -e .` before pytest"
+                "rif-runtime not installed in CI — ci.yml must run "
+                "`pip install -e .` before pytest"
             )
         pytest.skip("rif-runtime not installed — run `pip install -e .` first")
 
@@ -46,7 +47,7 @@ def test_version_matches_pyproject() -> None:
 
 
 def test_read_version_from_pyproject_path_resolution() -> None:
-    """_read_version_from_pyproject() resolves pyproject.toml via the real 3-parent path."""
+    """_read_version_from_pyproject() resolves pyproject.toml via the 3-parent path."""
     from rif_runtime._version import _read_version_from_pyproject
 
     pyproject = Path(__file__).parent.parent / "pyproject.toml"
@@ -63,7 +64,7 @@ def test_read_version_from_pyproject_path_resolution() -> None:
 def test_version_falls_back_to_pyproject(
     patch_metadata_unavailable: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """_read_version() reads pyproject.toml when importlib.metadata raises PackageNotFoundError."""
+    """_read_version() reads pyproject.toml when metadata raises PackageNotFound."""
     monkeypatch.setattr(
         "rif_runtime._version._read_version_from_pyproject", lambda: "9.8.7"
     )
@@ -77,7 +78,7 @@ def test_version_unknown_when_all_fallbacks_fail(
     patch_metadata_unavailable: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """_read_version() returns 'unknown' and emits a RuntimeWarning when all sources fail."""
+    """_read_version() returns 'unknown' and warns when all sources fail."""
     monkeypatch.setattr(
         "rif_runtime._version._read_version_from_pyproject", lambda: None
     )
@@ -92,3 +93,38 @@ def test_version_unknown_when_all_fallbacks_fail(
     assert len(w) == 1
     assert issubclass(w[0].category, RuntimeWarning)
     assert "rif-runtime" in str(w[0].message)
+
+
+def test_api_app_version_matches_the_package() -> None:
+    """The OpenAPI document must not advertise a version the package isn't.
+
+    api.py hardcoded "0.3.0" while the package was 0.3.0rc2, so /openapi.json
+    described a release that had not shipped. Asserted against the resolver
+    rather than a literal, so this stays true through the "unknown" fallback.
+    """
+    from rif_runtime import __version__
+    from rif_runtime.api import app
+
+    assert app.version == __version__
+
+
+def test_openapi_document_reports_the_package_version() -> None:
+    """Check the served document, not just the attribute."""
+    from rif_runtime import __version__
+    from rif_runtime.api import app
+
+    assert app.openapi()["info"]["version"] == __version__
+
+
+def test_no_hardcoded_version_literal_in_api_module() -> None:
+    """A future edit must not reintroduce the literal that drifted."""
+    import re
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parent.parent / "src" / "rif_runtime" / "api.py"
+    ).read_text(encoding="utf-8")
+
+    assert not re.search(r'version\s*=\s*"\d+\.\d+', source), (
+        "api.py contains a hardcoded version literal; use __version__ instead"
+    )

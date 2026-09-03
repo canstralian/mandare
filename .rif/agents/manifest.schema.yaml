@@ -1,0 +1,47 @@
+version: 1
+
+required:
+  - name
+  - kind
+  - owns
+  - responsibilities
+  - inputs
+  - outputs
+  - quality_gates
+
+properties:
+
+  name:
+    type: string
+
+  kind:
+    enum:
+      - claude-skill
+      - cursor-agent
+
+  description:
+    type: string
+
+  owns:
+    type: list
+
+  responsibilities:
+    type: list
+
+  inputs:
+    type: list
+
+  outputs:
+    type: list
+
+  depends_on:
+    type: list
+
+  blocks:
+    type: list
+
+  quality_gates:
+    type: list
+
+  invariants:
+    type: list

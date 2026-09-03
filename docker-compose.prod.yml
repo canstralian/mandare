@@ -1,0 +1,137 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.12.3"
+    container_name: rif-runtime-server-prod
+    restart: always
+    environment:
+      # Only settings the runtime actually reads. This block previously set
+      # RIF_LOG_LEVEL, RIF_SERVER_WORKERS, RIF_SECURITY_SANDBOX_MODE and
+      # RIF_POLICY_AUTO_RELOAD, none of which anything in src/ reads --
+      # "sandbox mode: strict" in particular read as a hardening control while
+      # doing nothing at all. See .env.example for the full supported set.
+      RIF_POSTURE: "normal"
+      RIF_DATA_DIR: "/app/data"
+      RIF_CONFIG_DIR: "/app/config"
+      # Fail-closed control-plane auth: supply real keys via your secret store.
+      RIF_CONTROL_PLANE_API_KEYS: "${RIF_CONTROL_PLANE_API_KEYS:?set a control-plane key}"
+      # Governance-state reads require the same key in production.
+      RIF_REQUIRE_READ_AUTH: "true"
+      # HMAC key for Metasploit capability tokens. Required, not defaulted:
+      # ${VAR:-} passes an empty string when unset, and MetasploitGovernor
+      # treats empty as absent and generates a fresh random key per process --
+      # so with `restart: always` every restart silently invalidates every
+      # outstanding token. Failing to start is the honest outcome.
+      RIF_MSF_BROKER_KEY: "${RIF_MSF_BROKER_KEY:?set a stable Metasploit signing key}"
+    ports:
+      - "8000:8000"
+    volumes:
+      - rif-data:/app/data
+      - rif-config:/app/config
+    healthcheck:
+      # python, not curl: the runtime image is python:slim and has no curl, so
+      # the previous check could only ever fail.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status == 200 else 1)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - rif-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+        reservations:
+          cpus: "1"
+          memory: 512M
+
+  # Postgres backend (optional, uncomment if using SQL storage)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: rif-postgres
+  #   restart: always
+  #   environment:
+  #     POSTGRES_DB: rif_runtime
+  #     POSTGRES_USER: rif_user
+  #     POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - rif-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U rif_user -d rif_runtime"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   secrets:
+  #     - db_password
+
+  # Prometheus metrics (optional, uncomment if using Prometheus)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: rif-prometheus
+  #   restart: always
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus-data:/prometheus
+  #   command:
+  #     - "--config.file=/etc/prometheus/prometheus.yml"
+  #     - "--storage.tsdb.path=/prometheus"
+  #   networks:
+  #     - rif-network
+
+  # Jaeger tracing (optional, uncomment if using distributed tracing)
+  # jaeger:
+  #   image: jaegertracing/all-in-one:latest
+  #   container_name: rif-jaeger
+  #   restart: always
+  #   ports:
+  #     - "6831:6831/udp"
+  #     - "16686:16686"
+  #   networks:
+  #     - rif-network
+
+volumes:
+  rif-data:
+    driver: local
+  rif-config:
+    driver: local
+  # postgres-data:
+  #   driver: local
+  # prometheus-data:
+  #   driver: local
+
+networks:
+  rif-network:
+    driver: bridge
+
+# secrets:
+#   db_password:
+#     file: ./secrets/db_password.txt
+#   jwt_secret:
+#     file: ./secrets/jwt_secret.txt
+#   signing_key:
+#     file: ./secrets/rif_signing_key.txt

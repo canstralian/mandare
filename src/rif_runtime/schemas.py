@@ -1,16 +1,17 @@
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class Decision(str, Enum):
+class Decision(StrEnum):
     allow = "allow"
     deny = "deny"
     review = "review"
 
 
-class Posture(str, Enum):
+class Posture(StrEnum):
     normal = "normal"
     elevated = "elevated"
     restricted = "restricted"
@@ -22,7 +23,7 @@ class PolicyRequest(BaseModel):
     action: str
     target: str
     reason: str | None = None
-    context: dict = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict)
 
 
 class PolicyDecision(BaseModel):
@@ -34,7 +35,7 @@ class PolicyDecision(BaseModel):
     posture: Posture
     reason: str
     matched_rule: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class EnvironmentProfile(BaseModel):
