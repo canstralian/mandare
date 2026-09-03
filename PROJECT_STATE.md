@@ -30,10 +30,11 @@ during this pass, or explicitly marked `[UNVERIFIED]`/`[BLOCKED]`.
   same actor as #173's most recent updates). `[VERIFIED]`.
   - `state: open`, `draft: false`, `mergeable_state: blocked`. `[VERIFIED]`.
   - Combined status on head SHA `f994495`: only two contexts report —
-    `Vercel – rif-runtime: failure` ("Deployment has failed" / account-blocked, per PR body)
-    and `CodeRabbit: success`. **No merge-gate / CI workflow run appears in the combined
-    status at all.** `[VERIFIED]` — corroborates the PR body's claim that GitHub-hosted
-    runners are not being allocated for this repository.
+    `Vercel – rif-runtime: failure` ("Deployment has failed") and `CodeRabbit: success`.
+    **No merge-gate / CI workflow run appears in the combined status at all.** `[VERIFIED]`
+    — corroborates the PR body's claim that GitHub-hosted runners are not being allocated
+    for this repository. The "account blocked" explanation is from the PR body and remains
+    `[UNVERIFIED]` in this session.
   - Local validation evidence (tests/lint/type/security/build) quoted in the PR body
     (351 passed, ruff/mypy/bandit clean, wheel installs cleanly) is `[UNVERIFIED]` by this
     session — it was produced in a different environment and this session did not
@@ -67,10 +68,10 @@ which are still relevant.
    corroborated here by the combined-status check showing zero CI contexts). Remedy is
    the repository/org Actions spending limit and Actions policy — owner-only, not
    resolvable by this agent. `[BLOCKED]`.
-2. **Vercel account block.** The `Vercel – rif-runtime` context fails with "Deployment has
-   failed"; Vercel separately reported "Account is blocked" against
-   `dejagersa-1111s-projects`/`team_0aV9dnO3IbZA7SGgL9y1rPIG`. Account-level, owner-only.
-   `[BLOCKED]`.
+2. **Vercel deployment/account blocker.** The `Vercel – rif-runtime` context fails with
+   "Deployment has failed". `[VERIFIED]` Vercel separately reported "Account is blocked"
+   against `dejagersa-1111s-projects`/`team_0aV9dnO3IbZA7SGgL9y1rPIG` per PR body
+   (`[UNVERIFIED]` in this session). Account-level, owner-only. `[BLOCKED]`.
 3. **#173 merge itself.** `mergeable_state: blocked` with no CI signal available means the
    PR cannot be safely merged by mechanical inspection alone, and this agent's toolset has
    no PR-merge capability regardless. Requires the repository owner to merge (or force an
