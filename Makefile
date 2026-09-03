@@ -211,7 +211,7 @@ all: docker-down clean install dev docker-up
 	@echo "  Logs: make docker-logs"
 
 # Dependency locks (see requirements/README.md)
-PIP_COMPILE_ARGS = --quiet --generate-hashes --strip-extras --allow-unsafe
+PIP_COMPILE_ARGS = --quiet --generate-hashes --strip-extras --allow-unsafe --no-header
 
 # Recompile the locks from pyproject.toml. pip-compile keeps the versions
 # already pinned in the output files, so this is a no-op unless pyproject.toml

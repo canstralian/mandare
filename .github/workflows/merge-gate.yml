@@ -54,9 +54,9 @@ jobs:
       # diff exactly when pyproject.toml changed without recompiling.
       - name: Recompile locks
         run: |
-          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
+          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe --no-header \
             --output-file requirements/runtime.txt pyproject.toml
-          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
+          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe --no-header \
             --extra dev --output-file requirements/dev.txt pyproject.toml
 
       - name: Assert no drift
