@@ -29,11 +29,13 @@ Do not skip OBSERVE, CLASSIFY, or BOUND in order to start writing code.
 2. Classify every factual claim as `EXECUTED`, `INFERRED`, or `UNVERIFIED`.
 3. Local execution of ruff/mypy/pytest is **not** hosted CI. Never mark
    hosted verification complete from local runs alone.
-4. When hosted runs fail, read the job annotations before assuming a
-   workflow defect. Jobs that complete in seconds with zero steps executed
-   indicate an infrastructure or account cause (runner allocation, or an
-   account lock such as "not started because your account is locked due to
-   a billing issue") — an owner action, not a code fix. No workflow edit
+4. When hosted runs fail, do not classify the cause from timing or step
+   counts alone. Read each failed job's conclusion and annotation text
+   (`gh run view <run-id>`), distinguishing `failure` from `skipped` and
+   `cancelled`. Only an annotation that explicitly names an infrastructure
+   or account cause (for example, "The job was not started because your
+   account is locked due to a billing issue") justifies diagnosing an
+   owner-actionable blocker — and in that verified case, no workflow edit
    can produce a hosted run until the account-level cause is cleared.
 5. Never claim mergeability from an agent's statement. Read
    `mergeable` / `mergeStateStatus` from GitHub directly.
