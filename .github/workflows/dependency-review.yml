@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       # Dependency review uses the dependency-graph *compare* API, which on
       # private repos requires GitHub Advanced Security (the SBOM endpoint
@@ -34,7 +36,7 @@ jobs:
             echo "::notice::Dependency review is not available on this repository (requires Dependency graph + GitHub Advanced Security); skipping. Enable it under Settings -> Advanced Security to activate this check."
           fi
 
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         if: steps.dep-review.outputs.enabled == 'true'
         with:
           fail-on-severity: moderate
