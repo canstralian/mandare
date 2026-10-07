@@ -1,6 +1,7 @@
 import { Effect, approvalSummary, classifyToolCall, stableStringify, toolInput } from './classify-effect.js'
 
 const EVIDENCE_KEY = 'mandare.governance.evidence.v1'
+const GUARDED_EFFECTS = new Set([Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE, Effect.UNKNOWN])
 const MAX_EVIDENCE_RECORDS = 512
 const APPROVE = 'Approve once'
 const REFUSE = 'Refuse'
@@ -43,7 +44,7 @@ async function guardToolCall($, e, next) {
   const input = toolInput(e)
   const effect = classifyToolCall(e.tool, input)
 
-  if (![Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE, Effect.UNKNOWN].includes(effect)) {
+  if (!GUARDED_EFFECTS.has(effect)) {
     return next(e)
   }
 
@@ -110,10 +111,38 @@ async function guardToolCall($, e, next) {
   return result
 }
 
-export function register(on) {
-  on('tool.call', guardToolCall).catch(async ($, e, next) => {
-    return {
-      deny: `Mandare governance failed closed before execution: ${next.error.kind}. No authority was granted.`,
+/**
+ * Runs in the guard's place when it throws, outruns its budget, or is not run
+ * because the call was raised beneath its own frame (re-entry).
+ *
+ * It must never throw: a handler that throws leaves the hook absent, and an
+ * absent tool.call guard fails open. Every path that cannot prove the call is
+ * safe to continue answers with a deny.
+ */
+export async function failClosed($, e, next) {
+  const kind = String(next?.error?.kind ?? 'unknown')
+  try {
+    // The guard already passed the call beneath before failing. A deny now would
+    // undo nothing, so replay the settled answer instead of misreporting it.
+    if (next.called) return next(e)
+
+    // Re-entry: the guard was not run and its own $ calls reject, so no live
+    // approval is possible. Only effects that never need approval may continue.
+    if (kind === 're-entry') {
+      const effect = classifyToolCall(e.tool, toolInput(e))
+      if (!GUARDED_EFFECTS.has(effect)) return next(e)
+      return {
+        deny: `Mandare denied ${effect} raised beneath its own guard: no live approval is possible there. No authority was granted.`,
+      }
     }
-  })
+  } catch {
+    // Fall through to the deny below.
+  }
+  return {
+    deny: `Mandare governance failed closed before execution: ${kind}. No authority was granted.`,
+  }
+}
+
+export function register(on) {
+  on('tool.call', guardToolCall).catch(failClosed)
 }

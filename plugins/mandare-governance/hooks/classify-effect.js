@@ -18,9 +18,15 @@ const SAFE_BUILTINS = new Map([
   ['AskUserQuestion', Effect.READ],
   ['TodoRead', Effect.READ],
   ['TaskOutput', Effect.READ],
+  ['TaskGet', Effect.READ],
+  ['TaskList', Effect.READ],
+  ['ToolSearch', Effect.READ],
   ['LSP', Effect.READ],
   ['ListMcpResources', Effect.NETWORK_READ],
   ['ReadMcpResource', Effect.NETWORK_READ],
+  ['ListMcpResourcesTool', Effect.NETWORK_READ],
+  ['ReadMcpResourceTool', Effect.NETWORK_READ],
+  ['ReadMcpResourceDirTool', Effect.NETWORK_READ],
   ['WebFetch', Effect.NETWORK_READ],
   ['WebSearch', Effect.NETWORK_READ],
   ['Edit', Effect.LOCAL_WRITE],
@@ -42,7 +48,12 @@ const DESTRUCTIVE_BASH = [
   /(?:^|[;&|]\s*)rm\s+-(?:[A-Za-z]*r[A-Za-z]*f|[A-Za-z]*f[A-Za-z]*r)\b/i,
   /\bgit\s+reset\s+--hard\b/i,
   /\bgit\s+clean\b[^\n;&|]*\s-f(?:\s|$)/i,
-  /\bgit\s+push\b[^\n;&|]*(?:--force(?:-with-lease)?|-f)(?:\s|$)/i,
+  // Force pushes: long flags (with optional =value), short clusters containing f, and +refspecs.
+  /\bgit\s+push\b[^\n;&|]*\s(?:--force(?:-with-lease|-if-includes)?(?:=\S*)?|-[A-Za-z]*f[A-Za-z]*)(?:\s|$)/i,
+  /\bgit\s+push\b[^\n;&|]*\s\+\S/i,
+  // Remote ref deletion or mirroring: --delete/-d, :ref refspecs, --mirror, --prune.
+  /\bgit\s+push\b[^\n;&|]*\s(?:--delete|-d|--mirror|--prune)(?:\s|$)/i,
+  /\bgit\s+push\b[^\n;&|]*\s:\S/i,
   /\bterraform\s+destroy\b/i,
   /\bkubectl\s+delete\b/i,
   /\b(?:drop\s+(?:database|table)|truncate\s+table)\b/i,
@@ -59,7 +70,14 @@ const EXTERNAL_WRITE_BASH = [
   /\bdocker\s+push\b/i,
   /\bkubectl\s+(?:apply|create|patch|replace|rollout\s+restart|scale)\b/i,
   /\bterraform\s+apply\b/i,
-  /\bcurl\b[^\n;&|]*(?:-X|--request)\s*(?:POST|PUT|PATCH|DELETE)\b/i,
+  /\bcurl\b[^\n;&|]*(?:-X|--request)[\s=]*(?:POST|PUT|PATCH|DELETE)\b/i,
+  // curl sends a body (implicit POST/PUT) with -d/-F/-T, alone or in a short-option cluster.
+  // Case-sensitive on purpose: -f (fail) and -D (dump headers) are not body flags.
+  /\bcurl\b[^\n;&|]*\s(?:-[A-Za-z]*[dFT]|--data|--form|--upload-file|--json)/,
+  /\bwget\b[^\n;&|]*\s--(?:post-data|post-file|body-data|body-file|method)\b/i,
+  // gh api: an explicit non-GET method, or field/input flags without an explicit method (implicit POST).
+  /\bgh\s+api\b[^\n;&|]*(?:-X|--method)[\s=]*(?!GET\b)[A-Za-z]+/i,
+  /\bgh\s+api\b(?![^\n;&|]*(?:-X|--method))[^\n;&|]*\s(?:-f|-F|--field|--raw-field|--input)(?:[\s=]|$)/,
   /\b(?:scp|sftp)\b/i,
   /\brsync\b[^\n;&|]*\s[^\s]+@[^:]+:/i,
 ]
@@ -69,6 +87,7 @@ const NETWORK_READ_BASH = [
   /\bcurl\b/i,
   /\bwget\b/i,
   /\bgh\s+(?:api|pr|issue|release|run|repo)\s+(?:view|list|status|checks|diff)\b/i,
+  /\bgh\s+api\b/i,
 ]
 
 const MCP_DESTRUCTIVE = new Set([
@@ -78,7 +97,7 @@ const MCP_DESTRUCTIVE = new Set([
 const MCP_WRITE = new Set([
   'create', 'update', 'write', 'patch', 'put', 'post', 'send', 'forward',
   'merge', 'close', 'reopen', 'add', 'remove', 'archive', 'restore', 'approve',
-  'request', 'dismiss', 'resolve', 'unresolve', 'enable', 'disable', 'upload',
+  'dismiss', 'resolve', 'unresolve', 'enable', 'disable', 'upload',
   'deploy', 'publish', 'trigger', 'cancel', 'invite', 'assign', 'label', 'comment',
   'react', 'convert', 'mark', 'move', 'rename', 'set', 'submit', 'reply',
 ])
