@@ -1,0 +1,14 @@
+{
+  "name": "mandare-governance",
+  "displayName": "Mandare Governance",
+  "version": "0.1.0",
+  "description": "Fail-closed Claude Code host guard: classifies tool calls, requires one-shot live approval for external writes and destructive effects, and denies unclassified operations. A host adapter, not a policy engine or authority source.",
+  "author": {
+    "name": "canstralian",
+    "url": "https://github.com/canstralian"
+  },
+  "homepage": "https://github.com/canstralian/mandare/tree/main/plugins/mandare-governance",
+  "repository": "https://github.com/canstralian/mandare",
+  "license": "MIT",
+  "keywords": ["governance", "fail-closed", "approval", "tool-call"]
+}
