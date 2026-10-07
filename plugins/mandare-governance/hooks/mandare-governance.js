@@ -1,17 +1,40 @@
-import { Effect, approvalSummary, classifyToolCall, stableStringify, toolInput } from './classify-effect.js'
+import { Effect, MAX_REVIEW_CHARS, classifyToolCall, reviewText, stableStringify, toolInput } from './classify-effect.js'
+
+/** @typedef {import('claude-code').Hook<'tool.call'>} ToolCallHook */
+/** @typedef {Parameters<ToolCallHook>[0]} Engine */
+/** @typedef {Parameters<ToolCallHook>[1]} ToolCallEvent */
+/** @typedef {Record<string, string | number | null>} EvidenceRecord */
+/** @typedef {{ version: 1, records: EvidenceRecord[] }} EvidenceLedger */
 
 const EVIDENCE_KEY = 'mandare.governance.evidence.v1'
-const GUARDED_EFFECTS = new Set([Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE, Effect.UNKNOWN])
 const MAX_EVIDENCE_RECORDS = 512
 const APPROVE = 'Approve once'
 const REFUSE = 'Refuse'
+const PASS_THROUGH = new Set([Effect.READ, Effect.LOCAL_WRITE, Effect.LOCAL_EXECUTION, Effect.NETWORK_READ])
+const APPROVABLE = new Set([Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE])
 
+/**
+ * What the guard does with an effect: an allowlist, so any value the
+ * classifier was not written to return (undefined, a typo) is denied
+ * rather than passed through.
+ *
+ * @param {unknown} effect
+ * @returns {'pass' | 'approve' | 'deny'}
+ */
+export function disposition(effect) {
+  if (PASS_THROUGH.has(/** @type {any} */ (effect))) return 'pass'
+  if (APPROVABLE.has(/** @type {any} */ (effect))) return 'approve'
+  return 'deny'
+}
+
+/** @param {string} value */
 async function sha256(value) {
   const bytes = new TextEncoder().encode(value)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+/** @param {ToolCallEvent} e */
 async function fingerprintEvent(e) {
   const input = toolInput(e)
   const canonical = stableStringify({
@@ -22,10 +45,15 @@ async function fingerprintEvent(e) {
   return { input, fingerprint: await sha256(canonical) }
 }
 
+/**
+ * @param {Engine} $
+ * @param {EvidenceRecord} record
+ */
 async function appendEvidence($, record) {
-  const existing = await $.store.get(EVIDENCE_KEY)
+  const existing = /** @type {Partial<EvidenceLedger> | undefined} */ (await $.store.get(EVIDENCE_KEY))
+  /** @type {EvidenceLedger} */
   const ledger = existing && existing.version === 1 && Array.isArray(existing.records)
-    ? existing
+    ? /** @type {EvidenceLedger} */ (existing)
     : { version: 1, records: [] }
   const previous = ledger.records.at(-1)?.hash ?? null
   const timestampMs = await $.clock.now()
@@ -40,11 +68,17 @@ async function appendEvidence($, record) {
   await $.store.set(EVIDENCE_KEY, { version: 1, records })
 }
 
+/**
+ * @param {Engine} $
+ * @param {ToolCallEvent} e
+ * @param {Parameters<ToolCallHook>[2]} next
+ */
 async function guardToolCall($, e, next) {
   const input = toolInput(e)
   const effect = classifyToolCall(e.tool, input)
 
-  if (!GUARDED_EFFECTS.has(effect)) {
+  const action = disposition(effect)
+  if (action === 'pass') {
     return next(e)
   }
 
@@ -57,7 +91,7 @@ async function guardToolCall($, e, next) {
     decision: 'pending',
   })
 
-  if (effect === Effect.UNKNOWN) {
+  if (action === 'deny') {
     await appendEvidence($, {
       event: 'governance.denied',
       tool: e.tool,
@@ -70,11 +104,24 @@ async function guardToolCall($, e, next) {
     }
   }
 
+  const review = reviewText(e.tool, bound.input)
+  if (review === null) {
+    await appendEvidence($, {
+      event: 'governance.denied',
+      tool: e.tool,
+      effect,
+      inputHash: bound.fingerprint,
+      decision: 'deny_unreviewable',
+    })
+    return {
+      deny: `Mandare denied ${effect}: the invocation is longer than ${MAX_REVIEW_CHARS} characters, too long to show for approval. Split it into smaller calls.`,
+    }
+  }
+
   let answer = REFUSE
   try {
-    const summary = approvalSummary(e.tool, bound.input)
     answer = await $.ui.ask(
-      `Mandare classified this as ${effect}. Approve this exact invocation once?\n${summary}\nsha256:${bound.fingerprint.slice(0, 16)}`,
+      `Mandare classified this as ${effect}. Approve this exact invocation once?\n${review}\nsha256:${bound.fingerprint.slice(0, 16)}`,
       [APPROVE, REFUSE],
     )
   } catch {
@@ -102,13 +149,23 @@ async function guardToolCall($, e, next) {
 
   const result = await next(e)
   await appendEvidence($, {
-    event: result?.deny ? 'execution.denied_downstream' : result?.isError ? 'execution.failed' : 'execution.completed',
+    ...executionOutcome(result),
     tool: e.tool,
     effect,
     inputHash: bound.fingerprint,
-    decision: result?.deny ? 'downstream_deny' : result?.isError ? 'error' : 'completed',
   })
   return result
+}
+
+/**
+ * How an approved call ended beneath the guard, for the evidence record.
+ *
+ * @param {{ deny?: unknown, isError?: unknown } | undefined} result
+ */
+function executionOutcome(result) {
+  if (result?.deny) return { event: 'execution.denied_downstream', decision: 'downstream_deny' }
+  if (result?.isError) return { event: 'execution.failed', decision: 'error' }
+  return { event: 'execution.completed', decision: 'completed' }
 }
 
 /**
@@ -118,8 +175,10 @@ async function guardToolCall($, e, next) {
  * It must never throw: a handler that throws leaves the hook absent, and an
  * absent tool.call guard fails open. Every path that cannot prove the call is
  * safe to continue answers with a deny.
+ *
+ * @type {import('claude-code').CatchHandler<ToolCallHook>}
  */
-export async function failClosed($, e, next) {
+export const failClosed = async ($, e, next) => {
   const kind = String(next?.error?.kind ?? 'unknown')
   try {
     // The guard already passed the call beneath before failing. A deny now would
@@ -130,7 +189,7 @@ export async function failClosed($, e, next) {
     // approval is possible. Only effects that never need approval may continue.
     if (kind === 're-entry') {
       const effect = classifyToolCall(e.tool, toolInput(e))
-      if (!GUARDED_EFFECTS.has(effect)) return next(e)
+      if (disposition(effect) === 'pass') return next(e)
       return {
         deny: `Mandare denied ${effect} raised beneath its own guard: no live approval is possible there. No authority was granted.`,
       }
@@ -143,6 +202,7 @@ export async function failClosed($, e, next) {
   }
 }
 
+/** @param {import('claude-code').On} on */
 export function register(on) {
   on('tool.call', guardToolCall).catch(failClosed)
 }

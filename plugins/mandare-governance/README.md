@@ -20,6 +20,12 @@ input hash            != credential
 
 - Recognized external writes and destructive actions require a live `Approve once` answer to a
   prompt shown for that exact invocation.
+- The prompt shows the whole invocation: a Bash command verbatim, any other tool as its name and
+  canonical arguments. Control, zero-width and bidirectional characters are shown as escapes so the
+  terminal cannot draw something other than what runs. An invocation longer than 4000 characters
+  is denied rather than shown partially.
+- Only `READ`, `LOCAL_WRITE`, `LOCAL_EXECUTION` and `NETWORK_READ` pass through. Any other value,
+  including one the classifier was never written to return, is treated as unknown and denied.
 - Approval is never cached or reused. A second call, identical or modified, gets a new prompt.
 - Unknown built-in tools and unknown MCP operations are denied without prompting.
 - A dismissed prompt, a free-text answer other than `Approve once`, or a session with nobody to ask

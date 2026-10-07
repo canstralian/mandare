@@ -1,3 +1,6 @@
+/** @typedef {typeof Effect[keyof typeof Effect]} EffectClass */
+/** @typedef {Record<string, unknown>} ToolInput */
+
 export const Effect = Object.freeze({
   READ: 'READ',
   LOCAL_WRITE: 'LOCAL_WRITE',
@@ -108,13 +111,22 @@ const MCP_READ = new Set([
   'history', 'show', 'describe', 'count',
 ])
 
+/**
+ * @param {string} tool
+ * @param {ToolInput} [input]
+ * @returns {EffectClass}
+ */
 export function classifyToolCall(tool, input = {}) {
   if (tool === 'Bash') return classifyBash(String(input.command ?? ''))
-  if (SAFE_BUILTINS.has(tool)) return SAFE_BUILTINS.get(tool)
+  if (SAFE_BUILTINS.has(tool)) return SAFE_BUILTINS.get(tool) ?? Effect.UNKNOWN
   if (/^mcp__/i.test(tool)) return classifyMcp(tool)
   return Effect.UNKNOWN
 }
 
+/**
+ * @param {string} command
+ * @returns {EffectClass}
+ */
 export function classifyBash(command) {
   if (!command.trim()) return Effect.UNKNOWN
   if (DESTRUCTIVE_BASH.some((pattern) => pattern.test(command))) return Effect.DESTRUCTIVE
@@ -123,6 +135,10 @@ export function classifyBash(command) {
   return Effect.LOCAL_EXECUTION
 }
 
+/**
+ * @param {string} tool
+ * @returns {EffectClass}
+ */
 export function classifyMcp(tool) {
   const operation = String(tool).split('__').filter(Boolean).at(-1)?.toLowerCase() ?? ''
   const tokens = operation.split(/[_-]+/).filter(Boolean)
@@ -132,7 +148,12 @@ export function classifyMcp(tool) {
   return Effect.UNKNOWN
 }
 
+/**
+ * @param {object | null | undefined} event
+ * @returns {ToolInput}
+ */
 export function toolInput(event) {
+  /** @type {ToolInput} */
   const input = {}
   for (const [key, value] of Object.entries(event ?? {})) {
     if (['tool', 'tool_use_id', 'agentId', 'agent_id'].includes(key)) continue
@@ -141,18 +162,37 @@ export function toolInput(event) {
   return input
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 export function stableStringify(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']'
-  return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stableStringify(value[key])).join(',') + '}'
+  const record = /** @type {Record<string, unknown>} */ (value)
+  return '{' + Object.keys(record).sort().map((key) => JSON.stringify(key) + ':' + stableStringify(record[key])).join(',') + '}'
 }
 
-export function approvalSummary(tool, input) {
-  if (tool === 'Bash') {
-    const command = String(input.command ?? '').replace(/\s+/g, ' ').trim()
-    return command.length > 180 ? command.slice(0, 177) + '...' : command || 'empty command'
-  }
-  const operation = String(tool).split('__').filter(Boolean).at(-1) ?? tool
-  const resource = input.repository_full_name ?? input.repo_full_name ?? input.path ?? input.branch_name ?? input.branch ?? ''
-  return resource ? `${operation} on ${String(resource).slice(0, 120)}` : operation
+export const MAX_REVIEW_CHARS = 4000
+
+// C0/C1 controls (except tab and newline), zero-width and bidirectional
+// formatting characters can make a terminal draw something other than what runs.
+const UNSAFE_DISPLAY = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g
+
+/**
+ * The whole invocation as a human must see it to approve it: a Bash command
+ * verbatim, any other tool as its name and canonical arguments. Characters that
+ * could alter how a terminal draws the text are shown as escapes.
+ *
+ * Returns null when the text is longer than a prompt can show for review; the
+ * guard then denies instead of asking someone to approve what they cannot see.
+ *
+ * @param {string} tool
+ * @param {ToolInput} input
+ * @returns {string | null}
+ */
+export function reviewText(tool, input) {
+  const raw = tool === 'Bash' ? String(input.command ?? '') : `${tool} ${stableStringify(input)}`
+  const visible = raw.replace(UNSAFE_DISPLAY, (ch) => `\\u{${ch.codePointAt(0)?.toString(16)}}`)
+  return visible.length > MAX_REVIEW_CHARS ? null : visible
 }

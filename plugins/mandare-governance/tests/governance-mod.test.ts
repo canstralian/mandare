@@ -46,7 +46,7 @@ test('one-shot approval allows exactly that external mutation', async ($, on) =>
   on('tool.call', ($, e) => {
     if (e.tool === 'AskUserQuestion') {
       questions += 1
-      const question = e.questions[0].question
+      const question = e.questions[0]!.question
       return { result: { answers: { [question]: 'Approve once' } } }
     }
     executed += 1
@@ -70,7 +70,7 @@ test('approval is not cached across a second identical mutation', async ($, on) 
   on('tool.call', ($, e) => {
     if (e.tool === 'AskUserQuestion') {
       questions += 1
-      const question = e.questions[0].question
+      const question = e.questions[0]!.question
       const answer = questions === 1 ? 'Approve once' : 'Refuse'
       return { result: { answers: { [question]: answer } } }
     }
