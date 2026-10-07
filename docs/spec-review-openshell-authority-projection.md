@@ -89,7 +89,12 @@ providers, or middleware authority absent from that decision and its admitted
 capability contract.
 
 A projection compiler may reduce authority to fit OpenShell semantics. It MUST fail
-closed rather than broaden authority to obtain a representable policy.
+closed rather than broaden authority to obtain a representable policy. Authority
+introduced by the OpenShell runtime itself is not exempt from this rule: any
+system-injected filesystem, process-tree, network, or provider grant MUST already be
+covered by the governing Decision, its admitted capability execution requirements, or
+a trusted environment/runtime baseline explicitly bound into that Decision. Hidden
+runtime grants are authority expansion.
 
 ### OP-3 — Boundary containment is mandatory
 
@@ -97,14 +102,17 @@ Before a projected policy may be used for execution, RIF MUST check the fully co
 candidate against an operator-supplied maximum boundary using the OpenShell containment
 prover.
 
-Only prover result `Within` / process exit code `0` is authorization-compatible.
+Only upstream JSON `result: "within_boundary"` with actual process exit code `0`
+and envelope `exit_code: 0` is authorization-compatible. OpenShell's Rust
+`CheckResult::Within` variant serializes to `"within_boundary"`; a RIF-local enum
+may use a different internal name but MUST retain the raw upstream wire value.
 
 The following are denials:
 
-- `Exceeds` / exit code `1`;
-- input, output, usage, or internal error / exit code `2`;
-- unsupported or inconclusive semantics / exit code `3`;
-- interruption / exit code `130`;
+- JSON `result: "exceeds_boundary"` / exit code `1`;
+- JSON `result: "error"` / exit code `2`;
+- JSON `result: "unsupported"` or `"inconclusive"` / exit code `3`;
+- JSON `result: "inconclusive"` with cancellation / exit code `130`;
 - unknown exit codes;
 - malformed or missing JSON output when JSON output was requested;
 - missing prover executable when the prover gate is configured as required.
@@ -188,7 +196,7 @@ class NetworkAuthority:
     host: str
     port: int
     protocol: Literal["rest", "tcp", "mcp", "json-rpc", "websocket", "graphql"]
-    binaries: tuple[str, ...]
+    process_tree_roots: tuple[str, ...]
     access: Literal["read-only", "read-write", "full"] | None = None
     allow_rules: tuple[RequestRule, ...] = ()
     deny_rules: tuple[RequestRule, ...] = ()
@@ -199,11 +207,17 @@ binding:
 
 1. projection is immutable;
 2. projection carries the governing `decision_id`;
-3. filesystem authority is separated into read and write sets;
-4. network authority is explicit per destination and executable;
-5. request-level authority is explicit where OpenShell can inspect it;
-6. secret values are forbidden;
-7. unspecified authority means denied.
+3. filesystem authority is separated into read and read-write sets; a write grant is
+   representable only when read authority for the same path is also authorized;
+4. network authority is explicit per destination and process-tree root;
+5. each process-tree root explicitly authorizes the named executable **and its
+   descendants** for that network rule, matching the pinned OpenShell ancestor
+   semantics; exact-executable-only network authority is not representable in O1/O2
+   and MUST be rejected rather than approximated;
+6. request-level authority is explicit where OpenShell can inspect it;
+7. secret values are forbidden;
+8. unspecified authority means denied when the pinned backend can represent that
+   denial; an unrepresentable deny-all shape is execution-ineligible, never widened.
 
 `projection_id` SHOULD be a deterministic digest of the canonical projection payload
 excluding non-authority metadata. The exact canonicalization algorithm remains an open
@@ -226,10 +240,25 @@ filesystem_policy:
   read_write: []
 
 landlock:
-  compatibility: best_effort
+  compatibility: hard_requirement
 
 network_policies: {}
 ```
+
+This is a **serialization baseline, not a runnable deny-all filesystem policy**. At
+the pinned OpenShell revision, an empty `read_only` + `read_write` set returns
+without installing the optional Landlock ruleset; `hard_requirement` does not change
+that early-return behavior. The capability-free baseline protects OpenShell's private
+`/.openshell` subtree but does not deny the rest of the filesystem.
+
+Therefore a projection with zero effective filesystem grants is execution-ineligible
+under the pinned backend unless a later backend stage supplies independently verified
+deny-all filesystem enforcement. RIF MUST NOT describe empty filesystem lists as
+"default deny."
+
+For any runnable filesystem-constrained policy, `landlock.compatibility` MUST be
+`hard_requirement`. A backend that cannot establish the required Landlock rules
+fails closed.
 
 The compiler MUST NOT rely on OpenShell defaults where an omitted field could create
 more authority than an explicit RIF projection.
@@ -238,7 +267,11 @@ more authority than an explicit RIF projection.
 
 - `filesystem_read` -> `filesystem_policy.read_only`
 - `filesystem_write` -> `filesystem_policy.read_write`
+- every `filesystem_write` path MUST also be present in the authorized
+  `filesystem_read` set because OpenShell `read_write` grants both read and write
+  access; write-only authority is unrepresentable and MUST be rejected
 - workdir access is explicit; it is not silently enabled by the compiler
+- zero effective filesystem paths are execution-ineligible at the pinned revision
 
 Path normalization must reject ambiguous or invalid paths before YAML generation.
 Whether symlink/canonical path validation belongs in the compiler or sandbox preparation
@@ -252,11 +285,27 @@ Each `NetworkAuthority` maps to one named `network_policies` entry with:
 - explicit port;
 - explicit protocol;
 - `enforcement: enforce` for inspected protocols;
-- explicit binary path(s).
+- explicit process-tree root path(s), compiled to OpenShell `binaries`.
 
-For REST, WebSocket, and GraphQL, the compiler may use an OpenShell access preset only
-when the preset is equal to or narrower than the RIF authority. Otherwise it MUST emit
-explicit `rules`.
+At the pinned revision, an OpenShell network binary selector matches the connecting
+executable **or any ancestor executable**. RIF therefore models these selectors as
+process-tree roots, not exact executables. A listed Python/Claude/Node process can
+confer the rule's network authority to a child process. If the governing RIF authority
+permits only the exact executable and not descendants, the compiler MUST reject the
+projection as unrepresentable.
+
+The backend MUST also require OpenShell binary identity enforcement to remain enabled;
+a trusted runtime configuration that disables binary identity would erase this part of
+the projected boundary and is incompatible with execution eligibility.
+
+For REST, the compiler may use an OpenShell access preset only when the preset is
+equal to or narrower than the RIF authority. Otherwise it MUST emit explicit
+`rules`.
+
+The pinned containment prover models only L4 TCP and REST network authority. Although
+the projection vocabulary may retain `mcp`, `json-rpc`, `websocket`, and
+`graphql` for future backends, those protocols return `unsupported` from the pinned
+prover and are not execution-eligible in O1/O2 under this compatibility baseline.
 
 For REST rules, method and path are both required. A projection such as:
 
@@ -280,6 +329,29 @@ rules:
       method: GET
       path: /repos/canstralian/mandare/**
 ```
+
+#### 5.2.1 Runtime filesystem enrichment for networked sandboxes
+
+At the pinned revision, nonempty OpenShell network policy triggers proxy-mode
+filesystem enrichment. Existing paths from this upstream baseline can be injected:
+
+- read-only: `/usr`, `/lib`, `/etc`, `/app`, `/var/log`, `/proc`,
+  `/dev/urandom`;
+- read-write: `/tmp`, `/dev/null`.
+
+These grants are runtime authority. They MUST NOT appear after the proof as an
+unmodeled side effect.
+
+O1 is therefore a **preflight** for networked projections, not final execution
+eligibility. Before O2 executes a networked sandbox, it MUST construct the
+target-specific effective candidate including every runtime-injected baseline grant,
+verify that those grants are authorized by the bound capability/environment contract,
+and run containment on that effective candidate. The exact policy installed in the
+sandbox must be evidenced against the policy that was proven. Any mismatch fails
+closed.
+
+A network-only projection whose authored filesystem lists omit the upstream proxy
+baseline MUST NOT be treated as proving the eventual runtime authority.
 
 ### 5.3 TCP
 
@@ -371,9 +443,12 @@ Requirements:
 - bounded stdout/stderr capture;
 - controlled environment;
 - no fallback to "allow" if the binary is missing;
-- parse JSON only after an exit-code-compatible result;
+- parse JSON and require the JSON `exit_code` to equal the actual process exit code;
+- require `result: "within_boundary"`, envelope `exit_code: 0`, and actual
+  process exit code `0` as a three-way success agreement;
+- preserve the raw upstream `result` string in evidence;
 - preserve stderr for diagnostics but never use diagnostic text as authority;
-- unexpected output shape => denial;
+- unexpected output shape or result/exit disagreement => denial;
 - timeout => denial.
 
 The adapter SHALL return a typed result containing the raw upstream result state and
@@ -459,14 +534,21 @@ Implement:
 Acceptance:
 
 ```text
-candidate <= boundary  -> eligible
+candidate <= boundary  -> O1 preflight pass
 candidate > boundary   -> denied
 unsupported            -> denied
 inconclusive           -> denied
 prover unavailable     -> denied
 timeout                -> denied
 malformed result       -> denied
+result/exit mismatch   -> denied
 ```
+
+For network authority, O1 supports only `tcp` (L4) and `rest` under the pinned
+prover. `mcp`, `json-rpc`, `websocket`, and `graphql` remain representable
+future vocabulary but are not O1 execution-eligible. O1 does not itself create
+execution eligibility; O2 must prove the target-specific effective runtime policy,
+including OpenShell's injected proxy filesystem baseline, before execution.
 
 ### O2 — OpenShell execution backend
 
@@ -506,19 +588,31 @@ This stage is not authorized by this review.
 The approved implementation MUST include tests that prove at least:
 
 1. default projection emits no network policy;
-2. explicit filesystem read/write sets do not cross-map;
-3. REST path-limited authority does not compile to a wider access preset;
-4. TCP refuses application-layer constraints;
-5. binaries are explicit and an empty binary set is rejected for network rules;
-6. compiler output is deterministic for equivalent projections;
-7. prover exit `0` with valid JSON and required coverage can pass;
-8. prover exits `1`, `2`, `3`, `130`, and unknown all deny;
-9. missing prover denies;
-10. timeout denies;
-11. malformed JSON denies;
-12. missing required coverage denies the affected authority domain;
-13. boundary/candidate digests are stable over the exact bytes checked;
-14. secret-like values are rejected from projection fields intended to carry only
+2. zero effective filesystem grants are marked execution-ineligible rather than
+   described as deny-all;
+3. a write path without matching read authority is rejected;
+4. explicit filesystem read and read-write sets map without unintended widening;
+5. a networked policy cannot become execution-eligible until the target-specific
+   OpenShell proxy filesystem baseline is incorporated into the effective candidate
+   and proven;
+6. REST path-limited authority does not compile to a wider access preset;
+7. TCP refuses application-layer constraints;
+8. `mcp`, `json-rpc`, `websocket`, and `graphql` are denied as unsupported
+   by the pinned O1 prover;
+9. process-tree root semantics are explicit, and an exact-executable-only request is
+   rejected rather than compiled to an ancestor-inheriting selector;
+10. process-tree roots are explicit and an empty set is rejected for network rules;
+11. compiler output is deterministic for equivalent projections;
+12. actual exit `0` + JSON `result: "within_boundary"` + JSON `exit_code: 0`
+    with required coverage can pass;
+13. result/exit disagreement denies;
+14. prover exits `1`, `2`, `3`, `130`, and unknown all deny;
+15. missing prover denies;
+16. timeout denies;
+17. malformed JSON denies;
+18. missing required coverage denies the affected authority domain;
+19. boundary/candidate digests are stable over the exact bytes checked;
+20. secret-like values are rejected from projection fields intended to carry only
     opaque provider references.
 
 Integration tests with a real OpenShell prover are desirable but MUST NOT replace the
@@ -569,13 +663,17 @@ At that revision:
 
 - authored policy schema version is `1`;
 - containment CLI is `openshell-prover check`;
-- exit `0` means within boundary;
-- exit `1` means exceeds;
-- exit `2` means usage/input/output/internal error;
-- exit `3` means unsupported/inconclusive;
-- exit `130` is interruption on Unix;
-- JSON includes a numeric `schema_version`, `prover_version`, and
-  machine-readable `coverage.domains`.
+- JSON `result: "within_boundary"` pairs with exit `0`;
+- JSON `result: "exceeds_boundary"` pairs with exit `1`;
+- JSON `result: "error"` pairs with exit `2`;
+- JSON `result: "unsupported"` or `"inconclusive"` pairs with exit `3`;
+- cancelled JSON `result: "inconclusive"` pairs with exit `130` on Unix;
+- JSON includes a numeric `schema_version`, `prover_version`, an `exit_code`
+  field, and machine-readable `coverage.domains`;
+- the containment model reports these domains:
+  `filesystem`, `network_l4`, `network_rest`, `process`, and `landlock`;
+- network containment models only L4 TCP and REST; other authored network protocols
+  are unsupported by this prover revision.
 
 If any of those contracts change, compatibility must fail closed until the adapter is
 reviewed and updated.
@@ -586,15 +684,18 @@ reviewed and updated.
 
 - **OD-O1 — Projection digest canonicalization.** Proposed: RFC8785-JCS over a
   JSON-compatible projection model, consistent with the capability-snapshot review.
-- **OD-O2 — Required prover coverage domains for O1.** The implementation must name
-  the domains it relies on rather than assuming every upstream domain is modeled.
+- **OD-O2 — Required prover coverage domains for O1. Resolved.** The adapter requires
+  the pinned baseline coverage set `filesystem`, `network_l4`, `network_rest`,
+  `process`, and `landlock`. Missing required domains fail closed. Protocols
+  outside the modeled L4/REST network domains are not O1 execution-eligible.
 - **OD-O3 — Boundary source configuration.** Proposed: environment-specific local
   path in current configuration, not model-supplied input.
 - **OD-O4 — Workdir semantics.** Proposed: `include_workdir: false` unless a governed
   workspace path is explicitly projected.
-- **OD-O5 — Landlock compatibility.** Proposed for development:
-  `best_effort`; production posture may require a stricter compatibility mode if
-  OpenShell exposes one compatible with supported environments.
+- **OD-O5 — Landlock compatibility. Resolved.** Runnable filesystem-constrained
+  policies require `hard_requirement`. `best_effort` is not authorization-compatible
+  because the pinned runtime can continue without filesystem restrictions. Empty
+  filesystem lists remain execution-ineligible even with `hard_requirement`.
 - **OD-O6 — OpenShell package dependency.** O1 should use the standalone executable
   adapter and add no Python SDK dependency. SDK adoption is evaluated at O2.
 - **OD-O7 — Windows/WSL2 status.** Development support may be experimental; no
