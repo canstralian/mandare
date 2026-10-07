@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { Effect, classifyBash, classifyMcp, classifyToolCall, stableStringify, toolInput } from '../hooks/classify-effect.js'
+import { fingerprintEvent } from '../hooks/mandare-governance.js'
 
 // Pins the classification contract entry by entry. Changing a mapping must
 // change this file, so a reviewer sees every widening or narrowing of what the
@@ -129,7 +130,10 @@ test('an invocation too long to review is denied without asking', async ($, on) 
 
   expect(result.deny).toMatch(/too long to show for approval/)
   expect(h.asked.length).toBe(0)
-  expect(h.ledger().records.at(-1).decision).toBe('deny_unreviewable')
+  const record = h.ledger().records.at(-1)
+  expect([record.event, record.decision, record.tool, record.effect]).toEqual(['governance.denied', 'deny_unreviewable', 'Bash', 'EXTERNAL_WRITE'])
+  expect(record.inputHash).toBe(h.ledger().records.at(-2).inputHash)
+  expect(record.inputHash).toMatch(/^[0-9a-f]{64}$/)
 })
 
 test('evidence is a hash-linked chain bound to the exact invocation', async ($, on) => {
@@ -182,4 +186,18 @@ test('the fingerprint covers the tool, the call id and every argument', async ($
 
   const hashes = h.ledger().records.filter((r: any) => r.event === 'governance.classified').map((r: any) => r.inputHash)
   expect(new Set(hashes).size).toBe(4)
+})
+
+test('the fingerprint hash changes with the tool, the call id, or any argument', async () => {
+  const base = { tool: 'Bash', tool_use_id: 'call-1', command: 'git push origin main' }
+  const hash = async (e: any) => (await fingerprintEvent(e)).fingerprint
+  const reference = await hash(base)
+  expect(await hash({ ...base })).toBe(reference)
+  for (const changed of [
+    { ...base, tool: 'mcp__svc__post_message' },
+    { ...base, tool_use_id: 'call-2' },
+    { ...base, command: 'git push origin main2' },
+    { ...base, timeout: 1 },
+  ]) expect(await hash(changed)).not.toBe(reference)
+  expect((await fingerprintEvent(base as any)).input).toEqual({ command: 'git push origin main' })
 })

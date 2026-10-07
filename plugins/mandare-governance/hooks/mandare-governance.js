@@ -34,8 +34,12 @@ async function sha256(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-/** @param {ToolCallEvent} e */
-async function fingerprintEvent(e) {
+/**
+ * SHA-256 over the tool, the call id and the canonical arguments.
+ *
+ * @param {ToolCallEvent} e
+ */
+export async function fingerprintEvent(e) {
   const input = toolInput(e)
   const canonical = stableStringify({
     tool: e.tool,
