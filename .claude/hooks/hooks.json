@@ -1,0 +1,4 @@
+{
+  "description": "Mandare fail-closed governance adapter for Claude Code tool calls",
+  "modules": ["./mandare-governance.js"]
+}
