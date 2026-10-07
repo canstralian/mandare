@@ -44,6 +44,19 @@
         "name": "canstralian",
         "url": "https://github.com/canstralian"
       }
+    },
+    {
+      "name": "mandare-governance",
+      "displayName": "Mandare Governance",
+      "description": "Fail-closed Claude Code host guard for external writes, destructive effects, and unclassified tools. Canonical source for downstream consumers.",
+      "source": "./plugins/mandare-governance",
+      "category": "security",
+      "tags": [
+        "governance",
+        "fail-closed",
+        "approval",
+        "claude-code-mod"
+      ]
     }
   ]
 }
