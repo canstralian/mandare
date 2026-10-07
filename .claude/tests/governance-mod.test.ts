@@ -2,8 +2,8 @@ import { expect, mock, test } from 'claude-code/testing'
 
 function stubEvidence(on: any) {
   const saved = new Map<string, unknown>()
-  on('store.get', ($, e) => ({ value: saved.get(e.key) }))
-  on('store.set', ($, e) => {
+  on('store.get', (_$: any, e: any) => ({ value: saved.get(e.key) }))
+  on('store.set', (_$: any, e: any) => {
     saved.set(e.key, e.value)
     return { value: undefined }
   })
@@ -59,7 +59,7 @@ test('one-shot approval allows exactly that external mutation', async ($, on) =>
   expect(executed).toBe(1)
 
   const ledger = saved.get('mandare.governance.evidence.v1') as any
-  expect(ledger.records.map((r) => r.event)).toContain('governance.approved')
+  expect(ledger.records.map((r: any) => r.event)).toContain('governance.approved')
   expect(ledger.records.at(-1).event).toBe('execution.completed')
 })
 
