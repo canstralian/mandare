@@ -139,6 +139,22 @@ without a per-user install step only when its marketplace entry is a relative pa
   uses a `git-subdir` source with `sha`. Claude Code does not fetch such an external-source plugin
   from project settings alone; each user installs it once.
 
+### Releasing a version
+
+Releases are manual. `.github/workflows/release.yml` builds only `v*.*.*` tags for the RIF Runtime
+package and does not handle these tags.
+
+1. Merge the reviewed change into `main`.
+2. Check that the merge commit carries exactly the reviewed plugin content: `git rev-parse
+   <merge-commit>:plugins/mandare-governance` must equal the tree hash recorded in the release PR.
+3. Create a signed, annotated tag on that commit and push it:
+   `git tag -s -a mandare-governance--v<version> <merge-commit> -m "mandare-governance v<version>"`.
+4. Consumers update their pinned `ref` and their expected commit (Forge's and Red Team Forge's CI
+   compare `git ls-remote` of the tag, peeled to its commit, against it) in a reviewed change.
+
+Those consumer checks prove the tag resolves to the reviewed commit. They do not prove the plugin
+installs or loads in a session.
+
 ## Validate
 
 Requires Claude Code 2.1.287 or later for function hooks. From this directory:
