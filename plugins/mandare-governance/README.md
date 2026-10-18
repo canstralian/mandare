@@ -18,16 +18,17 @@ input hash            != credential
 
 ## Invariants
 
-- Recognized external writes and destructive actions require a live `Approve once` answer to a
-  prompt shown for that exact invocation.
+- External writes, destructive actions and calls it cannot classify require a live `Approve once`
+  answer to a prompt shown for that exact invocation. Unknown is never treated as safe.
 - The prompt shows the whole invocation: a Bash command verbatim, any other tool as its name and
   canonical arguments. Control, zero-width and bidirectional characters are shown as escapes so the
   terminal cannot draw something other than what runs. An invocation longer than 4000 characters
   is denied rather than shown partially.
-- Only `READ`, `LOCAL_WRITE`, `LOCAL_EXECUTION` and `NETWORK_READ` pass through. Any other value,
-  including one the classifier was never written to return, is treated as unknown and denied.
+- Only `READ`, `LOCAL_WRITE`, `LOCAL_EXECUTION` and `NETWORK_READ` pass through. A value outside the
+  effect classes, one the classifier was never written to return, is denied without prompting.
 - Approval is never cached or reused. A second call, identical or modified, gets a new prompt.
-- Unknown built-in tools and unknown MCP operations are denied without prompting.
+- Unknown built-in tools and unknown MCP operations are asked about like writes; the prompt says the
+  call could not be classified.
 - A dismissed prompt, a free-text answer other than `Approve once`, or a session with nobody to ask
   (`-p`, CI) is a refusal.
 - Governance failures fail closed (see below).
@@ -43,23 +44,34 @@ input hash            != credential
 | `NETWORK_READ` | defer to normal Claude Code permissions |
 | `EXTERNAL_WRITE` | require `Approve once` |
 | `DESTRUCTIVE` | require `Approve once` |
-| `UNKNOWN` | deny |
+| `UNKNOWN` | require `Approve once` |
 
 "Defer" means the call continues to the hooks beneath and to Claude Code's own permission rules,
 which still decide. Approval here also defers: a deny rule beneath (for example a project's
 `Bash(curl *)` deny) still refuses an approved call, and the evidence records
 `execution.denied_downstream`.
 
-MCP classification is verb-based on the operation name: destructive verbs win over write verbs,
-which win over read verbs. An operation with no recognized verb is `UNKNOWN`. Add a reviewed
-classification in `hooks/classify-effect.js` before relying on a new MCP operation or built-in tool.
+MCP classification reads the operation name (split at `_`, `-` and camelCase): destructive verbs
+win over write verbs; then a word that says the operation runs whatever it is given (`execute`,
+`run`, `sql`, `rpc`, `graphql`, `command`, `database`, ...) makes it `UNKNOWN`; only then do read
+verbs make it a read. An operation with no recognized verb is `UNKNOWN`. This is still the name the
+server chose, not what the operation does: a server that names a write `get_*` is trusted on it.
+Add a reviewed classification in `hooks/classify-effect.js` to stop prompting for a new operation.
 
-Bash classification is conservative text matching, **not** a shell parser or sandbox. It covers
-the common spellings of pushes (including force, `+refspec`, `:refspec`, `--delete`, `--mirror`),
-`gh` writes, `gh api` non-GET calls, `curl` body flags and methods, `wget --post-*`, package
-publishing, `kubectl`/`terraform` mutations and similar. Indirection (scripts, aliases, `eval`,
-interpreters such as `python -c`) can evade it. Remote API permissions, branch protection,
-credential scope, OS/container isolation and managed Claude Code policy remain stronger boundaries.
+Bash classification is conservative, **not** a shell parser or sandbox. The command is split at
+shell separators and substitution boundaries, and every word is checked, not only the first, so
+wrappers (`sudo`, `env`, `xargs`, `bash -c '...'`) do not hide a command. `git` is read past its
+global options (`-C`, `-c`, `--git-dir`, `--no-pager`, ...): pushes are writes, and force,
+`+refspec`, `:refspec`, `--delete`, `--mirror` or `--prune` pushes, `reset --hard` and `clean -f`
+are destructive. A `gh` subcommand is a read only if it is one of a fixed set (`view`, `list`,
+`status`, `checks`, `diff`, `search`, ...); any other `gh` subcommand needs approval, and `delete`
+is destructive. `rm` with recursive and force flags in any spelling and `find -delete` are
+destructive. Patterns cover `curl` body flags and methods, `wget --post-*`, package publishing,
+`kubectl`/`terraform` mutations and similar. A mention such as `echo git push` is over-classified
+and costs a prompt. Indirection the text does not show (scripts, aliases, shell functions,
+variables such as `$CMD`, interpreters such as `python -c`) can evade it. Remote API permissions,
+branch protection, credential scope, OS/container isolation and managed Claude Code policy remain
+stronger boundaries.
 
 ## Fail-closed behavior
 
@@ -98,7 +110,9 @@ the guard out.
 - **Evidence is not an audit log.** Guarded calls append a bounded (512 records), hash-linked suffix
   to the plugin store under `mandare.governance.evidence.v1`: effect, tool, input hash, decision,
   timestamp, previous-record hash. It supports local reconstruction and detects alteration within
-  the retained suffix. A process with the user's permissions can replace or truncate it.
+  the retained suffix. Appends are serialized within one Claude Code process, so concurrent guarded
+  calls do not drop records or fork the chain; two processes sharing the store are not serialized.
+  A process with the user's permissions can replace or truncate it.
 
 ## Consuming this plugin
 
@@ -149,11 +163,13 @@ package and does not handle these tags.
    <merge-commit>:plugins/mandare-governance` must equal the tree hash recorded in the release PR.
 3. Create a signed, annotated tag on that commit and push it:
    `git tag -s -a mandare-governance--v<version> <merge-commit> -m "mandare-governance v<version>"`.
-4. Consumers update their pinned `ref` and their expected commit (Forge's and Red Team Forge's CI
-   compare `git ls-remote` of the tag, peeled to its commit, against it) in a reviewed change.
+4. Consumers update their pinned `ref` and their expected commit in a reviewed change. Forge and
+   Red Team Forge each run a `governance-tag` workflow, on pull requests, on pushes to `main` and
+   weekly, that compares `git ls-remote` of the tag, peeled to its commit, against it.
 
-Those consumer checks prove the tag resolves to the reviewed commit. They do not prove the plugin
-installs or loads in a session.
+Those consumer checks prove the tag resolved to the reviewed commit when they ran. They do not
+prove the plugin installs or loads in a session, and a tag moved between runs is caught only at the
+next run.
 
 ## Validate
 

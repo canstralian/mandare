@@ -47,16 +47,10 @@ const SAFE_BUILTINS = new Map([
   ['ExitPlanMode', Effect.READ],
 ])
 
+// git, gh and rm are analysed token by token (see classifyCommandTokens), so
+// global options such as `git -C dir push` or wrappers such as `sudo` cannot
+// hide them. These patterns cover the remaining tools.
 const DESTRUCTIVE_BASH = [
-  /(?:^|[;&|]\s*)rm\s+-(?:[A-Za-z]*r[A-Za-z]*f|[A-Za-z]*f[A-Za-z]*r)\b/i,
-  /\bgit\s+reset\s+--hard\b/i,
-  /\bgit\s+clean\b[^\n;&|]*\s-f(?:\s|$)/i,
-  // Force pushes: long flags (with optional =value), short clusters containing f, and +refspecs.
-  /\bgit\s+push\b[^\n;&|]*\s(?:--force(?:-with-lease|-if-includes)?(?:=\S*)?|-[A-Za-z]*f[A-Za-z]*)(?:\s|$)/i,
-  /\bgit\s+push\b[^\n;&|]*\s\+\S/i,
-  // Remote ref deletion or mirroring: --delete/-d, :ref refspecs, --mirror, --prune.
-  /\bgit\s+push\b[^\n;&|]*\s(?:--delete|-d|--mirror|--prune)(?:\s|$)/i,
-  /\bgit\s+push\b[^\n;&|]*\s:\S/i,
   /\bterraform\s+destroy\b/i,
   /\bkubectl\s+delete\b/i,
   /\b(?:drop\s+(?:database|table)|truncate\s+table)\b/i,
@@ -65,8 +59,6 @@ const DESTRUCTIVE_BASH = [
 ]
 
 const EXTERNAL_WRITE_BASH = [
-  /\bgit\s+push\b/i,
-  /\bgh\s+(?:pr|issue|release)\s+(?:create|merge|close|reopen|comment|review|edit|delete)\b/i,
   /\b(?:npm|pnpm)\s+publish\b/i,
   /\byarn\s+npm\s+publish\b/i,
   /\btwine\s+upload\b/i,
@@ -78,20 +70,144 @@ const EXTERNAL_WRITE_BASH = [
   // Case-sensitive on purpose: -f (fail) and -D (dump headers) are not body flags.
   /\bcurl\b[^\n;&|]*\s(?:-[A-Za-z]*[dFT]|--data|--form|--upload-file|--json)/,
   /\bwget\b[^\n;&|]*\s--(?:post-data|post-file|body-data|body-file|method)\b/i,
-  // gh api: an explicit non-GET method, or field/input flags without an explicit method (implicit POST).
-  /\bgh\s+api\b[^\n;&|]*(?:-X|--method)[\s=]*(?!GET\b)[A-Za-z]+/i,
-  /\bgh\s+api\b(?![^\n;&|]*(?:-X|--method))[^\n;&|]*\s(?:-f|-F|--field|--raw-field|--input)(?:[\s=]|$)/,
   /\b(?:scp|sftp)\b/i,
   /\brsync\b[^\n;&|]*\s[^\s]+@[^:]+:/i,
 ]
 
 const NETWORK_READ_BASH = [
-  /\bgit\s+(?:fetch|ls-remote)\b/i,
   /\bcurl\b/i,
   /\bwget\b/i,
-  /\bgh\s+(?:api|pr|issue|release|run|repo)\s+(?:view|list|status|checks|diff)\b/i,
-  /\bgh\s+api\b/i,
 ]
+
+/** @type {EffectClass[]} */
+const RANK = [Effect.LOCAL_EXECUTION, Effect.NETWORK_READ, Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE]
+
+/**
+ * @param {EffectClass} a
+ * @param {EffectClass} b
+ * @returns {EffectClass}
+ */
+function stronger(a, b) {
+  return RANK.indexOf(b) > RANK.indexOf(a) ? b : a
+}
+
+// Options that take a separate value, per command, so the value is not read as the subcommand.
+const GIT_VALUE_OPTIONS = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--config-env', '--super-prefix'])
+const GH_VALUE_OPTIONS = new Set(['-R', '--repo', '--hostname'])
+
+// gh subcommands that only read. Any other gh subcommand needs approval.
+const GH_READ = new Set([
+  'view', 'list', 'ls', 'status', 'checks', 'diff', 'watch', 'download', 'clone', 'checkout',
+  'browse', 'token', 'get', 'help', 'version',
+])
+
+/**
+ * Index of the first non-option token at or after `from`.
+ *
+ * @param {string[]} tokens
+ * @param {number} from
+ * @param {Set<string>} valueOptions
+ */
+function skipOptions(tokens, from, valueOptions) {
+  let i = from
+  for (let token = tokens[i]; token?.startsWith('-'); token = tokens[i]) {
+    i += valueOptions.has(token) ? 2 : 1
+  }
+  return i
+}
+
+/** @param {string[]} args @param {string} letter @param {string} long */
+function hasFlag(args, letter, long) {
+  return args.some((arg) => arg === long || arg.startsWith(long + '=') || (/^-[A-Za-z]+$/.test(arg) && arg.includes(letter)))
+}
+
+/** @param {string[]} args */
+function classifyGit(args) {
+  const at = skipOptions(args, 0, GIT_VALUE_OPTIONS)
+  const sub = args[at]
+  const rest = args.slice(at + 1)
+  if (sub === 'push') {
+    const removes = rest.some((arg) => /^--(?:force|delete|mirror|prune)/.test(arg) || /^-[A-Za-z]*[fd][A-Za-z]*$/.test(arg))
+      || rest.some((arg) => /^[+:]./.test(arg))
+    return removes ? Effect.DESTRUCTIVE : Effect.EXTERNAL_WRITE
+  }
+  if (sub === 'send-email') return Effect.EXTERNAL_WRITE
+  if (sub === 'reset' && rest.includes('--hard')) return Effect.DESTRUCTIVE
+  if (sub === 'clean' && hasFlag(rest, 'f', '--force')) return Effect.DESTRUCTIVE
+  if (sub === 'fetch' || sub === 'ls-remote') return Effect.NETWORK_READ
+  return Effect.LOCAL_EXECUTION
+}
+
+/** @param {string[]} args */
+function classifyGh(args) {
+  const at = skipOptions(args, 0, GH_VALUE_OPTIONS)
+  const group = args[at]
+  if (group === undefined || group === 'search' || GH_READ.has(group)) return Effect.NETWORK_READ
+  if (group === 'api') return classifyGhApi(args.slice(at + 1))
+  const subAt = skipOptions(args, at + 1, GH_VALUE_OPTIONS)
+  const sub = args[subAt]
+  if (sub === 'delete') return Effect.DESTRUCTIVE
+  if (sub !== undefined && GH_READ.has(sub)) return Effect.NETWORK_READ
+  return Effect.EXTERNAL_WRITE
+}
+
+/**
+ * gh api: an explicit non-GET method, or field/input flags without an explicit
+ * method (implicit POST), writes.
+ *
+ * @param {string[]} args
+ */
+function classifyGhApi(args) {
+  let method = null
+  args.forEach((arg, i) => {
+    const m = /^(?:-X|--method)=?(.*)$/.exec(arg)
+    if (m) method = (m[1] || args[i + 1] || '').toUpperCase()
+  })
+  if (method !== null) return method === 'GET' ? Effect.NETWORK_READ : Effect.EXTERNAL_WRITE
+  const sendsFields = args.some((arg) => /^(?:-f|-F|--field|--raw-field|--input)(?:=|$)/.test(arg) || /^-[fF]./.test(arg))
+  return sendsFields ? Effect.EXTERNAL_WRITE : Effect.NETWORK_READ
+}
+
+/** @param {string[]} args */
+function classifyRm(args) {
+  const recursive = hasFlag(args, 'r', '--recursive') || hasFlag(args, 'R', '--recursive')
+  return recursive && hasFlag(args, 'f', '--force') ? Effect.DESTRUCTIVE : Effect.LOCAL_EXECUTION
+}
+
+/**
+ * Looks at every position in a command segment, not only the first word, so
+ * `sudo rm -rf`, `xargs git push` and `bash -c 'git push'` are still seen.
+ * A mention such as `echo git push` is over-classified; that costs a prompt.
+ *
+ * @param {string[]} tokens
+ * @returns {EffectClass}
+ */
+function classifyCommandTokens(tokens) {
+  let effect = /** @type {EffectClass} */ (Effect.LOCAL_EXECUTION)
+  tokens.forEach((token, i) => {
+    const program = token.split('/').at(-1)
+    const args = tokens.slice(i + 1)
+    if (program === 'git') effect = stronger(effect, classifyGit(args))
+    else if (program === 'gh') effect = stronger(effect, classifyGh(args))
+    else if (program === 'rm') effect = stronger(effect, classifyRm(args))
+    else if (program === 'find' && args.includes('-delete')) effect = stronger(effect, Effect.DESTRUCTIVE)
+  })
+  return effect
+}
+
+/**
+ * Command segments, split at shell separators and substitution boundaries,
+ * each as whitespace tokens with quotes and backslashes removed.
+ *
+ * @param {string} command
+ * @returns {string[][]}
+ */
+function commandSegments(command) {
+  return command
+    .split(/[;&|\n()`{}]|\$\(/)
+    .map((segment) => segment.split(/\s+/).map((token) => token.replace(/['"\\]/g, '')).filter(Boolean))
+    .filter((tokens) => tokens.length > 0)
+}
 
 const MCP_DESTRUCTIVE = new Set([
   'delete', 'destroy', 'purge', 'drop', 'wipe',
@@ -103,6 +219,13 @@ const MCP_WRITE = new Set([
   'dismiss', 'resolve', 'unresolve', 'enable', 'disable', 'upload',
   'deploy', 'publish', 'trigger', 'cancel', 'invite', 'assign', 'label', 'comment',
   'react', 'convert', 'mark', 'move', 'rename', 'set', 'submit', 'reply',
+])
+
+// Names that say the operation runs whatever it is given. A read verb beside one
+// of these proves nothing (`query_database` runs SQL), so the call is UNKNOWN.
+const MCP_OPEN_ENDED = new Set([
+  'execute', 'exec', 'run', 'sql', 'rpc', 'graphql', 'mutation', 'command', 'eval', 'script',
+  'invoke', 'database', 'db',
 ])
 
 const MCP_READ = new Set([
@@ -129,10 +252,11 @@ export function classifyToolCall(tool, input = {}) {
  */
 export function classifyBash(command) {
   if (!command.trim()) return Effect.UNKNOWN
-  if (DESTRUCTIVE_BASH.some((pattern) => pattern.test(command))) return Effect.DESTRUCTIVE
-  if (EXTERNAL_WRITE_BASH.some((pattern) => pattern.test(command))) return Effect.EXTERNAL_WRITE
-  if (NETWORK_READ_BASH.some((pattern) => pattern.test(command))) return Effect.NETWORK_READ
-  return Effect.LOCAL_EXECUTION
+  let effect = commandSegments(command).map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
+  if (DESTRUCTIVE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.DESTRUCTIVE)
+  if (EXTERNAL_WRITE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.EXTERNAL_WRITE)
+  if (NETWORK_READ_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.NETWORK_READ)
+  return effect
 }
 
 /**
@@ -140,10 +264,11 @@ export function classifyBash(command) {
  * @returns {EffectClass}
  */
 export function classifyMcp(tool) {
-  const operation = String(tool).split('__').filter(Boolean).at(-1)?.toLowerCase() ?? ''
-  const tokens = operation.split(/[_-]+/).filter(Boolean)
+  const operation = String(tool).split('__').filter(Boolean).at(-1) ?? ''
+  const tokens = operation.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[_-]+/).filter(Boolean)
   if (tokens.some((token) => MCP_DESTRUCTIVE.has(token))) return Effect.DESTRUCTIVE
   if (tokens.some((token) => MCP_WRITE.has(token))) return Effect.EXTERNAL_WRITE
+  if (tokens.some((token) => MCP_OPEN_ENDED.has(token))) return Effect.UNKNOWN
   if (tokens.some((token) => MCP_READ.has(token))) return Effect.NETWORK_READ
   return Effect.UNKNOWN
 }

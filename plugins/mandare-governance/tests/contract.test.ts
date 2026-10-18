@@ -21,13 +21,20 @@ const BUILTINS: Record<string, string> = {
 }
 
 const DESTRUCTIVE_COMMANDS = [
-  'rm -rf build', 'git reset --hard HEAD~1', 'git clean -fd -f', 'git push --force origin main',
+  'rm -rf build', 'git reset --hard HEAD~1', 'git clean -fd -f', 'git clean -fd', 'git push --force origin main',
+  'git -c user.name=x push --force origin main', 'git push -d origin old', 'gh repo delete o/r --yes', 'gh release delete v1',
+  'sudo rm -rf /x', 'rm -r -f build', 'rm --recursive --force build', 'rm -R -f build', 'find . -name "*.tmp" -delete',
+  "bash -c 'git push --force origin main'",
   'terraform destroy -auto-approve', 'kubectl delete ns prod', 'psql -c "DROP TABLE users"',
   'psql -c "truncate table audit"', 'mkfs.ext4 /dev/sdb1', 'dd if=/dev/zero of=/dev/sda',
 ]
 
 const EXTERNAL_WRITE_COMMANDS = [
-  'git push origin feature/x', 'gh pr create --fill', 'gh issue comment 1 -b hi', 'gh release delete v1',
+  'git push origin feature/x', 'gh pr create --fill', 'gh issue comment 1 -b hi',
+  'git -C /repo push origin main', 'git --no-pager push', 'git --git-dir=/r/.git push', 'cd x && git push',
+  'command git push', 'xargs git push', 'gh secret set TOKEN -b x', 'gh workflow run deploy.yml',
+  'gh repo create x --public', 'gh gist create f', 'gh label create bug', 'gh -R o/r pr merge 1', 'gh auth login',
+  'gh api -XPOST repos/o/r/issues', 'gh api graphql -fquery=mutation',
   'npm publish', 'pnpm publish --access public', 'yarn npm publish', 'twine upload dist/*',
   'docker push ghcr.io/o/i:1', 'kubectl apply -f deploy.yaml', 'kubectl rollout restart deploy/api',
   'terraform apply -auto-approve', 'curl -X PUT https://api.example.test/x', 'scp a.txt host:/tmp/',
@@ -36,8 +43,11 @@ const EXTERNAL_WRITE_COMMANDS = [
 
 const NETWORK_READ_COMMANDS = [
   'git fetch origin', 'git ls-remote origin', 'curl https://example.test', 'wget https://example.test/a',
-  'gh pr view 1', 'gh run list', 'gh repo view o/r',
+  'gh pr view 1', 'gh run list', 'gh repo view o/r', 'gh -R o/r pr checks 1', 'gh search prs bug', 'gh --version',
+  'git -C /repo fetch origin',
 ]
+
+const LOCAL_COMMANDS = ['pytest -q', 'git -C /repo status', 'git log --grep push', 'rm -f build.log', 'rm -r empty']
 
 const MCP_DESTRUCTIVE = ['delete', 'destroy', 'purge', 'drop', 'wipe']
 const MCP_WRITE = [
@@ -65,6 +75,7 @@ test('every external-write shell spelling is pinned', async () => {
 
 test('network reads stay reads and an empty command is unknown', async () => {
   for (const command of NETWORK_READ_COMMANDS) expect([command, classifyBash(command)]).toEqual([command, Effect.NETWORK_READ])
+  for (const command of LOCAL_COMMANDS) expect([command, classifyBash(command)]).toEqual([command, Effect.LOCAL_EXECUTION])
   expect(classifyBash('   ')).toBe(Effect.UNKNOWN)
   expect(classifyToolCall('Bash', {})).toBe(Effect.UNKNOWN)
 })
@@ -75,6 +86,12 @@ test('every MCP verb is pinned, with destructive over write over read', async ()
   for (const verb of MCP_READ) expect([verb, classifyMcp(`mcp__svc__${verb}_thing`)]).toEqual([verb, Effect.NETWORK_READ])
   expect(classifyMcp('mcp__svc__get_and_delete_thing')).toBe(Effect.DESTRUCTIVE)
   expect(classifyMcp('mcp__svc__list_then_update_thing')).toBe(Effect.EXTERNAL_WRITE)
+  for (const word of ['execute', 'exec', 'run', 'sql', 'rpc', 'graphql', 'mutation', 'command', 'eval', 'script', 'invoke', 'database', 'db']) {
+    expect([word, classifyMcp(`mcp__svc__query_${word}`)]).toEqual([word, Effect.UNKNOWN])
+  }
+  expect(classifyMcp('mcp__svc__run_delete')).toBe(Effect.DESTRUCTIVE)
+  expect(classifyMcp('mcp__svc__createIssue')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyMcp('mcp__svc__getIssue')).toBe(Effect.NETWORK_READ)
 })
 
 test('the fingerprint input is canonical and excludes only engine identity fields', async () => {
@@ -160,7 +177,7 @@ test('evidence is a hash-linked chain bound to the exact invocation', async ($, 
 })
 
 test('denials and failed executions are recorded with their own outcome', async ($, on) => {
-  const h = harness(on, ['Refuse', 'Approve once'], () => ({ isError: true, result: 'boom', text: 'boom' }))
+  const h = harness(on, ['Refuse', 'Refuse', 'Approve once'], () => ({ isError: true, result: 'boom', text: 'boom' }))
   await $.tool.call({ tool: 'mcp__new__teleport' } as any)
   await $.tool.call({ tool: 'Bash', command: 'npm publish' })
   await $.tool.call({ tool: 'Bash', command: 'docker push x' })
@@ -168,7 +185,7 @@ test('denials and failed executions are recorded with their own outcome', async 
   const outcomes = h.ledger().records.map((r: any) => [r.event, r.decision, r.tool, r.effect, typeof r.inputHash])
   expect(outcomes).toEqual([
     ['governance.classified', 'pending', 'mcp__new__teleport', 'UNKNOWN', 'string'],
-    ['governance.denied', 'deny_unknown_effect', 'mcp__new__teleport', 'UNKNOWN', 'string'],
+    ['governance.denied', 'refused_or_unattended', 'mcp__new__teleport', 'UNKNOWN', 'string'],
     ['governance.classified', 'pending', 'Bash', 'EXTERNAL_WRITE', 'string'],
     ['governance.denied', 'refused_or_unattended', 'Bash', 'EXTERNAL_WRITE', 'string'],
     ['governance.classified', 'pending', 'Bash', 'EXTERNAL_WRITE', 'string'],
@@ -200,4 +217,36 @@ test('the fingerprint hash changes with the tool, the call id, or any argument',
     { ...base, timeout: 1 },
   ]) expect(await hash(changed)).not.toBe(reference)
   expect((await fingerprintEvent(base as any)).input).toEqual({ command: 'git push origin main' })
+})
+
+test('concurrent guarded calls keep every evidence record in one unforked chain', async ($, on) => {
+  const saved = new Map<string, any>()
+  // Yields a few turns so the two calls' ledger reads and writes interleave.
+  const tick = async () => { for (let i = 0; i < 3; i += 1) await null }
+  on('store.get', async (_$: any, e: any) => {
+    await tick()
+    return { value: saved.get(e.key) }
+  })
+  on('store.set', async (_$: any, e: any) => {
+    await tick()
+    saved.set(e.key, e.value)
+    return { value: undefined }
+  })
+  mock.clock(on, { now: 1 })
+  on('tool.call', (_$: any, e: any) => {
+    if (e.tool === 'AskUserQuestion') return { result: { answers: { [e.questions[0].question]: 'Approve once' } } }
+    return { result: 'ran' }
+  })
+
+  await Promise.all([
+    $.tool.call({ tool: 'Bash', command: 'git push origin a' }),
+    $.tool.call({ tool: 'Bash', command: 'git push origin b' }),
+  ])
+
+  const records = saved.get('mandare.governance.evidence.v1').records
+  expect(records.length).toBe(6)
+  records.forEach((record: any, index: number) => {
+    expect(record.sequence).toBe(index + 1)
+    expect(record.previous).toBe(index === 0 ? null : records[index - 1].hash)
+  })
 })

@@ -117,7 +117,8 @@ test('an effect the classifier was not written to return is denied, not passed t
   expect(disposition('NETWORK_READ')).toBe('pass')
   expect(disposition('EXTERNAL_WRITE')).toBe('approve')
   expect(disposition('DESTRUCTIVE')).toBe('approve')
-  for (const bogus of ['UNKNOWN', undefined, null, '', 'EXTERNAL-WRITE', 'read', {}]) {
+  expect(disposition('UNKNOWN')).toBe('approve')
+  for (const bogus of [undefined, null, '', 'EXTERNAL-WRITE', 'read', {}]) {
     expect(disposition(bogus)).toBe('deny')
   }
 })

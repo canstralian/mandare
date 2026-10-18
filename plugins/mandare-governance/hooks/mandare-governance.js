@@ -11,7 +11,9 @@ const MAX_EVIDENCE_RECORDS = 512
 const APPROVE = 'Approve once'
 const REFUSE = 'Refuse'
 const PASS_THROUGH = new Set([Effect.READ, Effect.LOCAL_WRITE, Effect.LOCAL_EXECUTION, Effect.NETWORK_READ])
-const APPROVABLE = new Set([Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE])
+// UNKNOWN is approvable: an unclassified call is not assumed safe, it needs the
+// same live approval as a write, and with nobody to approve it is denied.
+const APPROVABLE = new Set([Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE, Effect.UNKNOWN])
 
 /**
  * What the guard does with an effect: an allowlist, so any value the
@@ -49,11 +51,27 @@ export async function fingerprintEvent(e) {
   return { input, fingerprint: await sha256(canonical) }
 }
 
+// Appends run one at a time. Each one reads the ledger's tail and writes it
+// back, so two in flight together would drop a record and fork the chain.
+// This orders appends within one process only.
+let evidenceQueue = Promise.resolve()
+
+/**
+ * @param {Engine} $
+ * @param {EvidenceRecord} record
+ * @returns {Promise<void>}
+ */
+function appendEvidence($, record) {
+  const append = evidenceQueue.then(() => writeEvidence($, record))
+  evidenceQueue = append.catch(() => {})
+  return append
+}
+
 /**
  * @param {Engine} $
  * @param {EvidenceRecord} record
  */
-async function appendEvidence($, record) {
+async function writeEvidence($, record) {
   const existing = /** @type {Partial<EvidenceLedger> | undefined} */ (await $.store.get(EVIDENCE_KEY))
   /** @type {EvidenceLedger} */
   const ledger = existing && existing.version === 1 && Array.isArray(existing.records)
@@ -101,11 +119,9 @@ async function guardToolCall($, e, next) {
       tool: e.tool,
       effect,
       inputHash: bound.fingerprint,
-      decision: 'deny_unknown_effect',
+      decision: 'deny_invalid_effect',
     })
-    return {
-      deny: `Mandare denied unclassified tool ${e.tool}. Add an explicit effect classification before using it.`,
-    }
+    return { deny: `Mandare denied ${e.tool}: its classification is not a known effect. No authority was granted.` }
   }
 
   const review = reviewText(e.tool, bound.input)
@@ -122,10 +138,13 @@ async function guardToolCall($, e, next) {
     }
   }
 
+  const classified = effect === Effect.UNKNOWN
+    ? `Mandare could not classify ${e.tool} (UNKNOWN), so it may write or delete.`
+    : `Mandare classified this as ${effect}.`
   let answer = REFUSE
   try {
     answer = await $.ui.ask(
-      `Mandare classified this as ${effect}. Approve this exact invocation once?\n${review}\nsha256:${bound.fingerprint.slice(0, 16)}`,
+      `${classified} Approve this exact invocation once?\n${review}\nsha256:${bound.fingerprint.slice(0, 16)}`,
       [APPROVE, REFUSE],
     )
   } catch {

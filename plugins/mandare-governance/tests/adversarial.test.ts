@@ -59,15 +59,67 @@ test('a refused MCP write cannot be re-routed through curl or gh api without fre
   expect(seen.executed.length).toBe(0)
 })
 
-test('a new MCP tool with an unclassified verb is denied without prompting', async ($, on) => {
+test('a new MCP tool with an unclassified verb runs only on a live approval', async ($, on) => {
   stubEvidence(on)
-  const seen = stubHostAndTool(on, ['Approve once'])
+  const seen = stubHostAndTool(on, ['Refuse', 'Approve once'])
 
-  const result = await $.tool.call({ tool: 'mcp__new-server__reconcile_accounts', ledger: 'prod' } as any)
+  const refused = await $.tool.call({ tool: 'mcp__new-server__reconcile_accounts', ledger: 'prod' } as any)
+  const approved = await $.tool.call({ tool: 'mcp__new-server__reconcile_accounts', ledger: 'prod' } as any)
+  const unattended = await $.tool.call({ tool: 'mcp__new-server__reconcile_accounts', ledger: 'prod' } as any)
 
-  expect(result.deny).toMatch(/unclassified tool/)
-  expect(seen.questions.length).toBe(0)
+  expect(refused.deny).toMatch(/UNKNOWN: this exact invocation was not approved/)
+  expect(approved).toEqual({ result: 'ran' })
+  expect(unattended.deny).toMatch(/UNKNOWN: this exact invocation was not approved/)
+  expect(seen.questions[0]).toMatch(/could not classify mcp__new-server__reconcile_accounts \(UNKNOWN\)/)
+  expect(seen.executed.length).toBe(1)
+})
+
+test('every reviewed shell bypass needs approval, and runs nothing when refused', async ($, on) => {
+  stubEvidence(on)
+  const bypasses = [
+    'git -C /repo push origin main', 'git -c user.name=x push --force origin main', 'git --no-pager push',
+    'gh repo delete o/r --yes', 'gh secret set TOKEN -b x', 'gh workflow run deploy.yml', 'gh repo create x --public',
+    'gh gist create f', 'gh label create bug', 'sudo rm -rf /x', 'rm -r -f build', 'rm --recursive --force build',
+  ]
+  const seen = stubHostAndTool(on, bypasses.map(() => 'Refuse'))
+
+  for (const command of bypasses) {
+    const result = await $.tool.call({ tool: 'Bash', command })
+    expect([command, result.deny]).toEqual([command, expect.stringMatching(/(EXTERNAL_WRITE|DESTRUCTIVE): this exact invocation was not approved/)])
+  }
+  expect(seen.questions.length).toBe(bypasses.length)
   expect(seen.executed.length).toBe(0)
+})
+
+test('an open-ended connector call (SQL, commands) is not passed through as a read', async ($, on) => {
+  stubEvidence(on)
+  const seen = stubHostAndTool(on, [])
+
+  for (const tool of ['mcp__Lovable__query_database', 'mcp__Supabase__execute_sql', 'mcp__shop__graphql_mutation']) {
+    const result = await $.tool.call({ tool, query: 'DELETE FROM users' } as any)
+    expect([tool, result.deny]).toEqual([tool, expect.stringMatching(/UNKNOWN: this exact invocation was not approved/)])
+  }
+  expect(seen.executed.length).toBe(0)
+})
+
+test('changing the caller\'s event while the prompt is open does not change what runs', async ($, on) => {
+  stubEvidence(on)
+  const event: any = { tool: 'Bash', command: 'git push origin feature/x' }
+  const executed: any[] = []
+  on('tool.call', (_$: any, e: any) => {
+    if (e.tool === 'AskUserQuestion') {
+      event.command = 'git push --force origin main'
+      return { result: { answers: { [e.questions[0].question]: 'Approve once' } } }
+    }
+    executed.push(e.command)
+    return { result: 'ran' }
+  })
+
+  const result = await $.tool.call(event)
+
+  // The engine hands the guard its own copy, so what runs is what was shown.
+  expect(result).toEqual({ result: 'ran' })
+  expect(executed).toEqual(['git push origin feature/x'])
 })
 
 test('a model claim of prior approval is not approval', async ($, on) => {
