@@ -39,15 +39,21 @@ const EXTERNAL_WRITE_COMMANDS = [
   'docker push ghcr.io/o/i:1', 'kubectl apply -f deploy.yaml', 'kubectl rollout restart deploy/api',
   'terraform apply -auto-approve', 'curl -X PUT https://api.example.test/x', 'scp a.txt host:/tmp/',
   'sftp user@host', 'rsync -a dist/ deploy@host:/srv/app', 'wget --method=DELETE https://x.test/a',
+  'git send-email --to=list@example.test 0001.patch',
 ]
 
 const NETWORK_READ_COMMANDS = [
   'git fetch origin', 'git ls-remote origin', 'curl https://example.test', 'wget https://example.test/a',
   'gh pr view 1', 'gh run list', 'gh repo view o/r', 'gh -R o/r pr checks 1', 'gh search prs bug', 'gh --version',
   'git -C /repo fetch origin',
+  'gh repo ls o', 'gh auth status', 'gh pr diff 1', 'gh run watch 1', 'gh run download 1', 'gh repo clone o/r',
+  'gh pr checkout 1', 'gh browse', 'gh auth token', 'gh config get editor', 'gh help', 'gh version',
 ]
 
-const LOCAL_COMMANDS = ['pytest -q', 'git -C /repo status', 'git log --grep push', 'rm -f build.log', 'rm -r empty']
+const LOCAL_COMMANDS = [
+  'pytest -q', 'git -C /repo status', 'git log --grep push', 'rm -f build.log', 'rm -r empty',
+  'git reset HEAD~1', 'git clean -n', 'find . -name "*.log" -print',
+]
 
 const MCP_DESTRUCTIVE = ['delete', 'destroy', 'purge', 'drop', 'wipe']
 const MCP_WRITE = [
