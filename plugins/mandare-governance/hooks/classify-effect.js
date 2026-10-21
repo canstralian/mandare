@@ -205,7 +205,12 @@ function classifyCommandTokens(tokens) {
 function commandSegments(command) {
   return command
     .split(/[;&|\n()`{}]|\$\(/)
-    .map((segment) => segment.split(/\s+/).map((token) => token.replace(/['"\\]/g, '')).filter(Boolean))
+    .map((segment) => {
+      const tokens = []
+      const words = segment.match(/(?:[^\\s'\"\\\\]|\\\\.|'(?:[^']*)'|\"(?:[^\"\\\\]|\\\\.)*\")+/g) ?? []
+      for (const word of words) tokens.push(word.replace(/['\"\\\\]/g, ''))
+      return tokens
+    })
     .filter((tokens) => tokens.length > 0)
 }
 
