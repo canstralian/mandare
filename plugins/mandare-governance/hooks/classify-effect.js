@@ -207,8 +207,28 @@ function commandSegments(command) {
     .split(/[;&|\n()`{}]|\$\(/)
     .map((segment) => {
       const tokens = []
-      const words = segment.match(/(?:[^\\s'\"\\\\]|\\\\.|'(?:[^']*)'|\"(?:[^\"\\\\]|\\\\.)*\")+/g) ?? []
-      for (const word of words) tokens.push(word.replace(/['\"\\\\]/g, ''))
+      let word = ''
+      let quote = null
+      let escaped = false
+      for (const ch of segment) {
+        if (escaped) {
+          word += ch
+          escaped = false
+        } else if (ch === '\\') {
+          escaped = true
+        } else if (quote !== null) {
+          if (ch === quote) quote = null
+          else word += ch
+        } else if (ch === '"' || ch === "'") {
+          quote = ch
+        } else if (/\s/.test(ch)) {
+          if (word) tokens.push(word)
+          word = ''
+        } else {
+          word += ch
+        }
+      }
+      if (word) tokens.push(word)
       return tokens
     })
     .filter((tokens) => tokens.length > 0)
