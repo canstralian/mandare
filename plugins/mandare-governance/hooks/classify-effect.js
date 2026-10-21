@@ -205,7 +205,37 @@ function classifyCommandTokens(tokens) {
 function commandSegments(command) {
   return command
     .split(/[;&|\n()`{}]|\$\(/)
-    .map((segment) => segment.split(/\s+/).map((token) => token.replace(/['"\\]/g, '')).filter(Boolean))
+    .map((segment) => {
+      const tokens = []
+      let word = ''
+      let quote = null
+      let escaped = false
+      for (const ch of segment) {
+        if (escaped) {
+          word += ch
+          escaped = false
+        } else if (ch === '\\') {
+          escaped = true
+        } else if (quote !== null) {
+          if (ch === quote) quote = null
+          else word += ch
+        } else if (ch === '"' || ch === "'") {
+          quote = ch
+        } else if (/\s/.test(ch)) {
+          if (word) tokens.push(word)
+          word = ''
+        } else {
+          word += ch
+        }
+      }
+      if (word) tokens.push(word)
+      // Preserve conservative classification of shell words within quoted wrapper
+      // arguments such as bash -c 'git push --force origin main'.
+      for (const token of [...tokens]) {
+        if (/\s/.test(token)) tokens.push(...token.split(/\s+/).filter(Boolean))
+      }
+      return tokens
+    })
     .filter((tokens) => tokens.length > 0)
 }
 
