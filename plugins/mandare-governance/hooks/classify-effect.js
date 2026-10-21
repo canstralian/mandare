@@ -229,6 +229,11 @@ function commandSegments(command) {
         }
       }
       if (word) tokens.push(word)
+      // Preserve conservative classification of shell words within quoted wrapper
+      // arguments such as bash -c 'git push --force origin main'.
+      for (const token of [...tokens]) {
+        if (/\s/.test(token)) tokens.push(...token.split(/\s+/).filter(Boolean))
+      }
       return tokens
     })
     .filter((tokens) => tokens.length > 0)
