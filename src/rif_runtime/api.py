@@ -14,6 +14,7 @@ from .auth import ControlPlaneAuth, ReadPlaneAuth
 from .configuration.policies import PolicyRule
 from .governance.drift import recommend_correction
 from .integrations import supabase as sb
+from .integrations.workstation import collect_local_status, configured_target
 from .mcp.capabilities import capability_catalog
 from .mcp.metasploit import (
     CapabilityToken,
@@ -91,6 +92,24 @@ def health() -> dict[str, Any]:
         "environment": runtime.environment_name,
         "posture": runtime.posture,
     }
+
+
+@app.get("/v1/workstation/local-status", dependencies=[ControlPlaneAuth])
+def workstation_local_status() -> dict[str, Any]:
+    """Minimal local host metadata; opt-in and always authenticated."""
+    target = configured_target()
+    if target is None:
+        enabled = os.environ.get("RIF_WORKSTATION_STATUS_ENABLED", "")
+        if enabled.strip().lower() != "true":
+            raise HTTPException(status_code=404, detail="not found")
+        raise HTTPException(status_code=503, detail="workstation status unavailable")
+    try:
+        status_data = collect_local_status()
+    except OSError:
+        raise HTTPException(
+            status_code=503, detail="workstation status unavailable"
+        ) from None
+    return {"target": target, "status": status_data}
 
 
 @app.get("/v1/environments")
