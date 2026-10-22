@@ -160,3 +160,42 @@ A successful policy evaluation is not equivalent to an unrestricted external sid
 ## Compatibility
 
 The API is currently versioned under `/v1`, but the repository is still a release-candidate project. Consumers should pin a known release/tag and test compatibility rather than assuming enterprise-level backward-compatibility guarantees.
+
+
+## Opt-in local workstation status
+
+`GET /v1/workstation/local-status` is a restricted, read-only endpoint for
+minimal host metadata. It uses the existing **mandatory** `X-API-Key`
+control-plane guard; unlike the optional read-plane guard, authentication is
+never disabled for this route.
+
+The endpoint is **off by default**. Its only configuration is:
+
+```sh
+export RIF_CONTROL_PLANE_API_KEYS='replace-with-a-secret-key'
+export RIF_WORKSTATION_STATUS_ENABLED=true
+export RIF_WORKSTATION_STATUS_TARGET=local-lab
+```
+
+`RIF_WORKSTATION_STATUS_TARGET` is an operator-defined, non-secret label of at
+most 64 ASCII letters, digits, underscores, or hyphens, beginning with a letter
+or digit. The endpoint does not accept a caller-selected target, arbitrary path,
+field list, or command. Missing/invalid target configuration returns HTTP 503;
+when disabled it returns HTTP 404 after API-key authentication.
+
+The response includes the configured target label plus **only**: OS family
+(Windows/Linux/Darwin/other), Python runtime version, logical CPU count, and
+total/free bytes on the process root volume. No hostname, username, environment
+variables, process data, raw paths, shell results, service status, or credentials
+are exposed. Collection errors return a generic HTTP 503 without leaking paths.
+
+**Boundary:** This is a local host metadata collector reachable only through
+its explicitly enabled API route, **not** a ChatGPT plugin, MCP server,
+Codex dispatcher, Docker/WSL inspector, machine identity attestation, RIF
+policy-decision binding, or desktop control plane. Authentication permits a
+preconfigured administrator to read metadata; it does not grant capabilities to
+the model. This route does not implement capability snapshots, runtime decision
+epochs, or a new evidence schema. Those areas remain governed by the open
+specification reviews. Network exposure, proxy controls, and operator approval
+to enable the endpoint are deployment responsibilities; this PR does not enable
+or deploy it.
