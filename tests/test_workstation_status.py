@@ -27,7 +27,7 @@ def test_disabled_by_default_and_never_collects(monkeypatch):
     def forbidden():
         raise AssertionError("collector must not run while disabled")
 
-    monkeypatch.setattr(workstation, "collect_local_status", forbidden)
+    monkeypatch.setattr("rif_runtime.api.collect_local_status", forbidden)
     assert client.get(ROUTE, headers=HEADER).status_code == 404
 
 
@@ -88,7 +88,7 @@ def test_collection_failure_is_generic_and_no_data_escapes(monkeypatch):
     def fail():
         raise OSError("/sensitive/private/path")
 
-    monkeypatch.setattr(workstation, "collect_local_status", fail)
+    monkeypatch.setattr("rif_runtime.api.collect_local_status", fail)
     response = client.get(ROUTE, headers=HEADER)
     assert response.status_code == 503
     assert "/sensitive/private/path" not in response.text

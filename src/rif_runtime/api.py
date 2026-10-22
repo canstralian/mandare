@@ -99,12 +99,13 @@ def workstation_local_status() -> dict[str, Any]:
     """Minimal local host metadata; opt-in and always authenticated."""
     target = configured_target()
     if target is None:
-        if os.environ.get("RIF_WORKSTATION_STATUS_ENABLED", "").strip().lower() != "true":
+        enabled = os.environ.get("RIF_WORKSTATION_STATUS_ENABLED", "")
+        if enabled.strip().lower() != "true":
             raise HTTPException(status_code=404, detail="not found")
         raise HTTPException(status_code=503, detail="workstation status unavailable")
     try:
         status_data = collect_local_status()
-    except OSError as exc:
+    except OSError:
         raise HTTPException(
             status_code=503, detail="workstation status unavailable"
         ) from None
