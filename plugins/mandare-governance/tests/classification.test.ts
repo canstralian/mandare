@@ -66,3 +66,15 @@ test('maps this build\'s read-only built-ins and keeps every other unmapped tool
   expect(classifyMcp('mcp__github__pull_request_read')).toBe(Effect.NETWORK_READ)
   expect(classifyMcp('mcp__github__request_copilot_review')).toBe(Effect.UNKNOWN)
 })
+
+test('preserves quoted and escaped Git directory arguments before classifying pushes', async () => {
+  for (const command of [
+    'git -C "my repo" push origin main',
+    "git -C 'my repo' push origin main",
+    'git -C my\\ repo push origin main',
+    'git -c "user.name=My Name" push origin main',
+  ]) {
+    expect(classifyBash(command)).toBe(Effect.EXTERNAL_WRITE)
+  }
+  expect(classifyBash('git -C "my repo" push --force origin main')).toBe(Effect.DESTRUCTIVE)
+})
