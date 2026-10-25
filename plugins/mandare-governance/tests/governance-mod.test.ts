@@ -23,20 +23,21 @@ test('passes recognized read-only calls without asking for authority', async ($,
   expect(toolCalls).toBe(1)
 })
 
-test('denies an unknown MCP operation before it reaches the provider', async ($, on) => {
+test('denies an unknown MCP operation before it reaches the provider when nobody approves it', async ($, on) => {
   const saved = stubEvidence(on)
   let providerCalls = 0
-  on('tool.call', () => {
+  on('tool.call', (_$: any, e: any) => {
+    if (e.tool === 'AskUserQuestion') return { deny: 'non-interactive: no one to ask' }
     providerCalls += 1
     return { result: 'should not run' }
   })
 
   const result = await $.tool.call({ tool: 'mcp__mystery__teleport', target: 'prod' })
-  expect(result.deny).toMatch(/unclassified tool/)
+  expect(result.deny).toMatch(/UNKNOWN: this exact invocation was not approved/)
   expect(providerCalls).toBe(0)
 
   const ledger = saved.get('mandare.governance.evidence.v1') as any
-  expect(ledger.records.at(-1).decision).toBe('deny_unknown_effect')
+  expect(ledger.records.at(-1).decision).toBe('refused_or_unattended')
 })
 
 test('one-shot approval allows exactly that external mutation', async ($, on) => {
@@ -46,7 +47,7 @@ test('one-shot approval allows exactly that external mutation', async ($, on) =>
   on('tool.call', ($, e) => {
     if (e.tool === 'AskUserQuestion') {
       questions += 1
-      const question = e.questions[0].question
+      const question = e.questions[0]!.question
       return { result: { answers: { [question]: 'Approve once' } } }
     }
     executed += 1
@@ -70,7 +71,7 @@ test('approval is not cached across a second identical mutation', async ($, on) 
   on('tool.call', ($, e) => {
     if (e.tool === 'AskUserQuestion') {
       questions += 1
-      const question = e.questions[0].question
+      const question = e.questions[0]!.question
       const answer = questions === 1 ? 'Approve once' : 'Refuse'
       return { result: { answers: { [question]: answer } } }
     }
