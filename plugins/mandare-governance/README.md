@@ -58,15 +58,19 @@ verbs make it a read. An operation with no recognized verb is `UNKNOWN`. This is
 server chose, not what the operation does: a server that names a write `get_*` is trusted on it.
 Add a reviewed classification in `hooks/classify-effect.js` to stop prompting for a new operation.
 
-Bash classification is conservative, **not** a shell parser or sandbox. The command is split at
-shell separators and substitution boundaries, and every word is checked, not only the first, so
+Bash classification is conservative, **not** a complete shell parser or sandbox. Shell word
+boundaries preserve quoted and escaped separators and empty arguments, so a Git option value
+cannot hide the following subcommand. Real unquoted separators start a new segment, and every
+word is checked, not only the first, so
 wrappers (`sudo`, `env`, `xargs`, `bash -c '...'`) do not hide a command. `git` is read past its
 global options (`-C`, `-c`, `--git-dir`, `--no-pager`, ...): pushes are writes, and force,
 `+refspec`, `:refspec`, `--delete`, `--mirror` or `--prune` pushes, `reset --hard` and `clean -f`
 are destructive. A `gh` subcommand is a read only if it is one of a fixed set (`view`, `list`,
 `status`, `checks`, `diff`, `search`, ...); any other `gh` subcommand needs approval, and `delete`
 is destructive. `rm` with recursive and force flags in any spelling and `find -delete` are
-destructive. Patterns cover `curl` body flags and methods, `wget --post-*`, package publishing,
+destructive. Quoted arguments are also inspected as possible wrapper commands, bounded to four
+levels; incomplete shell words and inputs beyond that bound classify as `UNKNOWN` and require
+live approval. Patterns cover `curl` body flags and methods, `wget --post-*`, package publishing,
 `kubectl`/`terraform` mutations and similar. A mention such as `echo git push` is over-classified
 and costs a prompt. Indirection the text does not show (scripts, aliases, shell functions,
 variables such as `$CMD`, interpreters such as `python -c`) can evade it. Remote API permissions,

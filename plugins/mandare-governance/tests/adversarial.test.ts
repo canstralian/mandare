@@ -80,6 +80,9 @@ test('every reviewed shell bypass needs approval, and runs nothing when refused'
     'git -C /repo push origin main', 'git -c user.name=x push --force origin main', 'git --no-pager push',
     'gh repo delete o/r --yes', 'gh secret set TOKEN -b x', 'gh workflow run deploy.yml', 'gh repo create x --public',
     'gh gist create f', 'gh label create bug', 'sudo rm -rf /x', 'rm -r -f build', 'rm --recursive --force build',
+    'git -C "my;repo" push origin main', 'git -C my\\;repo push origin main',
+    'git -C "my|repo" push --force origin main', 'git --namespace "" push origin main',
+    "bash -c 'git -C \"my repo\" push origin main'",
   ]
   const seen = stubHostAndTool(on, bypasses.map(() => 'Refuse'))
 

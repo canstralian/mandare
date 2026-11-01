@@ -196,17 +196,79 @@ function classifyCommandTokens(tokens) {
 }
 
 /**
- * Command segments, split at shell separators and substitution boundaries,
- * each as whitespace tokens with quotes and backslashes removed.
+ * Preserve shell word boundaries before looking for commands. Quoted arguments
+ * are also inspected as possible wrapper commands, bounded to four levels.
+ * This remains conservative classification, not a complete shell parser.
  *
  * @param {string} command
- * @returns {string[][]}
+ * @param {number} [depth]
+ * @returns {string[][] | null}
  */
-function commandSegments(command) {
-  return command
-    .split(/[;&|\n()`{}]|\$\(/)
-    .map((segment) => segment.split(/\s+/).map((token) => token.replace(/['"\\]/g, '')).filter(Boolean))
-    .filter((tokens) => tokens.length > 0)
+function commandSegments(command, depth = 0) {
+  /** @type {string[][]} */
+  const segments = []
+  /** @type {string[]} */
+  let tokens = []
+  let word = ''
+  let started = false
+  /** @type {"'" | '"' | null} */
+  let quote = null
+  const finishWord = () => {
+    if (started) tokens.push(word)
+    word = ''
+    started = false
+  }
+  const finishSegment = () => {
+    finishWord()
+    if (tokens.length > 0) segments.push(tokens)
+    tokens = []
+  }
+
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command.charAt(i)
+    if (ch === '\\' && quote !== "'") {
+      const next = command[i + 1]
+      if (next === undefined) return null
+      if (quote === '"' && !['$', '`', '"', '\\', '\n'].includes(next)) {
+        word += ch
+        started = true
+      } else {
+        if (next !== '\n') {
+          word += next
+          started = true
+        }
+        i += 1
+      }
+    } else if (quote !== null) {
+      if (ch === quote) quote = null
+      else word += ch
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      started = true
+    } else if (/[;&|\n()`{}]/.test(ch)) {
+      finishSegment()
+    } else if (/\s/.test(ch)) {
+      finishWord()
+    } else {
+      word += ch
+      started = true
+    }
+  }
+  if (quote !== null) return null
+  finishSegment()
+
+  /** @type {string[][]} */
+  const nested = []
+  for (const segment of segments) {
+    for (const token of segment) {
+      if (!/[\s;&|()`{}]/.test(token)) continue
+      if (depth >= 4) return null
+      const inner = commandSegments(token, depth + 1)
+      if (inner === null) return null
+      nested.push(...inner)
+    }
+  }
+  return [...segments, ...nested]
 }
 
 const MCP_DESTRUCTIVE = new Set([
@@ -252,7 +314,9 @@ export function classifyToolCall(tool, input = {}) {
  */
 export function classifyBash(command) {
   if (!command.trim()) return Effect.UNKNOWN
-  let effect = commandSegments(command).map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
+  const segments = commandSegments(command)
+  if (segments === null) return Effect.UNKNOWN
+  let effect = segments.map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
   if (DESTRUCTIVE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.DESTRUCTIVE)
   if (EXTERNAL_WRITE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.EXTERNAL_WRITE)
   if (NETWORK_READ_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.NETWORK_READ)
