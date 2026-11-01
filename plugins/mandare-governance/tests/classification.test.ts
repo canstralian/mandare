@@ -78,3 +78,34 @@ test('preserves quoted and escaped Git directory arguments before classifying pu
   }
   expect(classifyBash('git -C "my repo" push --force origin main')).toBe(Effect.DESTRUCTIVE)
 })
+
+test('keeps literal separators inside Git option arguments in one shell word', async () => {
+  for (const directory of ['my;repo', 'my|repo', 'my&repo', 'my(repo)', 'my`repo', 'my{repo}', 'my\nrepo']) {
+    expect(classifyBash(`git -C '${directory}' push origin main`)).toBe(Effect.EXTERNAL_WRITE)
+    expect(classifyBash(`git -C '${directory}' push --force origin main`)).toBe(Effect.DESTRUCTIVE)
+  }
+  for (const directory of ['my\\;repo', 'my\\|repo', 'my\\&repo', 'my\\(repo\\)', 'my\\`repo', 'my\\{repo\\}']) {
+    expect(classifyBash(`git -C ${directory} push origin main`)).toBe(Effect.EXTERNAL_WRITE)
+  }
+})
+
+test('preserves empty option values and quoted command strings', async () => {
+  for (const value of ['""', "''"]) {
+    expect(classifyBash(`git --namespace ${value} push origin main`)).toBe(Effect.EXTERNAL_WRITE)
+    expect(classifyBash(`git --namespace ${value} push --force origin main`)).toBe(Effect.DESTRUCTIVE)
+  }
+  expect(classifyBash("bash -c 'git -C \"my repo\" push origin main'")).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("bash -c 'git status; git push --force origin main'")).toBe(Effect.DESTRUCTIVE)
+  expect(classifyBash('git sta\\\ntus; git pu\\\nsh origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("git -C 'my\\repo' push origin main")).toBe(Effect.EXTERNAL_WRITE)
+})
+
+test('keeps real separators and fails closed on incomplete shell words', async () => {
+  expect(classifyBash('git status; git push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('git status | git push --force origin main')).toBe(Effect.DESTRUCTIVE)
+  expect(classifyBash('git -C "unfinished push origin main')).toBe(Effect.UNKNOWN)
+  expect(classifyBash('git push origin main' + '\\')).toBe(Effect.UNKNOWN)
+  let nested = 'git push origin main'
+  for (let depth = 0; depth < 6; depth += 1) nested = 'bash -c ' + JSON.stringify(nested)
+  expect(classifyBash(nested)).toBe(Effect.UNKNOWN)
+})
