@@ -57,11 +57,7 @@ jobs:
           pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
             --output-file requirements/runtime.txt pyproject.toml
           pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
-            --upgrade-package msgpack==1.2.3 \
             --extra dev --output-file requirements/dev.txt pyproject.toml
-          pip-compile --quiet --generate-hashes --strip-extras --allow-unsafe \
-            --extra dev --output-file requirements/dev.txt pyproject.toml
-          sha256sum requirements/runtime.txt requirements/dev.txt
 
       - name: Assert no drift
         run: |
