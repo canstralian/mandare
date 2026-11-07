@@ -3,11 +3,14 @@
 **Scope:** `spec/`, `contracts/`, `docs/`, and root-level `*.md`, audited against
 `src/rif_runtime/`, `supabase/migrations/`, `config/`, and `tests/`.
 
-**Re-verified against `main` at `9df47d4`** (2026-08-22). The first pass of this
-audit ran against `87498bd`; the large documentation overhaul that landed on `main`
-in between resolved most of what it found. Every finding below has been re-checked
-against the current tree — resolved items are recorded as resolved rather than
-deleted, so the fixes are traceable.
+**Re-verified against `main` at `7c132a7`** (2026-11-07). This is the third pass.
+The first ran against `87498bd`, the second against `9df47d4`. Each time, work that
+landed on `main` in between had already fixed part of what the previous pass found,
+so every finding is re-checked against the current tree on each pass and resolved
+items are recorded as resolved rather than deleted.
+
+Seven findings are open. Ten have been resolved across the three passes — three of
+them since the second pass, by the repository technical audit in #119.
 
 **Method:** every normative claim that names a module, route, identifier, table, or
 constant was checked against the referenced source.
@@ -29,11 +32,8 @@ not caught up and the spec must say so rather than claim conformance.
 | M1 | `spec/mcp/SPEC.md` §4 lane order does not mirror `MetasploitGovernor.evaluate()` as claimed | Medium |
 | M2 | Deny-reason identifiers differ between spec (`mcp.*`) and implementation (`msf.*`) | Medium |
 | M3 | Capability-token TTL: spec says 300 s, code defaults to 600 s in both call sites | Medium |
-| M4 | `POST /v1/runs` is the one route documented nowhere | Medium |
 | M7 | Identity-spine spec review cites three nonexistent ADRs and skips a section | Medium |
 | H2 | ADR numbering is split across two conventions with 0001 and 0009–0025 absent | Medium (was High) |
-| M6 | Root-level duplicates of `docs/` files persist | Low (was Medium) |
-| L1 | `tem]` junk file at repo root | Low |
 
 ### H3. `spec/` duplicates `contracts/`, and the copies are untested
 
@@ -107,7 +107,7 @@ and MUST be preserved." Comparing directly:
 | Spec §4 lane | `MetasploitGovernor.evaluate()` |
 |---|---|
 | §4.1 posture gate | `metasploit.py:249` — same position |
-| §4.2 egress gate | **not in the governor at all** — the egress check lives in `PolicyEngine.evaluate()` (`policy.py:76-85`), a different component on a different call path |
+| §4.2 egress gate | **not in the governor at all** — the egress check lives in `PolicyEngine.evaluate()` (`policy.py:118-124`), a different component on a different call path |
 | §4.3 injection quarantine | `metasploit.py:261` — but *second*, not third |
 | §4.4 read-only fast-path | `metasploit.py:278` — third, not fourth |
 | §4.5 consequential authority | split across three `GovernanceMode` lanes (`read_only_firewall`, `shadow`, `lab_broker`, lines 290-314) that §4 does not mention |
@@ -130,7 +130,7 @@ Only two of the spec's identifiers exist in code as written:
 | Spec | Code | Status |
 |---|---|---|
 | `posture.locked` | `posture.locked` (`metasploit.py:256`) | match |
-| `mcp.egress.disabled` | `mcp.egress.disabled` (`policy.py:84`) | match |
+| `mcp.egress.disabled` | `mcp.egress.disabled` (`policy.py:122`) | match |
 | `mcp.injection.quarantined` | `msf.injection.quarantined` | differs |
 | `mcp.capability.read_only` | `msf.capability.read_only` | differs |
 | `mcp.authority.absent` | `msf.capability.execution_absent` / `msf.broker.approval_absent` | differs |
@@ -147,7 +147,7 @@ whether to rename (breaking historical evidence) or keep `msf.*` is **OD-8**.
 
 Both call sites default to 600 s:
 - `src/rif_runtime/mcp/metasploit.py:219` — `ttl_seconds: int = 600`
-- `src/rif_runtime/api.py:195` — `int(payload.get("ttl_seconds", 600))`
+- `src/rif_runtime/api.py:211` — `int(payload.get("ttl_seconds", 600))`
 
 A doubled default on a security-critical time bound deserves a deliberate
 reconciliation: either the spec's 300 s is the intent and the code should tighten, or
@@ -158,18 +158,6 @@ hash excludes free-text fields (`intent_hash()` covers `tool`, `capability`,
 `target`, `scope_id`, `params`, omitting `text` / `untrusted_context`). Single-use
 `token_id` enforcement (§6.4) remains unimplemented — the spec is candid about this
 under OD-3.
-
-### M4. `POST /v1/runs` is documented nowhere
-
-`docs/API.md` has been rewritten and is now accurate: it covers 19 of the 20 routes
-in `api.py`, with an auth column, and the nonexistent `POST /v1/runtime/reset-posture`
-is gone. `CLAUDE.md`'s route block, previously malformed (literal `\n` escapes on one
-line), is also fixed.
-
-The one gap left: **`POST /v1/runs`** (`api.py:235`) appears in no document —
-verified by checking each route string in `api.py` against `docs/API.md`. It is also
-the only route authenticated by Supabase JWT identity (`IdentityId`) rather than
-`ControlPlaneAuth`, which is a security-relevant distinction no document records.
 
 ### M7. The identity-spine spec review cites ADRs that do not exist
 
@@ -201,30 +189,13 @@ decisions. What remains is a milder inconsistency:
 **Recommendation:** settle on one convention and location, and add an index ADR
 recording what 0001 and 0009–0025 were, so M7's dangling references can be resolved.
 
-### M6. Root-level duplicates (downgraded from Medium)
-
-`cli-reference.md`, `mcp-integration-guide.md`, and `ARCHITECTURE.md` still exist
-both at root and under `docs/`, with differing content (root `ARCHITECTURE.md` is
-184 lines against `docs/ARCHITECTURE.md`'s 9). `release-engineering-guide.md` exists
-only at root.
-
-The accuracy problem is fixed — root `cli-reference.md` now carries its own note that
-`rif execute` / `evidence` / `telemetry` / `validate` / `policy` "are
-historical/planned and are not current commands," matching the real command set
-(`serve`, `check`, `replay`, `msf-check`). What is left is ordinary duplication:
-two files with the same name that must be maintained in step.
-
-### L1. `tem]`
-
-A 6.9 KB file at repo root containing ANSI-escaped terminal output from `bat`
-rendering an old `pyproject.toml` (showing `version = "0.2.0"`). Plainly the residue
-of a shell redirect typo. Safe to delete.
-
 ---
 
-## Resolved since the first pass
+## Resolved
 
-These were findings against `87498bd` and are fixed on `main` at `9df47d4`.
+Fixed on `main` and retained for traceability. The first group was resolved by
+the documentation overhaul before the second pass; the second group by the
+repository technical audit in #119, between the second and third passes.
 
 | # | Finding | How it was resolved |
 |---|---|---|
@@ -236,6 +207,9 @@ These were findings against `87498bd` and are fixed on `main` at `9df47d4`.
 | L6 | `notebooklm/` was an unmaintained fork of `docs/` frozen at v0.2.x | The forked `docs/` subtree deleted |
 | L7 | `DATA_MODEL.md` typed `trust_tier` as T0–T3 while `spec/mcp/SPEC.md` defines T0–T4 | The `trust_tier` row is gone in the rewritten document |
 | — | `CLAUDE.md`'s API-surface block was malformed (literal `\n` escapes) | Fixed in the `CLAUDE.md` rewrite |
+| M4 | `POST /v1/runs` was the one route documented nowhere | `docs/API.md` now carries an "Execution runs" section for it, noting its Supabase JWT auth. Re-verified: every route string in `api.py` resolves in `docs/API.md`, and no documented route is absent from the code |
+| M6 | Root-level duplicates of `docs/` files | `cli-reference.md` and `mcp-integration-guide.md` are now pointer stubs naming the canonical `docs/` copy and the implementation source of truth, rather than parallel content |
+| L1 | `tem]` junk file at repo root | Deleted in #119 |
 
 ## Suggested sequencing
 
@@ -244,4 +218,6 @@ These were findings against `87498bd` and are fixed on `main` at `9df47d4`.
 3. **M2 / M3** (OD-8, OD-9) — namespace and TTL; both are one-line decisions with
    downstream effects on replay and on token lifetime.
 4. **H2 / M7** — renumber the ADRs and resolve the dangling ADR-0010/0012/0015.
-5. **M4 / M6 / L1** — mechanical and independently mergeable.
+   These are last because they are bookkeeping, but M7's review document is
+   normative in tone while citing ADRs that do not exist, so it cannot be ratified
+   until they do.
