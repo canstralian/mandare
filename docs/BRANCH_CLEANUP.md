@@ -1,6 +1,6 @@
 # Branch Cleanup Procedure
 
-**Repository:** `canstralian/rif-runtime`
+**Repository:** `canstralian/mandare`
 **Trigger:** a successful release (a `v*.*.*` tag pushed and the
 [Release workflow](../.github/workflows/release.yml) green), or a periodic
 stale-branch audit.

@@ -1,13 +1,13 @@
 # RIF Runtime
 
-[![Merge Gate](https://github.com/canstralian/rif-runtime/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/merge-gate.yml)
-[![Coverage](https://github.com/canstralian/rif-runtime/actions/workflows/coverage.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/coverage.yml)
-[![Image](https://github.com/canstralian/rif-runtime/actions/workflows/image.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/image.yml)
-[![Release](https://github.com/canstralian/rif-runtime/actions/workflows/release.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/release.yml)
-[![CodeQL](https://github.com/canstralian/rif-runtime/actions/workflows/codeql.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/codeql.yml)
-[![Bandit](https://github.com/canstralian/rif-runtime/actions/workflows/bandit.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/bandit.yml)
-[![Gitleaks](https://github.com/canstralian/rif-runtime/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/canstralian/rif-runtime/actions/workflows/gitleaks.yml)
-[![License](https://img.shields.io/github/license/canstralian/rif-runtime)](LICENSE)
+[![Merge Gate](https://github.com/canstralian/mandare/actions/workflows/merge-gate.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/merge-gate.yml)
+[![Coverage](https://github.com/canstralian/mandare/actions/workflows/coverage.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/coverage.yml)
+[![Image](https://github.com/canstralian/mandare/actions/workflows/image.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/image.yml)
+[![Release](https://github.com/canstralian/mandare/actions/workflows/release.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/release.yml)
+[![CodeQL](https://github.com/canstralian/mandare/actions/workflows/codeql.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/codeql.yml)
+[![Bandit](https://github.com/canstralian/mandare/actions/workflows/bandit.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/bandit.yml)
+[![Gitleaks](https://github.com/canstralian/mandare/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/canstralian/mandare/actions/workflows/gitleaks.yml)
+[![License](https://img.shields.io/github/license/canstralian/mandare)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
 **RIF Runtime is a policy and governance runtime for agent-driven systems.** It evaluates proposed actions before they cross a capability boundary, maintains runtime posture, and records decision history for inspection and replay.
