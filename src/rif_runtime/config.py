@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
-from .schemas import RuntimeConfig
+from .schemas import EnvironmentProfile, Posture, RuntimeConfig
 
 _SETTINGS_TOML_PATH = Path("rif.toml")
 
@@ -46,13 +46,11 @@ class ProviderMode(StrEnum):
     hybrid = "hybrid"
 
 
-class PostureLevel(StrEnum):
-    """Runtime governance posture levels."""
-
-    normal = "normal"
-    elevated = "elevated"
-    restricted = "restricted"
-    locked = "locked"
+# The runtime's posture enum, re-exported under the name this module has
+# always used. It was previously a second, identical StrEnum defined here,
+# which let configuration and runtime drift apart in principle while looking
+# interchangeable in practice. One definition now backs both.
+PostureLevel = Posture
 
 
 # ---------------------------------------------------------------------------
@@ -66,8 +64,26 @@ class RuntimeSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     posture: PostureLevel = PostureLevel.normal
-    environment: str = "production"
+    environment: str | None = None
     cloud_egress: bool = False
+
+    @field_validator("environment", mode="before")
+    @classmethod
+    def _blank_environment_is_unset(cls, value: object) -> object:
+        """Treat a blank ``RIF_ENVIRONMENT`` as absent, not as a name.
+
+        ``RIF_ENVIRONMENT=`` in a .env or a container spec yields "", which two
+        readers disagreed about: ``load_config``'s fallback took it as unset
+        (``or "production"``), while ``RIFRuntime._configured_environment``
+        tested ``is None`` and so treated it as a configured name. With no
+        environments.yaml on disk the fallback invented "production" and the
+        runtime then refused to start against the empty string it had been
+        handed. Normalising here is what keeps the two in agreement, rather
+        than repeating the same falsiness check at each reader.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
 
 
 class ServerSection(BaseModel):
@@ -75,9 +91,26 @@ class ServerSection(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    host: str = "0.0.0.0"  # nosec B104 — intentional bind-all default, overridable via RIF_SERVER_HOST
+    # Loopback, not 0.0.0.0. This default was previously bind-all, which was
+    # harmless only because nothing read it: `rif serve` hardcoded 127.0.0.1.
+    # Now that the CLI takes its default from here, bind-all would silently
+    # expose every `rif serve` to the network. Deployments that must listen
+    # externally say so explicitly -- the Dockerfile passes --host=0.0.0.0.
+    host: str = "127.0.0.1"
     port: int = 8000
     root_path: str = ""
+
+    @field_validator("host", mode="before")
+    @classmethod
+    def _blank_host_uses_default(cls, value: object) -> object:
+        """Treat a blank ``RIF_SERVER_HOST`` as absent, not as an empty bind.
+
+        ``RIF_SERVER_HOST=`` yields "", which is not a useful listen address.
+        Fall back to the loopback default so blank env matches an unset var.
+        """
+        if isinstance(value, str) and not value.strip():
+            return "127.0.0.1"
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("port")
     @classmethod
@@ -104,6 +137,28 @@ class PathsSection(BaseModel):
 
     data_dir: str = "data"
     config_dir: str = "config"
+
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def _blank_data_dir_uses_default(cls, value: object) -> object:
+        """Treat blank ``RIF_DATA_DIR`` as unset, not as CWD.
+
+        ``Path("")`` is ``Path(".")``, so a container spec with
+        ``RIF_DATA_DIR=`` would write runtime state into the working directory.
+        Mirror blank-``RIF_ENVIRONMENT`` normalisation: empty means the field
+        default (``data``), not an empty path.
+        """
+        if isinstance(value, str) and not value.strip():
+            return "data"
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("config_dir", mode="before")
+    @classmethod
+    def _blank_config_dir_uses_default(cls, value: object) -> object:
+        """Treat blank ``RIF_CONFIG_DIR`` as unset, not as CWD."""
+        if isinstance(value, str) and not value.strip():
+            return "config"
+        return value.strip() if isinstance(value, str) else value
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +195,11 @@ class RifSettings(BaseModel):
 # Env-var override mapping
 # ---------------------------------------------------------------------------
 
+
+class ConfigError(Exception):
+    """Raised when configuration is invalid or cannot be loaded."""
+
+
 # Maps RIF_<NAME> env var to (section, key) path in the settings dict.
 _ENV_MAP: dict[str, tuple[str, str]] = {
     "RIF_POSTURE": ("runtime", "posture"),
@@ -167,23 +227,30 @@ def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _coerce_env_value(raw: str, section: str, key: str) -> str | int | bool:
-    """Best-effort coercion so env vars match expected TOML types."""
+    """Best-effort coercion so env vars match expected TOML types.
+
+    Integer coercion failures (including a blank ``RIF_SERVER_PORT``) raise
+    ``ConfigError`` here so callers see the same diagnostic path as pydantic
+    validation failures, rather than a bare ``ValueError`` from ``int("")``.
+    """
     # Boolean fields
     if key == "cloud_egress":
         return raw.lower() in ("1", "true", "yes")
     # Integer fields
     if key == "port":
-        return int(raw)
+        try:
+            return int(raw.strip())
+        except ValueError as exc:
+            raise ConfigError(
+                f"invalid {section}.{key} from environment: {raw!r} "
+                "(expected an integer between 1 and 65535)"
+            ) from exc
     return raw
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
-
-
-class ConfigError(Exception):
-    """Raised when configuration is invalid or cannot be loaded."""
 
 
 def load_settings(
@@ -257,12 +324,25 @@ def load_config(path: str | Path | None = None) -> RuntimeConfig:
         path = Path(path)
 
     if not path.is_file():
-        # Provide sensible defaults when environments file is absent
-        from .schemas import EnvironmentProfile
-
+        # No environments file: fall back to a single restrictive profile
+        # (EnvironmentProfile() defaults to networking_type="limited").
+        #
+        # The fallback adopts the *configured* environment name rather than a
+        # fixed "production". Otherwise the same RIF_ENVIRONMENT value is valid
+        # or invalid depending only on whether a file happened to be found --
+        # and RIFRuntime, which raises on an unknown name, would refuse to start
+        # anywhere the file is not on disk. That is not hypothetical: the Vercel
+        # entrypoint sets RIF_ENVIRONMENT=RIF_Runtime and runs from a CWD where
+        # config/ may not be present, so cold start crashed with
+        # "RIF_Runtime is not defined in environments.yaml (known: production)".
+        #
+        # Naming the fallback after the request is not a silent profile swap:
+        # there is no other profile to serve, and the one served is the
+        # restrictive default rather than something the operator did not choose.
+        name = get_settings().runtime.environment or "production"
         return RuntimeConfig(
-            default_environment="production",
-            environments={"production": EnvironmentProfile()},
+            default_environment=name,
+            environments={name: EnvironmentProfile()},
         )
 
     return RuntimeConfig.model_validate(yaml.safe_load(path.read_text()))
