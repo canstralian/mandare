@@ -30,6 +30,8 @@ A documentation page must not promote a lower-tier statement into a higher-tier 
 | `mcp-integration-guide.md` | Generic MCP integration proposal | Planned/design |
 | `plugin-capability-sdk-guide.md` | Future plugin SDK | Planned/design |
 | `api-reference.md` | Historical planned API pointer | Legacy pointer |
+| `BRANCH_CLEANUP.md` | Post-release branch hygiene procedure | Maintained guidance |
+| `fast-path-routing-checklist.md` | Track A / Track B review-routing test | Maintained guidance |
 
 ## Architecture decisions and reviews
 

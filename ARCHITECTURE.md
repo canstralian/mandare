@@ -2,7 +2,7 @@
 
 ## Purpose
 
-RIF Runtime places a deterministic governance boundary between an agent or caller and actions the runtime is willing to evaluate or invoke.
+RIF Runtime places a policy-enforced governance boundary between an agent or caller and the actions the runtime is willing to evaluate or invoke.
 
 The architectural invariant is:
 

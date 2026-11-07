@@ -101,6 +101,7 @@ The larger target architecture is documented separately from the implementation 
 - [`SECURITY.md`](SECURITY.md) — security model, limitations, and reporting
 - [`DEPLOYMENT.md`](DEPLOYMENT.md) — supported container deployment paths
 - [`TESTING.md`](TESTING.md) — testing strategy
+- [`release-engineering-guide.md`](release-engineering-guide.md) — current release process, with unimplemented controls called out
 - [`docs/API.md`](docs/API.md) — current HTTP routes
 - [`docs/cli-reference.md`](docs/cli-reference.md) — current CLI commands
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned work
