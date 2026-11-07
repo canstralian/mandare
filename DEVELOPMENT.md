@@ -12,7 +12,7 @@ This guide is intentionally command-first. If a command is not backed by the cur
 ## Local setup
 
 ```bash
-git clone https://github.com/canstralian/rif-runtime.git
+git clone https://github.com/canstralian/mandare.git
 cd rif-runtime
 python3 -m venv .venv
 source .venv/bin/activate

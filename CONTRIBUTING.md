@@ -11,7 +11,7 @@ For cross-domain contract changes, check `spec/README.md` for open specification
 ## Local setup
 
 ```bash
-git clone https://github.com/canstralian/rif-runtime.git
+git clone https://github.com/canstralian/mandare.git
 cd rif-runtime
 python3 -m venv .venv
 source .venv/bin/activate
