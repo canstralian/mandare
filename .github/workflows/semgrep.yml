@@ -43,6 +43,37 @@ jobs:
             --sarif \
             --output=semgrep.sarif
 
+      - name: Summarize Semgrep findings
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('semgrep.sarif').read_text())
+          findings = []
+          for run in report.get('runs', []):
+              for result in run.get('results', []):
+                  for location in result.get('locations', []):
+                      physical = location.get('physicalLocation', {})
+                      findings.append({
+                          'rule': result.get('ruleId'),
+                          'level': result.get('level'),
+                          'path': physical.get('artifactLocation', {}).get('uri'),
+                          'line': physical.get('region', {}).get('startLine'),
+                      })
+          print(json.dumps({'finding_locations': findings}, indent=2))
+          PY
+
+      - name: Retain Semgrep evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-sarif-${{ github.sha }}
+          path: semgrep.sarif
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Semgrep SARIF
         uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         if: always()
