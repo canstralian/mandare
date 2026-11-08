@@ -109,3 +109,79 @@ test('keeps real separators and fails closed on incomplete shell words', async (
   for (let depth = 0; depth < 6; depth += 1) nested = 'bash -c ' + JSON.stringify(nested)
   expect(classifyBash(nested)).toBe(Effect.UNKNOWN)
 })
+
+test('requires approval for unsupported active command substitutions', async () => {
+  for (const command of [
+    'git -C "$(printf "%s" "my;repo")" push origin main',
+    'git -C "$(printf "%s" "my;repo")" push --force origin main',
+    'git -C $(printf "%s" "my;repo") push origin main',
+    'git -C "`printf "%s" "my;repo"`" push origin main',
+    'echo "$(git push origin main)"',
+    "sh -c 'git -C \"$(printf \"%s\" \"my;repo\")\" push origin main'",
+    'git -C "$((1 + $(printf 1)))" push origin main',
+    'git -C "$\\\n(printf "%s" "my;repo")" push origin main',
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  expect(classifyBash("git -C '$(literal)' push origin main")).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('git -C "\\$(literal)" push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('git -C "my\\`repo" push origin main')).toBe(Effect.EXTERNAL_WRITE)
+})
+
+test('requires approval for env split-string spellings without interpreting their grammar', async () => {
+  for (const command of [
+    'env -S \'"git"\' push origin main',
+    'env -S \'"git"\' push --force origin main',
+    'env -S\'"git"\' push origin main',
+    '/usr/bin/env --split-string \'"git"\' push origin main',
+    'env --split-string=\'"git"\' push --force origin main',
+    'env --split=\'"git"\' push origin main',
+    'env -iS \'"git"\' push origin main',
+    "env -S 'git\\_push\\_origin\\_main'",
+    "bash -c 'env -S \"git push origin main\"'",
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  expect(classifyBash('env LANG=C git push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('env LANG=C git status')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('env LANG=C git status --short')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('env LANG=C git log --since=2026-01-01')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('env -- git status --short')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('env -u S git status --short')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('env -uS git status --short')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('env -C "my repo\'s copy" git status --short')).toBe(Effect.LOCAL_EXECUTION)
+})
+
+test('keeps literal operands out of recursive shell parsing', async () => {
+  for (const command of [
+    'git commit -m "fix: don\'t break quoting"',
+    'git -C "my repo\'s copy" status',
+    'git -C "my repo\'s copy" commit -m "it\'s fine; keep (literal) syntax"',
+    'printf "%s" "an unmatched \' is literal"',
+    "bash -c 'git status' \"my repo's copy\"",
+  ]) expect(classifyBash(command)).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('git -C "my repo\'s copy" push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('git -C "my repo\'s copy" push --force origin main')).toBe(Effect.DESTRUCTIVE)
+})
+
+test('inspects recognized shell command operands with a bounded depth', async () => {
+  for (const shell of ['sh', 'bash', 'dash', 'ash', 'ksh', 'zsh', '/bin/bash']) {
+    for (const options of ['-c', '-lc', '-xc', '+c', '-o pipefail -c']) {
+      expect(classifyBash(shell + ' ' + options + " 'git push origin main'")).toBe(Effect.EXTERNAL_WRITE)
+    }
+  }
+  expect(classifyBash("bash --noprofile --norc -c 'git push --force origin main'")).toBe(Effect.DESTRUCTIVE)
+  expect(classifyBash("bash -c 'git -C \"my repo\" push origin main'")).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("bash -c 'git -C \"unfinished'")).toBe(Effect.UNKNOWN)
+  expect(classifyBash('bash -c')).toBe(Effect.UNKNOWN)
+  expect(classifyBash("bash -c -- 'git push origin main'")).toBe(Effect.UNKNOWN)
+  expect(classifyBash("bash -c +x 'git push origin main'")).toBe(Effect.UNKNOWN)
+})
+
+test('keeps opaque executable string consumers behind live approval', async () => {
+  for (const command of [
+    "eval 'git push origin main'",
+    "ssh host 'git push origin main'",
+    'python -c \'import os; os.system("git push origin main")\'',
+    'python3 -c \'import os; os.system("git push origin main")\'',
+    'python3.12 -c \'import os; os.system("git push origin main")\'',
+    "bash -c 'eval \"git push origin main\"'",
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  expect(classifyBash('python3 -m pytest -q')).toBe(Effect.LOCAL_EXECUTION)
+})

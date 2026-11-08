@@ -68,12 +68,19 @@ global options (`-C`, `-c`, `--git-dir`, `--no-pager`, ...): pushes are writes, 
 are destructive. A `gh` subcommand is a read only if it is one of a fixed set (`view`, `list`,
 `status`, `checks`, `diff`, `search`, ...); any other `gh` subcommand needs approval, and `delete`
 is destructive. `rm` with recursive and force flags in any spelling and `find -delete` are
-destructive. Quoted arguments are also inspected as possible wrapper commands, bounded to four
-levels; incomplete shell words and inputs beyond that bound classify as `UNKNOWN` and require
-live approval. Patterns cover `curl` body flags and methods, `wget --post-*`, package publishing,
+destructive. Recognized shell wrappers (`sh`, `bash`, `dash`, `ash`, `ksh`, `zsh`, including
+paths and flags such as `-lc` or Bash `+c`) have their command operand inspected, bounded to four levels.
+Literal operands such as commit messages and directory names are not reparsed as shell source.
+Unsupported executable-string consumers (`eval`, `ssh` and Python/PyPy `-c`) require live approval
+rather than losing the protection previously provided by inspecting their embedded command text.
+Active command substitutions (including backticks), GNU `env` split strings (`-S`,
+`--split-string`, attached values and short-option clusters), incomplete shell words and inputs
+beyond the nesting bound classify as `UNKNOWN` and require live approval. Single-quoted or escaped
+literal substitution markers remain literal. Patterns cover `curl` body flags and methods,
+`wget --post-*`, package publishing,
 `kubectl`/`terraform` mutations and similar. A mention such as `echo git push` is over-classified
 and costs a prompt. Indirection the text does not show (scripts, aliases, shell functions,
-variables such as `$CMD`, interpreters such as `python -c`) can evade it. Remote API permissions,
+variables such as `$CMD`, unrecognized interpreters) can evade it. Remote API permissions,
 branch protection, credential scope, OS/container isolation and managed Claude Code policy remain
 stronger boundaries.
 

@@ -29,6 +29,18 @@ test('re-entry denies an external write: no live approval is possible beneath th
   expect(calls()).toBe(0)
 })
 
+test('re-entry denies unsupported Bash parsing forms without reaching execution', async () => {
+  for (const command of [
+    'git -C "$(printf "%s" "my;repo")" push origin main',
+    'env -S \'"git"\' push --force origin main',
+  ]) {
+    const { next, calls } = caught('re-entry', false)
+    const result: any = await handler({}, { tool: 'Bash', command }, next)
+    expect(result.deny).toMatch(/UNKNOWN raised beneath its own guard/)
+    expect(calls()).toBe(0)
+  }
+})
+
 test('re-entry denies an unclassified tool', async () => {
   const { next, calls } = caught('re-entry', false)
   const result: any = await handler({}, { tool: 'mcp__new__teleport' }, next)

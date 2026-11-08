@@ -83,6 +83,7 @@ test('every reviewed shell bypass needs approval, and runs nothing when refused'
     'git -C "my;repo" push origin main', 'git -C my\\;repo push origin main',
     'git -C "my|repo" push --force origin main', 'git --namespace "" push origin main',
     "bash -c 'git -C \"my repo\" push origin main'",
+    "bash +c 'git push origin main'",
   ]
   const seen = stubHostAndTool(on, bypasses.map(() => 'Refuse'))
 
@@ -92,6 +93,49 @@ test('every reviewed shell bypass needs approval, and runs nothing when refused'
   }
   expect(seen.questions.length).toBe(bypasses.length)
   expect(seen.executed.length).toBe(0)
+})
+
+test('unsupported substitutions and env split strings run nothing when refused or unattended', async ($, on) => {
+  stubEvidence(on)
+  const commands = [
+    'git -C "$(printf "%s" "my;repo")" push origin main',
+    'git -C "$(printf "%s" "my;repo")" push --force origin main',
+    'git -C "$\\\n(printf "%s" "my;repo")" push origin main',
+    'git -C "`printf "%s" "my;repo"`" push origin main',
+    'env -S \'"git"\' push origin main',
+    'env -S \'"git"\' push --force origin main',
+    'env --split-string=\'"git"\' push origin main',
+    'env -iS \'"git"\' push origin main',
+    "bash -c 'env -S \"git push origin main\"'",
+    "eval 'git push origin main'",
+    "ssh host 'git push origin main'",
+    'python3 -c \'import os; os.system("git push origin main")\'',
+  ]
+  const seen = stubHostAndTool(on, commands.map(() => 'Refuse'))
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (const command of commands) {
+      const result = await $.tool.call({ tool: 'Bash', command })
+      expect(result.deny).toMatch(/UNKNOWN: this exact invocation was not approved/)
+    }
+  }
+  expect(seen.questions.length).toBe(commands.length * 2)
+  expect(seen.executed.length).toBe(0)
+})
+
+test('literal apostrophes in local Git operands need no live approval', async ($, on) => {
+  stubEvidence(on)
+  const seen = stubHostAndTool(on, [])
+  const commands = [
+    'git commit -m "fix: don\'t break quoting"',
+    'git -C "my repo\'s copy" status',
+    "bash -c 'git status' \"my repo's copy\"",
+    'env LANG=C git status --short',
+  ]
+  for (const command of commands) {
+    expect(await $.tool.call({ tool: 'Bash', command })).toEqual({ result: 'ran' })
+  }
+  expect(seen.questions.length).toBe(0)
+  expect(seen.executed.map((e) => e.command)).toEqual(commands)
 })
 
 test('an open-ended connector call (SQL, commands) is not passed through as a read', async ($, on) => {
