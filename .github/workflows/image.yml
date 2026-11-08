@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Do not leave the job's GITHUB_TOKEN in .git/config. This job builds
           # and then *runs* the checked-out code inside a container; a persisted
@@ -37,10 +37,10 @@ jobs:
           # after checkout talks to git.
           persist-credentials: false
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: false
@@ -58,6 +58,9 @@ jobs:
           # throwaway one -- is indistinguishable from a real leaked credential
           # to a secret scanner, and trains reviewers to ignore the finding.
           key="$(openssl rand -hex 16)"
+          # Audit exception: this fresh smoke-container nonce is not an external
+          # credential. Keep masking; see docs/security/semgrep-remediation.md.
+          # nosemgrep: yaml.github-actions.security.audit.unsafe-add-mask-workflow-command.unsafe-add-mask-workflow-command
           echo "::add-mask::${key}"
           echo "SMOKE_KEY=${key}" >> "$GITHUB_ENV"
           docker run -d --name rif-smoke -p 8000:8000 \
@@ -136,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Do not leave the job's GITHUB_TOKEN in .git/config. This job builds
           # and then *runs* the checked-out code inside a container; a persisted
@@ -149,14 +152,14 @@ jobs:
         # job failed to resolve the action at all. Pinned to a real release
         # rather than @master, which lint.yml used -- a mutable ref on a
         # third-party action in a job holding security-events: write.
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: "fs"
           scan-ref: "."
           format: "sarif"
           output: "trivy-results.sarif"
 
-      - uses: github/codeql-action/upload-sarif@v4
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         if: always()
         with:
           sarif_file: trivy-results.sarif

@@ -195,18 +195,124 @@ function classifyCommandTokens(tokens) {
   return effect
 }
 
+/** @param {string[]} args */
+function envUsesSplitString(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? ''
+    if (arg === '--' || !arg.startsWith('-') || arg === '-') break
+    if (arg.startsWith('--')) {
+      if (/^--s/.test(arg)) return true
+      if (!arg.includes('=') && ['--unset', '--chdir', '--argv0'].some((option) => option.startsWith(arg))) i += 1
+      continue
+    }
+    for (let at = 1; at < arg.length; at += 1) {
+      const flag = arg[at]
+      if (flag === 'S') return true
+      if (flag === 'u' || flag === 'C' || flag === 'a') {
+        if (at === arg.length - 1) i += 1
+        break
+      }
+    }
+  }
+  return false
+}
+
 /**
- * Command segments, split at shell separators and substitution boundaries,
- * each as whitespace tokens with quotes and backslashes removed.
+ * Preserve shell word boundaries before looking for commands. Only recognized
+ * shell -c operands are reparsed as shell source, bounded to four levels.
+ * This remains conservative classification, not a complete shell parser.
  *
  * @param {string} command
- * @returns {string[][]}
+ * @param {number} [depth]
+ * @returns {string[][] | null}
  */
-function commandSegments(command) {
-  return command
-    .split(/[;&|\n()`{}]|\$\(/)
-    .map((segment) => segment.split(/\s+/).map((token) => token.replace(/['"\\]/g, '')).filter(Boolean))
-    .filter((tokens) => tokens.length > 0)
+function commandSegments(command, depth = 0) {
+  /** @type {string[][]} */
+  const segments = []
+  /** @type {string[]} */
+  let tokens = []
+  let word = ''
+  let started = false
+  /** @type {"'" | '"' | null} */
+  let quote = null
+  const finishWord = () => {
+    if (started) tokens.push(word)
+    word = ''
+    started = false
+  }
+  const finishSegment = () => {
+    finishWord()
+    if (tokens.length > 0) segments.push(tokens)
+    tokens = []
+  }
+
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command.charAt(i)
+    if (ch === '\\' && quote !== "'") {
+      const next = command[i + 1]
+      if (next === undefined) return null
+      if (quote === '"' && !['$', '`', '"', '\\', '\n'].includes(next)) {
+        word += ch
+        started = true
+      } else {
+        if (next !== '\n') {
+          word += next
+          started = true
+        }
+        i += 1
+      }
+    } else if (quote !== "'" && (ch === '`' || (ch === '$' && /^(?:\\\n)*\(/.test(command.slice(i + 1))))) {
+      // Substitutions have their own quote state and can change word boundaries.
+      // Do not mistake their contents for literal operands or outer shell source.
+      return null
+    } else if (quote !== null) {
+      if (ch === quote) quote = null
+      else word += ch
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      started = true
+    } else if (/[;&|\n()`{}]/.test(ch)) {
+      finishSegment()
+    } else if (/\s/.test(ch)) {
+      finishWord()
+    } else {
+      word += ch
+      started = true
+    }
+  }
+  if (quote !== null) return null
+  finishSegment()
+
+  /** @type {string[][]} */
+  const nested = []
+  for (const segment of segments) {
+    for (let i = 0; i < segment.length; i += 1) {
+      const program = segment[i]?.split('/').at(-1)
+      const args = segment.slice(i + 1)
+      // GNU env split strings have their own escaping grammar. Attached values,
+      // short-option clusters and abbreviated long options need the same gate.
+      if (program === 'env' && envUsesSplitString(args)) return null
+      // These consumers execute strings with grammars this lexer does not model.
+      // Do not let narrowing literal inspection turn a visible write into a pass.
+      if (program === 'eval' || program === 'ssh') return null
+      if (/^(?:python(?:\d+(?:\.\d+)*)?|pypy[23]?)$/.test(program ?? '') && args.some((arg) => /^-[^-]*c/.test(arg))) return null
+      if (!['sh', 'bash', 'dash', 'ash', 'ksh', 'zsh'].includes(program ?? '')) continue
+      for (let at = 0; at < args.length; at += 1) {
+        const option = args[at] ?? ''
+        if (!/^[-+]/.test(option) || option === '--') break
+        if (/^[-+][^-+]*c/.test(option)) {
+          const script = args[at + 1]
+          if (script === undefined || /^[-+]/.test(script) || depth >= 4) return null
+          const inner = commandSegments(script, depth + 1)
+          if (inner === null) return null
+          nested.push(...inner)
+          break
+        }
+        if (['-o', '+o', '-O', '+O', '--rcfile', '--init-file'].includes(option)) at += 1
+      }
+    }
+  }
+  return [...segments, ...nested]
 }
 
 const MCP_DESTRUCTIVE = new Set([
@@ -252,7 +358,9 @@ export function classifyToolCall(tool, input = {}) {
  */
 export function classifyBash(command) {
   if (!command.trim()) return Effect.UNKNOWN
-  let effect = commandSegments(command).map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
+  const segments = commandSegments(command)
+  if (segments === null) return Effect.UNKNOWN
+  let effect = segments.map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
   if (DESTRUCTIVE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.DESTRUCTIVE)
   if (EXTERNAL_WRITE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.EXTERNAL_WRITE)
   if (NETWORK_READ_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.NETWORK_READ)
