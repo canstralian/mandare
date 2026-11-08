@@ -31,6 +31,36 @@ jobs:
       - name: Install Semgrep
         run: python -m pip install --upgrade pip semgrep
 
+      - name: Verify findings fail the scanner
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          with tempfile.TemporaryDirectory(prefix='semgrep-enforcement-') as directory:
+              fixture = Path(directory) / 'workflow.yml'
+              output = Path(directory) / 'findings.json'
+              fixture.write_text(
+                  'jobs:\n  probe:\n    steps:\n'
+                  '      - uses: actions/checkout@v4\n'
+                  '      - run: echo "' + '::'.join(['', 'add-mask', 'synthetic-nonce']) + '"\n'
+              )
+              result = subprocess.run([
+                  'semgrep', 'scan', '--config=p/python', '--config=p/security-audit',
+                  '--config=p/secrets', '--config=p/github-actions', '--error',
+                  '--json', '--output=' + str(output), str(fixture),
+              ], check=False)
+              if result.returncode != 1:
+                  raise SystemExit('Expected finding exit status 1, got ' + str(result.returncode))
+              rules = {finding['check_id'] for finding in json.loads(output.read_text())['results']}
+              for expected in ['github-actions-mutable-action-tag', 'unsafe-add-mask-workflow-command']:
+                  if not any(rule.endswith('.' + expected) for rule in rules):
+                      raise SystemExit('Missing expected enforcement finding: ' + expected)
+              print('Verified: mutable references and unreviewed mask commands still fail scanning')
+          PY
+
       # Use the CLI (not semgrep/semgrep-action@v1): that action rejects
       # generateSarif and does not emit semgrep.sarif for upload.
       - name: Run Semgrep
@@ -40,6 +70,7 @@ jobs:
             --config=p/security-audit \
             --config=p/secrets \
             --config=p/github-actions \
+            --error \
             --sarif \
             --output=semgrep.sarif
 
@@ -61,6 +92,7 @@ jobs:
                           'level': result.get('level'),
                           'path': physical.get('artifactLocation', {}).get('uri'),
                           'line': physical.get('region', {}).get('startLine'),
+                          'suppressions': result.get('suppressions', []),
                       })
           print(json.dumps({'finding_locations': findings}, indent=2))
           PY
