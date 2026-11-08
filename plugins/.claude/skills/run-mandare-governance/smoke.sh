@@ -8,9 +8,18 @@
 # answer or block the call; the only pushes go to a throwaway local bare repo.
 set -uo pipefail
 
+usage() { sed -n '4,5p' "$0" | sed 's/^# *//' >&2; exit 2; }
+case "${1:-}" in
+  '') ;;
+  run) [ $# -eq 2 ] && [ -n "$2" ] || usage ;;
+  *) usage ;;
+esac
+
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 PLUGIN="$ROOT/plugins/mandare-governance"
 WORK=${SMOKE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/mandare-smoke.XXXXXX")}
+# A reused dir keeps the old ledger and repos, so every count and check below would be off.
+[ -z "$(ls -A "$WORK" 2>/dev/null)" ] || { echo "SMOKE_DIR $WORK is not empty; pass a new or empty dir" >&2; exit 2; }
 mkdir -p "$WORK/cfg"
 
 # One headless session. $1 = command, $2 = "plugin" or "none". Prints: <ran-exactly> <tab> <tool result>.
@@ -59,6 +68,7 @@ check() { # name, mode, command, expected regex on the tool result
 }
 
 check "control: push without plugin succeeds" none  "git -C $R push origin main"                         'main -> main'
+pushed=$(git -C "$WORK/remote.git" rev-parse -q --verify main)
 git -C "$R" commit -q --allow-empty -m pending
 check "git -C push is EXTERNAL_WRITE"         plugin "git -C $R push origin main"                         'Mandare denied EXTERNAL_WRITE'
 check "git -c ... push --force is DESTRUCTIVE" plugin "git -c user.name=x -C $R push --force origin main" 'Mandare denied DESTRUCTIVE'
@@ -66,8 +76,8 @@ check "bash -c wrapped push is guarded"       plugin "bash -c 'cd $R && git push
 check "gh repo delete is DESTRUCTIVE"         plugin "gh repo delete o/does-not-exist --yes"              'Mandare denied DESTRUCTIVE'
 check "local read passes"                     plugin "git -C $R log --oneline -1"                         'pending'
 
-remote=$(git -C "$WORK/remote.git" log --oneline -1 main)
-if [[ $remote == *init ]]; then echo "PASS  remote unchanged after denials ($remote)"; else echo "FAIL  remote moved: $remote"; fail=1; fi
+remote=$(git -C "$WORK/remote.git" rev-parse -q --verify main)
+if [ -n "$pushed" ] && [ "$remote" = "$pushed" ]; then echo "PASS  remote unchanged after denials (${remote:0:7})"; else echo "FAIL  remote moved: ${pushed:0:7} -> ${remote:0:7}"; fail=1; fi
 
 python3 - "$WORK/cfg/plugins/store" <<'EOF' || fail=1
 import glob, json, sys

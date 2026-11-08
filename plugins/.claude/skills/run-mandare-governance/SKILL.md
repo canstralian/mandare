@@ -6,7 +6,8 @@ description: Run, drive and smoke-test the mandare-governance Claude Code plugin
 `mandare-governance` (`plugins/mandare-governance/`) is a `tool.call` hook module, so its
 surface is a running Claude Code session. The driver `smoke.sh` launches headless `claude -p`
 sessions with the plugin loaded via `--plugin-dir`. It reads the actual Bash tool result
-from `stream-json`, not the model's summary. All paths below are relative to the repo root.
+from `stream-json`, not the model's summary. All paths below are relative to the repo root. The skill lives under
+`plugins/.claude/` so neither marketplace plugin (`.claude/`, `plugins/mandare-governance/`) ships it.
 
 ## Prerequisites
 
@@ -18,7 +19,7 @@ from `stream-json`, not the model's summary. All paths below are relative to the
 Full case table, about 1 minute, exits non-zero on any FAIL:
 
 ```bash
-.claude/skills/run-mandare-governance/smoke.sh
+plugins/.claude/skills/run-mandare-governance/smoke.sh
 ```
 
 The table checks:
@@ -33,7 +34,7 @@ The table checks:
 Ask how the live plugin treats one command:
 
 ```bash
-.claude/skills/run-mandare-governance/smoke.sh run "gh workflow run deploy.yml -R o/r"
+plugins/.claude/skills/run-mandare-governance/smoke.sh run "gh workflow run deploy.yml -R o/r"
 # exact  plugins=mandare-governance  <tool_use_error>Mandare denied EXTERNAL_WRITE: this exact invocation was not approved.</tool_use_error>
 ```
 
@@ -45,7 +46,7 @@ Each output line has three fields:
 - The last field is the raw tool result.
 
 The work directory (bare remote, repo, `cfg/` with the plugin store) is printed at the end.
-Set `SMOKE_DIR=<dir>` to choose it.
+Set `SMOKE_DIR=<dir>` to choose it; it must be new or empty, or the driver exits 2.
 
 ## Test (unit level)
 
