@@ -170,11 +170,9 @@ implementation authority," which cannot be satisfied.
 The document also jumps from §11 to §13 — there is no §12.
 
 One time-sensitive item: §7 scopes the `execution_id` deprecation window as
-`v0.2.x → v0.3.0`, with input aliases "removed at `v0.3.0`." No executable
-references to `execution_id` were found in `src/`, but the seeded
-`src/rif_runtime/execution/state.py` docstring still mentions the open re-key
-checklist. The absence of executable references alone does not establish that the
-checklist is complete.
+`v0.2.x → v0.3.0`, with input aliases "removed at `v0.3.0`." The code is already
+clean — `execution_id` has zero occurrences in `src/` — so the deprecation appears
+complete in practice and only the checklist is stale.
 
 ### H2. ADR numbering (downgraded from High)
 
