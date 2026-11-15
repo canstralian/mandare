@@ -336,6 +336,7 @@ index, so the mapping is load-bearing for replay:
 | `mcp.injection.quarantined` | `msf.injection.quarantined` |
 | `mcp.capability.read_only` | `msf.capability.read_only` |
 | `mcp.authority.absent` | `msf.capability.execution_absent`, `msf.broker.approval_absent` |
+| `mcp.gate.approval_absent` | `msf.broker.approval_absent` |
 | `mcp.gate.signature_invalid` | `msf.broker.signature_invalid` |
 | `mcp.gate.token_expired` | `msf.broker.token_expired` |
 | `mcp.gate.capability_mismatch` | `msf.broker.capability_mismatch` |
@@ -343,6 +344,7 @@ index, so the mapping is load-bearing for replay:
 | `mcp.gate.intent_mismatch` | `msf.broker.intent_mismatch` |
 | `mcp.gate.authorized` | `msf.broker.authorized` |
 | `mcp.gate.token_replayed` | *(none — §6.4 unimplemented)* |
+| *(none — shadow lane not modelled by this spec)* | `msf.shadow.denied` |
 
 Renaming the emitted identifiers is a breaking change to historical evidence;
 whether the framework adopts `mcp.*` or retains `msf.*` as the reference lane's
