@@ -62,9 +62,12 @@ R="$WORK/repo"
 fail=0
 
 check() { # name, mode, command, expected regex on the tool result
-  local out; out=$(session "$3" "$2")
-  if [[ $out == exact* ]] && [[ $out =~ $4 ]]; then echo "PASS  $1"; else echo "FAIL  $1"; fail=1; fi
+  local out rc=0
+  out=$(session "$3" "$2") || rc=$?
+  # A failed session must not pass on whatever partial output it printed.
+  if [[ $rc -eq 0 && $out == exact* && $out =~ $4 ]]; then echo "PASS  $1"; else echo "FAIL  $1"; fail=1; fi
   echo "      $out"
+  [ "$rc" -eq 0 ] || echo "      session exited $rc"
 }
 
 check "control: push without plugin succeeds" none  "git -C $R push origin main"                         'main -> main'

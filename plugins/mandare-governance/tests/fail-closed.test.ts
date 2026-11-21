@@ -134,3 +134,16 @@ test('an effect the classifier was not written to return is denied, not passed t
     expect(disposition(bogus)).toBe('deny')
   }
 })
+
+test('re-entry: a pass-through call whose continuation rejects is denied, not thrown', async () => {
+  let calls = 0
+  const next: any = () => {
+    calls += 1
+    return Promise.reject(new Error('beneath rejected'))
+  }
+  next.called = false
+  next.error = { kind: 're-entry' }
+  const result: any = await handler({}, { tool: 'Read', file_path: 'README.md' }, next)
+  expect(result.deny).toMatch(/failed closed before execution: re-entry/)
+  expect(calls).toBe(1)
+})

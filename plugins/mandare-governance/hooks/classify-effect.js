@@ -271,6 +271,17 @@ function commandSegments(command, depth = 0) {
     } else if (ch === '"' || ch === "'") {
       quote = ch
       started = true
+    } else if (ch === '<' && command[i + 1] === '<') {
+      // Heredoc and here-string bodies have their own quoting rules, which this
+      // lexer does not model. A quote inside one must not change later parsing.
+      return null
+    } else if (ch === '#' && !started && (i === 0 || /[ \t\n;&|()]/.test(command.charAt(i - 1)))) {
+      // Bash comments out the rest of the line when an unquoted # begins a word
+      // after a blank or an operator (not `${#`, not mid-word). Skipping it stops
+      // a quote in comment text from swallowing the next line's command.
+      const end = command.indexOf('\n', i)
+      if (end === -1) break
+      i = end - 1
     } else if (/[;&|\n()`{}]/.test(ch)) {
       finishSegment()
     } else if (/\s/.test(ch)) {
@@ -360,10 +371,16 @@ export function classifyBash(command) {
   if (!command.trim()) return Effect.UNKNOWN
   const segments = commandSegments(command)
   if (segments === null) return Effect.UNKNOWN
+  // Quotes and escapes change the text but not the command bash runs
+  // (`"npm" publish`, `c\url -X POST`), so the patterns also see each segment's
+  // shell words. The raw text stays in the set: this only ever adds matches.
+  const texts = [command, ...segments.map((tokens) => tokens.join(' '))]
+  /** @param {RegExp[]} patterns */
+  const matches = (patterns) => texts.some((text) => patterns.some((pattern) => pattern.test(text)))
   let effect = segments.map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
-  if (DESTRUCTIVE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.DESTRUCTIVE)
-  if (EXTERNAL_WRITE_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.EXTERNAL_WRITE)
-  if (NETWORK_READ_BASH.some((pattern) => pattern.test(command))) effect = stronger(effect, Effect.NETWORK_READ)
+  if (matches(DESTRUCTIVE_BASH)) effect = stronger(effect, Effect.DESTRUCTIVE)
+  if (matches(EXTERNAL_WRITE_BASH)) effect = stronger(effect, Effect.EXTERNAL_WRITE)
+  if (matches(NETWORK_READ_BASH)) effect = stronger(effect, Effect.NETWORK_READ)
   return effect
 }
 

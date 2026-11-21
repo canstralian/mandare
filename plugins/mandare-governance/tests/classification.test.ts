@@ -185,3 +185,49 @@ test('keeps opaque executable string consumers behind live approval', async () =
   ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
   expect(classifyBash('python3 -m pytest -q')).toBe(Effect.LOCAL_EXECUTION)
 })
+
+// Review of the v0.1.0 candidate (#195): each command below ran a write or a
+// deletion that the classifier at b1480e5 passed through without a prompt.
+test('comment text cannot open a quote that hides the next command', async () => {
+  expect(classifyBash("echo ok # it's\ngit push origin main\n# '")).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("true #'\nrm -rf build\n#'")).toBe(Effect.DESTRUCTIVE)
+  // A continued line joins the comment; the following line is still a command.
+  expect(classifyBash("echo a \\\n# it's\ngit push origin main\n# '")).toBe(Effect.EXTERNAL_WRITE)
+  // A # inside a word, a quote, an escape or a parameter expansion is not a comment.
+  expect(classifyBash('git status # just looking')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('echo a#b')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('echo "#\'" && git push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("echo \\#'x' && git push origin main")).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('echo ${#items[@]}; git push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('curl https://example.test/docs#section')).toBe(Effect.NETWORK_READ)
+})
+
+test('heredocs and here-strings require approval until their bodies are modeled', async () => {
+  for (const command of [
+    "cat <<EOF\nit's\nEOF\ngit push origin main\n# '",
+    "cat <<'EOF' > notes.txt\nhello\nEOF",
+    'cat <<-EOF\n\tindented\n\tEOF',
+    'wc -c <<< "it\'s"',
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  expect(classifyBash('echo "<<EOF"')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('sort < input.txt')).toBe(Effect.LOCAL_EXECUTION)
+})
+
+test('quoting or escaping a command or flag cannot hide pattern-matched effects', async () => {
+  for (const command of [
+    'curl "-X" "POST" https://example.test/hooks',
+    'c\\url -X POST https://example.test/hooks',
+    "curl '--data' x https://example.test/hooks",
+    '"npm" publish',
+    'docker "push" registry.example.test/app:1',
+    'w\\get --post-data=x https://example.test/form',
+    "bash -c 'kubectl \"apply\" -f deploy.yaml'",
+  ]) expect(classifyBash(command)).toBe(Effect.EXTERNAL_WRITE)
+  for (const command of [
+    'kubectl "delete" pod web',
+    'k\\ubectl delete pod web',
+    '"terraform" destroy -auto-approve',
+    'd\\d if=/dev/zero of=/dev/sda',
+  ]) expect(classifyBash(command)).toBe(Effect.DESTRUCTIVE)
+  expect(classifyBash('curl "https://example.test/status"')).toBe(Effect.NETWORK_READ)
+})

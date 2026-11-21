@@ -71,14 +71,20 @@ is destructive. `rm` with recursive and force flags in any spelling and `find -d
 destructive. Recognized shell wrappers (`sh`, `bash`, `dash`, `ash`, `ksh`, `zsh`, including
 paths and flags such as `-lc` or Bash `+c`) have their command operand inspected, bounded to four levels.
 Literal operands such as commit messages and directory names are not reparsed as shell source.
+An unquoted `#` that begins a word after a blank or an operator is a comment and is skipped to the
+end of the line, so a quote in comment text cannot swallow the next line's command; a `#` inside a
+word, a quote, an escape or `${#...}` stays literal.
 Unsupported executable-string consumers (`eval`, `ssh` and Python/PyPy `-c`) require live approval
 rather than losing the protection previously provided by inspecting their embedded command text.
-Active command substitutions (including backticks), GNU `env` split strings (`-S`,
+Active command substitutions (including backticks), heredocs and here-strings (any unquoted `<<`,
+including `<<-` and `<<<`), GNU `env` split strings (`-S`,
 `--split-string`, attached values and short-option clusters), incomplete shell words and inputs
 beyond the nesting bound classify as `UNKNOWN` and require live approval. Single-quoted or escaped
 literal substitution markers remain literal. Patterns cover `curl` body flags and methods,
 `wget --post-*`, package publishing,
-`kubectl`/`terraform` mutations and similar. A mention such as `echo git push` is over-classified
+`kubectl`/`terraform` mutations and similar. They are matched against each segment's shell words
+as well as the raw text, so quoting or escaping a command or flag (`"npm" publish`,
+`c\url -X POST`, `curl "-X" "POST"`) does not hide it. A mention such as `echo git push` is over-classified
 and costs a prompt. Indirection the text does not show (scripts, aliases, shell functions,
 variables such as `$CMD`, unrecognized interpreters) can evade it. Remote API permissions,
 branch protection, credential scope, OS/container isolation and managed Claude Code policy remain

@@ -212,7 +212,9 @@ export const failClosed = async ($, e, next) => {
     // approval is possible. Only effects that never need approval may continue.
     if (kind === 're-entry') {
       const effect = classifyToolCall(e.tool, toolInput(e))
-      if (disposition(effect) === 'pass') return next(e)
+      // Awaited so a rejection beneath lands in the catch and is denied below,
+      // instead of escaping the handler (a thrown handler fails open).
+      if (disposition(effect) === 'pass') return await next(e)
       return {
         deny: `Mandare denied ${effect} raised beneath its own guard: no live approval is possible there. No authority was granted.`,
       }
