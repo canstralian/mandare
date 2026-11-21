@@ -1,0 +1,522 @@
+/** @typedef {typeof Effect[keyof typeof Effect]} EffectClass */
+/** @typedef {Record<string, unknown>} ToolInput */
+
+export const Effect = Object.freeze({
+  READ: 'READ',
+  LOCAL_WRITE: 'LOCAL_WRITE',
+  LOCAL_EXECUTION: 'LOCAL_EXECUTION',
+  NETWORK_READ: 'NETWORK_READ',
+  EXTERNAL_WRITE: 'EXTERNAL_WRITE',
+  DESTRUCTIVE: 'DESTRUCTIVE',
+  UNKNOWN: 'UNKNOWN',
+})
+
+const SAFE_BUILTINS = new Map([
+  ['Read', Effect.READ],
+  ['Glob', Effect.READ],
+  ['Grep', Effect.READ],
+  ['LS', Effect.READ],
+  ['NotebookRead', Effect.READ],
+  ['Skill', Effect.READ],
+  ['AskUserQuestion', Effect.READ],
+  ['TodoRead', Effect.READ],
+  ['TaskOutput', Effect.READ],
+  ['TaskGet', Effect.READ],
+  ['TaskList', Effect.READ],
+  ['ToolSearch', Effect.READ],
+  ['LSP', Effect.READ],
+  ['ListMcpResources', Effect.NETWORK_READ],
+  ['ReadMcpResource', Effect.NETWORK_READ],
+  ['ListMcpResourcesTool', Effect.NETWORK_READ],
+  ['ReadMcpResourceTool', Effect.NETWORK_READ],
+  ['ReadMcpResourceDirTool', Effect.NETWORK_READ],
+  ['WebFetch', Effect.NETWORK_READ],
+  ['WebSearch', Effect.NETWORK_READ],
+  ['Edit', Effect.LOCAL_WRITE],
+  ['Write', Effect.LOCAL_WRITE],
+  ['MultiEdit', Effect.LOCAL_WRITE],
+  ['NotebookEdit', Effect.LOCAL_WRITE],
+  ['TodoWrite', Effect.LOCAL_WRITE],
+  ['TaskCreate', Effect.LOCAL_WRITE],
+  ['TaskUpdate', Effect.LOCAL_WRITE],
+  ['TaskStop', Effect.LOCAL_WRITE],
+  ['Task', Effect.LOCAL_EXECUTION],
+  ['Agent', Effect.LOCAL_EXECUTION],
+  ['KillShell', Effect.LOCAL_EXECUTION],
+  ['EnterPlanMode', Effect.READ],
+  ['ExitPlanMode', Effect.READ],
+])
+
+// git, gh and rm are analysed token by token (see classifyCommandTokens), so
+// global options such as `git -C dir push` or wrappers such as `sudo` cannot
+// hide them. These patterns cover the remaining tools.
+const DESTRUCTIVE_BASH = [
+  /\bterraform\s+destroy\b/i,
+  /\bkubectl\s+delete\b/i,
+  /\b(?:drop\s+(?:database|table)|truncate\s+table)\b/i,
+  /\bmkfs(?:\.[A-Za-z0-9_-]+)?\b/i,
+  /\bdd\b[^\n;&|]*\bof=\/dev\//i,
+]
+
+const EXTERNAL_WRITE_BASH = [
+  /\b(?:npm|pnpm)\s+publish\b/i,
+  /\byarn\s+npm\s+publish\b/i,
+  /\btwine\s+upload\b/i,
+  /\bdocker\s+push\b/i,
+  /\bkubectl\s+(?:apply|create|patch|replace|rollout\s+restart|scale)\b/i,
+  /\bterraform\s+apply\b/i,
+  /\bcurl\b[^\n;&|]*(?:-X|--request)[\s=]*(?:POST|PUT|PATCH|DELETE)\b/i,
+  // curl sends a body (implicit POST/PUT) with -d/-F/-T, alone or in a short-option cluster.
+  // Case-sensitive on purpose: -f (fail) and -D (dump headers) are not body flags.
+  /\bcurl\b[^\n;&|]*\s(?:-[A-Za-z]*[dFT]|--data|--form|--upload-file|--json)/,
+  /\bwget\b[^\n;&|]*\s--(?:post-data|post-file|body-data|body-file|method)\b/i,
+  /\b(?:scp|sftp)\b/i,
+  /\brsync\b[^\n;&|]*\s[^\s]+@[^:]+:/i,
+]
+
+const NETWORK_READ_BASH = [
+  /\bcurl\b/i,
+  /\bwget\b/i,
+]
+
+/** @type {EffectClass[]} */
+const RANK = [Effect.LOCAL_EXECUTION, Effect.NETWORK_READ, Effect.EXTERNAL_WRITE, Effect.DESTRUCTIVE]
+
+/**
+ * @param {EffectClass} a
+ * @param {EffectClass} b
+ * @returns {EffectClass}
+ */
+function stronger(a, b) {
+  return RANK.indexOf(b) > RANK.indexOf(a) ? b : a
+}
+
+// Options that take a separate value, per command, so the value is not read as the subcommand.
+const GIT_VALUE_OPTIONS = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--config-env', '--super-prefix'])
+const GH_VALUE_OPTIONS = new Set(['-R', '--repo', '--hostname'])
+
+// gh subcommands that only read. Any other gh subcommand needs approval.
+const GH_READ = new Set([
+  'view', 'list', 'ls', 'status', 'checks', 'diff', 'watch', 'download', 'clone', 'checkout',
+  'browse', 'token', 'get', 'help', 'version',
+])
+
+/**
+ * Index of the first non-option token at or after `from`.
+ *
+ * @param {string[]} tokens
+ * @param {number} from
+ * @param {Set<string>} valueOptions
+ */
+function skipOptions(tokens, from, valueOptions) {
+  let i = from
+  for (let token = tokens[i]; token?.startsWith('-'); token = tokens[i]) {
+    i += valueOptions.has(token) ? 2 : 1
+  }
+  return i
+}
+
+/** @param {string[]} args @param {string} letter @param {string} long */
+function hasFlag(args, letter, long) {
+  return args.some((arg) => arg === long || arg.startsWith(long + '=') || (/^-[A-Za-z]+$/.test(arg) && arg.includes(letter)))
+}
+
+/** @param {string[]} args */
+function classifyGit(args) {
+  const at = skipOptions(args, 0, GIT_VALUE_OPTIONS)
+  const sub = args[at]
+  const rest = args.slice(at + 1)
+  if (sub === 'push') {
+    const removes = rest.some((arg) => /^--(?:force|delete|mirror|prune)/.test(arg) || /^-[A-Za-z]*[fd][A-Za-z]*$/.test(arg))
+      || rest.some((arg) => /^[+:]./.test(arg))
+    return removes ? Effect.DESTRUCTIVE : Effect.EXTERNAL_WRITE
+  }
+  if (sub === 'send-email') return Effect.EXTERNAL_WRITE
+  if (sub === 'reset' && rest.includes('--hard')) return Effect.DESTRUCTIVE
+  if (sub === 'clean' && hasFlag(rest, 'f', '--force')) return Effect.DESTRUCTIVE
+  if (sub === 'fetch' || sub === 'ls-remote') return Effect.NETWORK_READ
+  return Effect.LOCAL_EXECUTION
+}
+
+/** @param {string[]} args */
+function classifyGh(args) {
+  const at = skipOptions(args, 0, GH_VALUE_OPTIONS)
+  const group = args[at]
+  if (group === undefined || group === 'search' || GH_READ.has(group)) return Effect.NETWORK_READ
+  if (group === 'api') return classifyGhApi(args.slice(at + 1))
+  const subAt = skipOptions(args, at + 1, GH_VALUE_OPTIONS)
+  const sub = args[subAt]
+  if (sub === 'delete') return Effect.DESTRUCTIVE
+  if (sub !== undefined && GH_READ.has(sub)) return Effect.NETWORK_READ
+  return Effect.EXTERNAL_WRITE
+}
+
+/**
+ * gh api: an explicit non-GET method, or field/input flags without an explicit
+ * method (implicit POST), writes.
+ *
+ * @param {string[]} args
+ */
+function classifyGhApi(args) {
+  let method = null
+  args.forEach((arg, i) => {
+    const m = /^(?:-X|--method)=?(.*)$/.exec(arg)
+    if (m) method = (m[1] || args[i + 1] || '').toUpperCase()
+  })
+  if (method !== null) return method === 'GET' ? Effect.NETWORK_READ : Effect.EXTERNAL_WRITE
+  const sendsFields = args.some((arg) => /^(?:-f|-F|--field|--raw-field|--input)(?:=|$)/.test(arg) || /^-[fF]./.test(arg))
+  return sendsFields ? Effect.EXTERNAL_WRITE : Effect.NETWORK_READ
+}
+
+/** @param {string[]} args */
+function classifyRm(args) {
+  const recursive = hasFlag(args, 'r', '--recursive') || hasFlag(args, 'R', '--recursive')
+  return recursive && hasFlag(args, 'f', '--force') ? Effect.DESTRUCTIVE : Effect.LOCAL_EXECUTION
+}
+
+/**
+ * Looks at every position in a command segment, not only the first word, so
+ * `sudo rm -rf`, `xargs git push` and `bash -c 'git push'` are still seen.
+ * A mention such as `echo git push` is over-classified; that costs a prompt.
+ *
+ * @param {string[]} tokens
+ * @returns {EffectClass}
+ */
+function classifyCommandTokens(tokens) {
+  let effect = /** @type {EffectClass} */ (Effect.LOCAL_EXECUTION)
+  tokens.forEach((token, i) => {
+    const program = token.split('/').at(-1)
+    const args = tokens.slice(i + 1)
+    if (program === 'git') effect = stronger(effect, classifyGit(args))
+    else if (program === 'gh') effect = stronger(effect, classifyGh(args))
+    else if (program === 'rm') effect = stronger(effect, classifyRm(args))
+    else if (program === 'find' && args.includes('-delete')) effect = stronger(effect, Effect.DESTRUCTIVE)
+  })
+  return effect
+}
+
+/** @param {string[]} args */
+function envUsesSplitString(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? ''
+    if (arg === '--' || !arg.startsWith('-') || arg === '-') break
+    if (arg.startsWith('--')) {
+      if (/^--s/.test(arg)) return true
+      if (!arg.includes('=') && ['--unset', '--chdir', '--argv0'].some((option) => option.startsWith(arg))) i += 1
+      continue
+    }
+    for (let at = 1; at < arg.length; at += 1) {
+      const flag = arg[at]
+      if (flag === 'S') return true
+      if (flag === 'u' || flag === 'C' || flag === 'a') {
+        if (at === arg.length - 1) i += 1
+        break
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Up to `n` characters from `at`, skipping the backslash-newline line
+ * continuations bash removes before it tokenizes, so `<\`+newline+`<` still
+ * reads as `<<`. Bounded by `n`: no slicing of the rest of the command.
+ *
+ * @param {string} command
+ * @param {number} at
+ * @param {number} [n]
+ * @returns {string}
+ */
+function peek(command, at, n = 1) {
+  let text = ''
+  for (let i = at; text.length < n && i < command.length; i += 1) {
+    if (command[i] === '\\' && command[i + 1] === '\n') i += 1
+    else text += command[i]
+  }
+  return text
+}
+
+// A plain name or positional parameter, its length, or an array's element count.
+// Other subscripts are evaluated as arithmetic, which can run command substitutions.
+const PLAIN_PARAMETER = /^(?:#?(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]+)|#[A-Za-z_][A-Za-z0-9_]*\[[@*]\])$/
+
+/**
+ * True when the `$` just before `at` starts an expansion that can rewrite words
+ * the text does not show: any `${...}` other than a plain name, positional
+ * parameter or `${#name}` length (`${x:-git} push` runs git push), and any
+ * expansion of IFS (`git${IFS}push` splits into `git push`). A plain `$NAME`
+ * remains a documented limit: its value is not in the text at all.
+ *
+ * @param {string} command
+ * @param {number} at
+ */
+function rewritingExpansion(command, at) {
+  const next = peek(command, at, 4)
+  if (next.startsWith('{')) {
+    const open = command.indexOf('{', at)
+    const close = command.indexOf('}', open + 1)
+    if (close === -1) return true
+    const body = command.slice(open + 1, close)
+    return !PLAIN_PARAMETER.test(body) || /^#?IFS$/.test(body)
+  }
+  return /^IFS(?![A-Za-z0-9_])/.test(next)
+}
+
+/**
+ * True when the unquoted `{` at `at` starts a brace expansion, which turns one
+ * word into several (`{git,} push` runs git push). Bash expands only when the
+ * `{` is not followed by a blank and the braces hold a `,` or `..`; `{}`,
+ * `HEAD@{1}` and `{ cmd; }` groups stay literal.
+ *
+ * @param {string} command
+ * @param {number} at
+ */
+function braceExpands(command, at) {
+  if (/\s/.test(command.charAt(at + 1))) return false
+  const close = command.indexOf('}', at + 1)
+  if (close === -1) return false
+  const body = command.slice(at + 1, close)
+  return body.includes(',') || body.includes('..')
+}
+
+/**
+ * Preserve shell word boundaries before looking for commands. Only recognized
+ * shell -c operands are reparsed as shell source, bounded to four levels.
+ * This remains conservative classification, not a complete shell parser.
+ *
+ * @param {string} command
+ * @param {number} [depth]
+ * @returns {string[][] | null}
+ */
+function commandSegments(command, depth = 0) {
+  /** @type {string[][]} */
+  const segments = []
+  /** @type {string[]} */
+  let tokens = []
+  let word = ''
+  let started = false
+  /** @type {"'" | '"' | null} */
+  let quote = null
+  const finishWord = () => {
+    if (started) tokens.push(word)
+    word = ''
+    started = false
+  }
+  const finishSegment = () => {
+    finishWord()
+    if (tokens.length > 0) segments.push(tokens)
+    tokens = []
+  }
+
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command.charAt(i)
+    if (ch === '\\' && quote !== "'") {
+      const next = command[i + 1]
+      if (next === undefined) return null
+      if (quote === '"' && !['$', '`', '"', '\\', '\n'].includes(next)) {
+        word += ch
+        started = true
+      } else {
+        if (next !== '\n') {
+          word += next
+          started = true
+        }
+        i += 1
+      }
+    } else if (quote !== "'" && (ch === '`' || (ch === '$' && /^(?:\\\n)*\(/.test(command.slice(i + 1))))) {
+      // Substitutions have their own quote state and can change word boundaries.
+      // Do not mistake their contents for literal operands or outer shell source.
+      return null
+    } else if (quote === null && ch === '$' && peek(command, i + 1) === "'") {
+      // ANSI-C quoting ($'...') has backslash escapes, including \', that plain
+      // single quotes lack. Unmodeled, it could make a later # look like a comment.
+      return null
+    } else if (quote !== "'" && ch === '$' && rewritingExpansion(command, i + 1)) {
+      return null
+    } else if (quote !== null) {
+      if (ch === quote) quote = null
+      else word += ch
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      started = true
+    } else if (ch === '<' && peek(command, i + 1) === '<') {
+      // Heredoc and here-string bodies have their own quoting rules, which this
+      // lexer does not model. A quote inside one must not change later parsing.
+      // A line continuation between the two < still forms the operator.
+      return null
+    } else if (ch === '#' && !started && (i === 0 || /[ \t\n;&|()]/.test(command.charAt(i - 1)))) {
+      // Bash comments out the rest of the line when an unquoted # begins a word
+      // after a blank or an operator (not `${#`, not mid-word). Skipping it stops
+      // a quote in comment text from swallowing the next line's command.
+      const end = command.indexOf('\n', i)
+      if (end === -1) break
+      i = end - 1
+    } else if (ch === '{' && command.charAt(i - 1) !== '$' && braceExpands(command, i)) {
+      return null
+    } else if (/[;&|\n()`{}]/.test(ch)) {
+      finishSegment()
+    } else if (/\s/.test(ch)) {
+      finishWord()
+    } else {
+      word += ch
+      started = true
+    }
+  }
+  if (quote !== null) return null
+  finishSegment()
+
+  /** @type {string[][]} */
+  const nested = []
+  for (const segment of segments) {
+    for (let i = 0; i < segment.length; i += 1) {
+      const program = segment[i]?.split('/').at(-1)
+      const args = segment.slice(i + 1)
+      // GNU env split strings have their own escaping grammar. Attached values,
+      // short-option clusters and abbreviated long options need the same gate.
+      if (program === 'env' && envUsesSplitString(args)) return null
+      // These consumers execute strings with grammars this lexer does not model.
+      // Do not let narrowing literal inspection turn a visible write into a pass.
+      if (program === 'eval' || program === 'ssh') return null
+      if (/^(?:python(?:\d+(?:\.\d+)*)?|pypy[23]?)$/.test(program ?? '') && args.some((arg) => /^-[^-]*c/.test(arg))) return null
+      if (!['sh', 'bash', 'dash', 'ash', 'ksh', 'zsh'].includes(program ?? '')) continue
+      for (let at = 0; at < args.length; at += 1) {
+        const option = args[at] ?? ''
+        if (!/^[-+]/.test(option) || option === '--') break
+        if (/^[-+][^-+]*c/.test(option)) {
+          const script = args[at + 1]
+          if (script === undefined || /^[-+]/.test(script) || depth >= 4) return null
+          const inner = commandSegments(script, depth + 1)
+          if (inner === null) return null
+          nested.push(...inner)
+          break
+        }
+        if (['-o', '+o', '-O', '+O', '--rcfile', '--init-file'].includes(option)) at += 1
+      }
+    }
+  }
+  return [...segments, ...nested]
+}
+
+const MCP_DESTRUCTIVE = new Set([
+  'delete', 'destroy', 'purge', 'drop', 'wipe',
+])
+
+const MCP_WRITE = new Set([
+  'create', 'update', 'write', 'patch', 'put', 'post', 'send', 'forward',
+  'merge', 'close', 'reopen', 'add', 'remove', 'archive', 'restore', 'approve',
+  'dismiss', 'resolve', 'unresolve', 'enable', 'disable', 'upload',
+  'deploy', 'publish', 'trigger', 'cancel', 'invite', 'assign', 'label', 'comment',
+  'react', 'convert', 'mark', 'move', 'rename', 'set', 'submit', 'reply',
+])
+
+// Names that say the operation runs whatever it is given. A read verb beside one
+// of these proves nothing (`query_database` runs SQL), so the call is UNKNOWN.
+const MCP_OPEN_ENDED = new Set([
+  'execute', 'exec', 'run', 'sql', 'rpc', 'graphql', 'mutation', 'command', 'eval', 'script',
+  'invoke', 'database', 'db',
+])
+
+const MCP_READ = new Set([
+  'get', 'fetch', 'list', 'search', 'read', 'find', 'query', 'view', 'inspect',
+  'compare', 'download', 'check', 'lookup', 'validate', 'verify', 'status', 'diff',
+  'history', 'show', 'describe', 'count',
+])
+
+/**
+ * @param {string} tool
+ * @param {ToolInput} [input]
+ * @returns {EffectClass}
+ */
+export function classifyToolCall(tool, input = {}) {
+  if (tool === 'Bash') return classifyBash(String(input.command ?? ''))
+  if (SAFE_BUILTINS.has(tool)) return SAFE_BUILTINS.get(tool) ?? Effect.UNKNOWN
+  if (/^mcp__/i.test(tool)) return classifyMcp(tool)
+  return Effect.UNKNOWN
+}
+
+/**
+ * @param {string} command
+ * @returns {EffectClass}
+ */
+export function classifyBash(command) {
+  if (!command.trim()) return Effect.UNKNOWN
+  const segments = commandSegments(command)
+  if (segments === null) return Effect.UNKNOWN
+  // Quotes and escapes change the text but not the command bash runs
+  // (`"npm" publish`, `c\url -X POST`), so the patterns also see each segment's
+  // shell words. A separator inside a word is data, not the end of a command, so
+  // it is blanked rather than allowed to cut a pattern short before its write
+  // flag. The raw text stays in the set: this only ever adds matches.
+  const words = (/** @type {string[]} */ tokens) => tokens.map((token) => token.replace(/[\n;&|]/g, ' ')).join(' ')
+  const texts = [command, ...segments.map(words)]
+  /** @param {RegExp[]} patterns */
+  const matches = (patterns) => texts.some((text) => patterns.some((pattern) => pattern.test(text)))
+  let effect = segments.map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)
+  if (matches(DESTRUCTIVE_BASH)) effect = stronger(effect, Effect.DESTRUCTIVE)
+  if (matches(EXTERNAL_WRITE_BASH)) effect = stronger(effect, Effect.EXTERNAL_WRITE)
+  if (matches(NETWORK_READ_BASH)) effect = stronger(effect, Effect.NETWORK_READ)
+  return effect
+}
+
+/**
+ * @param {string} tool
+ * @returns {EffectClass}
+ */
+export function classifyMcp(tool) {
+  const operation = String(tool).split('__').filter(Boolean).at(-1) ?? ''
+  const tokens = operation.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[_-]+/).filter(Boolean)
+  if (tokens.some((token) => MCP_DESTRUCTIVE.has(token))) return Effect.DESTRUCTIVE
+  if (tokens.some((token) => MCP_WRITE.has(token))) return Effect.EXTERNAL_WRITE
+  if (tokens.some((token) => MCP_OPEN_ENDED.has(token))) return Effect.UNKNOWN
+  if (tokens.some((token) => MCP_READ.has(token))) return Effect.NETWORK_READ
+  return Effect.UNKNOWN
+}
+
+/**
+ * @param {object | null | undefined} event
+ * @returns {ToolInput}
+ */
+export function toolInput(event) {
+  /** @type {ToolInput} */
+  const input = {}
+  for (const [key, value] of Object.entries(event ?? {})) {
+    if (['tool', 'tool_use_id', 'agentId', 'agent_id'].includes(key)) continue
+    input[key] = value
+  }
+  return input
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']'
+  const record = /** @type {Record<string, unknown>} */ (value)
+  return '{' + Object.keys(record).sort().map((key) => JSON.stringify(key) + ':' + stableStringify(record[key])).join(',') + '}'
+}
+
+export const MAX_REVIEW_CHARS = 4000
+
+// C0/C1 controls (except tab and newline), zero-width and bidirectional
+// formatting characters can make a terminal draw something other than what runs.
+const UNSAFE_DISPLAY = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/g
+
+/**
+ * The whole invocation as a human must see it to approve it: a Bash command
+ * verbatim, any other tool as its name and canonical arguments. Characters that
+ * could alter how a terminal draws the text are shown as escapes.
+ *
+ * Returns null when the text is longer than a prompt can show for review; the
+ * guard then denies instead of asking someone to approve what they cannot see.
+ *
+ * @param {string} tool
+ * @param {ToolInput} input
+ * @returns {string | null}
+ */
+export function reviewText(tool, input) {
+  const raw = tool === 'Bash' ? String(input.command ?? '') : `${tool} ${stableStringify(input)}`
+  const visible = raw.replace(UNSAFE_DISPLAY, (ch) => `\\u{${ch.codePointAt(0)?.toString(16)}}`)
+  return visible.length > MAX_REVIEW_CHARS ? null : visible
+}
