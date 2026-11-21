@@ -218,6 +218,68 @@ function envUsesSplitString(args) {
 }
 
 /**
+ * Up to `n` characters from `at`, skipping the backslash-newline line
+ * continuations bash removes before it tokenizes, so `<\`+newline+`<` still
+ * reads as `<<`. Bounded by `n`: no slicing of the rest of the command.
+ *
+ * @param {string} command
+ * @param {number} at
+ * @param {number} [n]
+ * @returns {string}
+ */
+function peek(command, at, n = 1) {
+  let text = ''
+  for (let i = at; text.length < n && i < command.length; i += 1) {
+    if (command[i] === '\\' && command[i + 1] === '\n') i += 1
+    else text += command[i]
+  }
+  return text
+}
+
+// A plain name or positional parameter, its length, or an array's element count.
+// Other subscripts are evaluated as arithmetic, which can run command substitutions.
+const PLAIN_PARAMETER = /^(?:#?(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]+)|#[A-Za-z_][A-Za-z0-9_]*\[[@*]\])$/
+
+/**
+ * True when the `$` just before `at` starts an expansion that can rewrite words
+ * the text does not show: any `${...}` other than a plain name, positional
+ * parameter or `${#name}` length (`${x:-git} push` runs git push), and any
+ * expansion of IFS (`git${IFS}push` splits into `git push`). A plain `$NAME`
+ * remains a documented limit: its value is not in the text at all.
+ *
+ * @param {string} command
+ * @param {number} at
+ */
+function rewritingExpansion(command, at) {
+  const next = peek(command, at, 4)
+  if (next.startsWith('{')) {
+    const open = command.indexOf('{', at)
+    const close = command.indexOf('}', open + 1)
+    if (close === -1) return true
+    const body = command.slice(open + 1, close)
+    return !PLAIN_PARAMETER.test(body) || /^#?IFS$/.test(body)
+  }
+  return /^IFS(?![A-Za-z0-9_])/.test(next)
+}
+
+/**
+ * True when the unquoted `{` at `at` starts a brace expansion, which turns one
+ * word into several (`{git,} push` runs git push). Bash expands only when the
+ * `{` is not followed by a blank and the braces hold a `,` or `..`; `{}`,
+ * `HEAD@{1}` and `{ cmd; }` groups stay literal.
+ *
+ * @param {string} command
+ * @param {number} at
+ */
+function braceExpands(command, at) {
+  if (/\s/.test(command.charAt(at + 1))) return false
+  const close = command.indexOf('}', at + 1)
+  if (close === -1) return false
+  const body = command.slice(at + 1, close)
+  return body.includes(',') || body.includes('..')
+}
+
+/**
  * Preserve shell word boundaries before looking for commands. Only recognized
  * shell -c operands are reparsed as shell source, bounded to four levels.
  * This remains conservative classification, not a complete shell parser.
@@ -265,15 +327,22 @@ function commandSegments(command, depth = 0) {
       // Substitutions have their own quote state and can change word boundaries.
       // Do not mistake their contents for literal operands or outer shell source.
       return null
+    } else if (quote === null && ch === '$' && peek(command, i + 1) === "'") {
+      // ANSI-C quoting ($'...') has backslash escapes, including \', that plain
+      // single quotes lack. Unmodeled, it could make a later # look like a comment.
+      return null
+    } else if (quote !== "'" && ch === '$' && rewritingExpansion(command, i + 1)) {
+      return null
     } else if (quote !== null) {
       if (ch === quote) quote = null
       else word += ch
     } else if (ch === '"' || ch === "'") {
       quote = ch
       started = true
-    } else if (ch === '<' && command[i + 1] === '<') {
+    } else if (ch === '<' && peek(command, i + 1) === '<') {
       // Heredoc and here-string bodies have their own quoting rules, which this
       // lexer does not model. A quote inside one must not change later parsing.
+      // A line continuation between the two < still forms the operator.
       return null
     } else if (ch === '#' && !started && (i === 0 || /[ \t\n;&|()]/.test(command.charAt(i - 1)))) {
       // Bash comments out the rest of the line when an unquoted # begins a word
@@ -282,6 +351,8 @@ function commandSegments(command, depth = 0) {
       const end = command.indexOf('\n', i)
       if (end === -1) break
       i = end - 1
+    } else if (ch === '{' && command.charAt(i - 1) !== '$' && braceExpands(command, i)) {
+      return null
     } else if (/[;&|\n()`{}]/.test(ch)) {
       finishSegment()
     } else if (/\s/.test(ch)) {
@@ -373,8 +444,11 @@ export function classifyBash(command) {
   if (segments === null) return Effect.UNKNOWN
   // Quotes and escapes change the text but not the command bash runs
   // (`"npm" publish`, `c\url -X POST`), so the patterns also see each segment's
-  // shell words. The raw text stays in the set: this only ever adds matches.
-  const texts = [command, ...segments.map((tokens) => tokens.join(' '))]
+  // shell words. A separator inside a word is data, not the end of a command, so
+  // it is blanked rather than allowed to cut a pattern short before its write
+  // flag. The raw text stays in the set: this only ever adds matches.
+  const words = (/** @type {string[]} */ tokens) => tokens.map((token) => token.replace(/[\n;&|]/g, ' ')).join(' ')
+  const texts = [command, ...segments.map(words)]
   /** @param {RegExp[]} patterns */
   const matches = (patterns) => texts.some((text) => patterns.some((pattern) => pattern.test(text)))
   let effect = segments.map(classifyCommandTokens).reduce(stronger, Effect.LOCAL_EXECUTION)

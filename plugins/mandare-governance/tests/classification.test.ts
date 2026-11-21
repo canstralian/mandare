@@ -231,3 +231,62 @@ test('quoting or escaping a command or flag cannot hide pattern-matched effects'
   ]) expect(classifyBash(command)).toBe(Effect.DESTRUCTIVE)
   expect(classifyBash('curl "https://example.test/status"')).toBe(Effect.NETWORK_READ)
 })
+
+// Second review of #195 (0341970): each command below ran a write that the
+// classifier at that commit passed through without a prompt.
+test('separators inside a quoted operand cannot end a pattern before its write flag', async () => {
+  for (const command of [
+    "c\\url 'https://example.test/?a=1&b=2' -X POST",
+    "\"curl\" 'https://example.test/?a=1;b=2' -d x",
+    "c\\url 'https://example.test/?a=1|b=2' --request=PUT",
+    "w\\get 'https://example.test/?a=1&b=2' --post-data=x",
+  ]) expect(classifyBash(command)).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("d\\d 'if=/dev/zero;x' of=/dev/sda")).toBe(Effect.DESTRUCTIVE)
+  expect(classifyBash("curl 'https://example.test/?a=1&b=2'")).toBe(Effect.NETWORK_READ)
+})
+
+test('ANSI-C quoting requires approval: its escapes are not modeled', async () => {
+  for (const command of [
+    "echo $'\\' #' ; git push origin main",
+    "echo $'it\\'s' && git push origin main",
+    "printf $'\\x41'",
+    "echo $\\\n'x'",
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  // Locale strings use double-quote rules, and a quoted $' is literal.
+  expect(classifyBash('echo $"hello" && git push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash("echo \"$'\" && git push origin main")).toBe(Effect.EXTERNAL_WRITE)
+})
+
+test('a line continuation cannot split a heredoc operator', async () => {
+  for (const command of [
+    "cat <\\\n<EOF\nit's\nEOF\ngit push origin main\n# '",
+    "cat <\\\n\\\n<EOF\nx\nEOF",
+    'wc -c <\\\n<< "x"',
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  expect(classifyBash('sort <\\\n input.txt')).toBe(Effect.LOCAL_EXECUTION)
+})
+
+test('brace and parameter expansion that can rewrite words require approval', async () => {
+  for (const command of [
+    'git {push,} origin main',
+    '{git,} push origin main',
+    'git {push..} origin main',
+    'echo {1..3} && true',
+    '${x:-git} push origin main',
+    'echo "${x:-git}"',
+    '${!name} push origin main',
+    'echo ${arr[0]}',
+    'echo ${#arr[x]}',
+    'git${IFS}push origin main',
+    'git$IFS"push" origin main',
+    'echo $\\\n{x:-git}',
+  ]) expect(classifyBash(command)).toBe(Effect.UNKNOWN)
+  // Plain variables, positional parameters, lengths and braces that bash does
+  // not expand keep their classification (plain $VAR remains a documented limit).
+  expect(classifyBash('echo ${HOME} && git push origin main')).toBe(Effect.EXTERNAL_WRITE)
+  expect(classifyBash('echo "${HOME}/x" ${#items} ${1}')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('git log HEAD@{1} @{u}..HEAD')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('find . -name "*.tmp" -exec echo {} \;')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash('{ git status; true; }')).toBe(Effect.LOCAL_EXECUTION)
+  expect(classifyBash("echo '{a,b}' \"\\${x:-y}\" \\${IFS}")).toBe(Effect.LOCAL_EXECUTION)
+})

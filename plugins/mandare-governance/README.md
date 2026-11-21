@@ -77,16 +77,21 @@ word, a quote, an escape or `${#...}` stays literal.
 Unsupported executable-string consumers (`eval`, `ssh` and Python/PyPy `-c`) require live approval
 rather than losing the protection previously provided by inspecting their embedded command text.
 Active command substitutions (including backticks), heredocs and here-strings (any unquoted `<<`,
-including `<<-` and `<<<`), GNU `env` split strings (`-S`,
+including `<<-`, `<<<` and a `<<` split by a line continuation), ANSI-C quoting (`$'...'`), brace
+expansion (`{git,} push`, `{1..3}`), parameter expansion other than a plain name, positional
+parameter, length or array count (`${x:-git}`, `${x/a/b}`, `${arr[i]}`), any expansion of `IFS`,
+GNU `env` split strings (`-S`,
 `--split-string`, attached values and short-option clusters), incomplete shell words and inputs
 beyond the nesting bound classify as `UNKNOWN` and require live approval. Single-quoted or escaped
 literal substitution markers remain literal. Patterns cover `curl` body flags and methods,
 `wget --post-*`, package publishing,
 `kubectl`/`terraform` mutations and similar. They are matched against each segment's shell words
 as well as the raw text, so quoting or escaping a command or flag (`"npm" publish`,
-`c\url -X POST`, `curl "-X" "POST"`) does not hide it. A mention such as `echo git push` is over-classified
+`c\url -X POST`, `curl "-X" "POST"`) does not hide it, and a `;`, `&`, `|` or newline inside a
+quoted operand (such as a URL query) does not end the match before a later write flag. A mention such as `echo git push` is over-classified
 and costs a prompt. Indirection the text does not show (scripts, aliases, shell functions,
-variables such as `$CMD`, unrecognized interpreters) can evade it. Remote API permissions,
+variables such as `$CMD`, unrecognized interpreters) can evade it, as can a pathname glob in a
+command name (`/usr/bin/g?t push`), whose expansion depends on the filesystem. Remote API permissions,
 branch protection, credential scope, OS/container isolation and managed Claude Code policy remain
 stronger boundaries.
 
